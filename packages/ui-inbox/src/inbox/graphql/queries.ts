@@ -1,6 +1,5 @@
 import conversationFields from './conversationFields';
 import { queries as customerQueries } from '@erxes/ui-contacts/src/customers/graphql';
-import { isEnabled } from '@erxes/ui/src/utils/core';
 import messageFields from './messageFields';
 
 export const paramsDef = `
@@ -53,8 +52,8 @@ const conversationList = `
 `;
 
 const sidebarConversations = `
-  query conversations(${listParamsDef}) {
-    conversations(${listParamsValue}) {
+  query conversations(${listParamsDef}, $skip: Int) {
+    conversations(${listParamsValue}, skip: $skip) {
       _id
       content
       status
@@ -81,9 +80,6 @@ const sidebarConversations = `
           name
         }
       }
-      ${
-        isEnabled('contacts')
-          ? `
       customer {
         _id
         firstName
@@ -95,20 +91,11 @@ const sidebarConversations = `
         avatar
         visitorContactInfo
       }
-      `
-          : ``
-      }
       tagIds
-      ${
-        isEnabled('tags')
-          ? `
       tags {
         _id
         name
         colorCode
-      }
-      `
-          : ``
       }
       readUserIds
     }
@@ -206,12 +193,15 @@ const allBrands = `
   }
 `;
 
+const tagsQueryCount = `
+  query tagsQueryCount($type: String) {
+    tagsQueryCount(type: $type)
+  }
+`;
+
 const tagList = `
-  query tags($type: String) {
-    ${
-      isEnabled('tags')
-        ? `
-    tags(type: $type) {
+  query tags($type: String, $page: Int, $perPage: Int) {
+    tags(type: $type, page: $page, perPage: $perPage) {
       _id
       name
       colorCode
@@ -219,26 +209,17 @@ const tagList = `
       parentId
       relatedIds
     }
-    `
-        : ``
-    }
   }
 `;
 
 // subOf alais as parentId
 const segmentList = `
   query segments($contentTypes: [String]!) {
-    ${
-      isEnabled('segments')
-        ? `
-        segments(contentTypes: $contentTypes) {
-          _id
-          contentType
-          name
-          parentId: subOf
-        }
-    `
-        : ``
+    segments(contentTypes: $contentTypes) {
+        _id
+        contentType
+        name
+        parentId: subOf
     }
   }
 `;
@@ -268,10 +249,30 @@ const lastConversation = `
     }
   }
 `;
+const postInfo = `
+  query facebookGetPost( $erxesApiId: String!){
+    facebookGetPost(erxesApiId: $erxesApiId){
+      _id
+      content
+      permalink_url
+      attachments
+    }
+  }
+ `;
 
+const instagramPostInfo = `
+  query instagramGetPost( $erxesApiId: String!){
+    instagramGetPost(erxesApiId: $erxesApiId){
+      _id
+      content
+      permalink_url
+      attachments
+    }
+  }
+ `;
 const responseTemplateList = `
-  query responseTemplates($perPage: Int) {
-    responseTemplates(perPage: $perPage) {
+  query responseTemplates($page: Int, $perPage: Int, $searchValue: String, $brandId:String) {
+    responseTemplates(page:$page ,perPage: $perPage, searchValue: $searchValue, brandId: $brandId) {
       _id
       name
       brandId
@@ -291,7 +292,34 @@ const convertToInfo = `
   }
 `;
 
-const generateCustomerDetailQuery = params => {
+const facebookGetComments = `
+  query facebookGetComments($conversationId: String!, $isResolved: Boolean, $commentId: String, $senderId: String, $skip: Int, $limit: Int) {
+    facebookGetComments(conversationId: $conversationId, isResolved: $isResolved, commentId: $commentId, senderId: $senderId, skip: $skip, limit: $limit) {
+      content
+      conversationId
+      postId
+      recipientId
+      senderId
+      erxesApiId
+      attachments
+      timestamp
+      permalink_url
+      content
+      commentId
+      parentId
+      customer {
+        _id
+        firstName
+        lastName
+        profilePic
+      }
+      commentCount
+      isResolved
+    }
+  }
+`;
+
+const generateCustomerDetailQuery = (params) => {
   const {
     showDeviceProperties = false,
     showTrackedData = false,
@@ -334,9 +362,7 @@ const generateCustomerDetailQuery = params => {
   if (showCompanies) {
     fields = `
       ${fields}
-      ${
-        isEnabled('contacts')
-          ? `companies {
+      companies {
           _id
           primaryName
           website
@@ -348,9 +374,7 @@ const generateCustomerDetailQuery = params => {
             lastName
             primaryEmail
           }
-        }`
-          : ``
-      }
+        }
     `;
   }
 
@@ -358,16 +382,10 @@ const generateCustomerDetailQuery = params => {
     fields = `
       ${fields}
       tagIds
-      ${
-        isEnabled('tags')
-          ? `
-          getTags {
-            _id
-            name
-            colorCode
-          }
-        `
-          : ``
+      getTags {
+        _id
+        name
+        colorCode
       }
     `;
   }
@@ -406,12 +424,16 @@ export default {
   allBrands,
   tagList,
   segmentList,
+  facebookGetComments,
   responseTemplateList,
   conversationCounts,
   totalConversationsCount,
   unreadConversationsCount,
   lastConversation,
+  tagsQueryCount,
   channelsByMembers,
   generateCustomerDetailQuery,
-  convertToInfo
+  convertToInfo,
+  postInfo,
+  instagramPostInfo
 };

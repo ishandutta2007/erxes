@@ -1,17 +1,13 @@
-import { getSubdomain } from '@erxes/api-utils/src/core';
-import { NodeVM } from 'vm2';
-import { graphqlPubsub } from '../configs';
-import { generateModels } from '../connectionResolver';
-import { pConversationClientMessageInserted } from '../graphql/resolvers/widgetMutations';
-import {
-  sendContactsMessage,
-  sendCoreMessage,
-  sendFormsMessage
-} from '../messageBroker';
+import { getSubdomain } from "@erxes/api-utils/src/core";
+import { NodeVM } from "vm2";
+import graphqlPubsub from "@erxes/api-utils/src/graphqlPubsub";
+import { IModels, generateModels } from "../connectionResolver";
+import { pConversationClientMessageInserted } from "../graphql/resolvers/widgetMutations";
+import { sendCoreMessage } from "../messageBroker";
 
 const checkCompanyFieldsExists = async doc => {
   for (const key in doc) {
-    if (key.includes('company')) {
+    if (key.includes("company")) {
       return true;
     }
   }
@@ -20,9 +16,9 @@ const checkCompanyFieldsExists = async doc => {
 };
 
 const createCustomer = (subdomain, data) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'customers.createCustomer',
+    action: "customers.createCustomer",
     isRPC: true,
     data
   });
@@ -37,9 +33,9 @@ const updateCustomer = ({
   _id: string;
   doc;
 }) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'customers.updateCustomer',
+    action: "customers.updateCustomer",
     isRPC: true,
     data: {
       _id,
@@ -49,18 +45,18 @@ const updateCustomer = ({
 };
 
 const findCustomer = (subdomain, data) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'customers.findOne',
+    action: "customers.findOne",
     isRPC: true,
     data
   });
 };
 
 const createCompany = (subdomain, data) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'companies.createCompany',
+    action: "companies.createCompany",
     isRPC: true,
     data
   });
@@ -75,9 +71,9 @@ const updateCompany = ({
   _id: string;
   doc;
 }) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'companies.updateCompany',
+    action: "companies.updateCompany",
     isRPC: true,
     data: {
       _id,
@@ -87,9 +83,9 @@ const updateCompany = ({
 };
 
 const findCompany = (subdomain, data) => {
-  return sendContactsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'companies.findOne',
+    action: "companies.findOne",
     isRPC: true,
     data
   });
@@ -119,7 +115,12 @@ const solveCustomFieldsData = (customFieldsData, prevCustomFieldsData) => {
 
 const webhookMiddleware = async (req, res, next) => {
   const subdomain = getSubdomain(req);
-  const models = await generateModels(subdomain);
+  let models: IModels;
+  try {
+    models = await generateModels(subdomain);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 
   try {
     const integration = await models.Integrations.findOne({
@@ -127,7 +128,7 @@ const webhookMiddleware = async (req, res, next) => {
     });
 
     if (!integration) {
-      return next(new Error('Invalid request'));
+      return next(new Error("Invalid request"));
     }
 
     const webhookData = integration.webhookData;
@@ -137,7 +138,7 @@ const webhookMiddleware = async (req, res, next) => {
       (!Object.values(req.headers).includes(webhookData.token) &&
         !Object.values(req.headers).includes(webhookData.origin))
     ) {
-      return next(new Error('Invalid request'));
+      return next(new Error("Invalid request"));
     }
 
     const params = req.body;
@@ -156,12 +157,12 @@ const webhookMiddleware = async (req, res, next) => {
     if (params.customFields) {
       customFieldsData = await Promise.all(
         params.customFields.map(async element => {
-          const customField = await sendFormsMessage({
+          const customField = await sendCoreMessage({
             subdomain,
-            action: 'fields.findOne',
+            action: "fields.findOne",
             data: {
               query: {
-                contentType: 'contacts:customer',
+                contentType: "core:customer",
                 text: element.name
               }
             },
@@ -171,7 +172,7 @@ const webhookMiddleware = async (req, res, next) => {
           if (customField) {
             let value = element.value;
 
-            if (customField.validation === 'date') {
+            if (customField.validation === "date") {
               value = new Date(element.value);
             }
 
@@ -189,12 +190,12 @@ const webhookMiddleware = async (req, res, next) => {
 
     // prepare customFieldsData and trackedData
     if (params.data) {
-      const data = await sendFormsMessage({
+      const data = await sendCoreMessage({
         subdomain,
-        action: 'fields.generateCustomFieldsData',
+        action: "fields.generateCustomFieldsData",
         data: {
           customData: params.data,
-          contentType: 'contacts:customer'
+          contentType: "core:customer"
         },
         isRPC: true
       });
@@ -257,10 +258,10 @@ const webhookMiddleware = async (req, res, next) => {
           content: params.content
         });
       } else {
-        if (conversation.status === 'closed') {
+        if (conversation.status === "closed") {
           await models.Conversations.updateOne(
             { _id: conversation._id },
-            { status: 'open' }
+            { status: "open" }
           );
         }
       }
@@ -277,15 +278,17 @@ const webhookMiddleware = async (req, res, next) => {
         messageDoc.formWidgetData = params.formContent;
       }
 
-      const message = await models.ConversationMessages.createMessage(
-        messageDoc
-      );
+      const message =
+        await models.ConversationMessages.createMessage(messageDoc);
 
       await pConversationClientMessageInserted(models, subdomain, message);
 
-      graphqlPubsub.publish('conversationMessageInserted', {
-        conversationMessageInserted: message
-      });
+      graphqlPubsub.publish(
+        `conversationMessageInserted:${message.conversationId}`,
+        {
+          conversationMessageInserted: message
+        }
+      );
     }
 
     // company
@@ -304,12 +307,12 @@ const webhookMiddleware = async (req, res, next) => {
       };
 
       if (params.parentCompany.companyData) {
-        parentCompanyData = await sendFormsMessage({
+        parentCompanyData = await sendCoreMessage({
           subdomain,
-          action: 'fields.generateCustomFieldsData',
+          action: "fields.generateCustomFieldsData",
           data: {
             customData: params.parentCompany.companyData,
-            contentType: 'contacts:company'
+            contentType: "core:company"
           },
           isRPC: true
         });
@@ -359,12 +362,12 @@ const webhookMiddleware = async (req, res, next) => {
       };
 
       if (params.companyData) {
-        companyData = await sendFormsMessage({
+        companyData = await sendCoreMessage({
           subdomain,
-          action: 'fields.generateCustomFieldsData',
+          action: "fields.generateCustomFieldsData",
           data: {
             customData: params.companyData,
-            contentType: 'contacts:company'
+            contentType: "core:company"
           },
           isRPC: true
         });
@@ -421,11 +424,11 @@ const webhookMiddleware = async (req, res, next) => {
     if (company && customer) {
       await sendCoreMessage({
         subdomain,
-        action: 'conformities.editConformity',
+        action: "conformities.editConformity",
         data: {
-          mainType: 'customer',
+          mainType: "customer",
           mainTypeId: customer._id,
-          relType: 'company',
+          relType: "company",
           relTypeIds: [company._id]
         },
         isRPC: true,
@@ -433,7 +436,7 @@ const webhookMiddleware = async (req, res, next) => {
       });
     }
 
-    return res.send('ok');
+    return res.send("ok");
   } catch (e) {
     return next(e);
   }

@@ -1,24 +1,22 @@
-import * as compose from 'lodash.flowright';
+import * as compose from "lodash.flowright";
 
-import { Alert, confirm, withProps } from '@erxes/ui/src/utils';
+import { Alert, confirm, withProps } from "@erxes/ui/src/utils";
+import { IButtonMutateProps, MutationVariables } from "@erxes/ui/src/types";
+import { mutations, queries } from "../graphql";
+
+import { AppConsumer } from "coreui/appContext";
+import ButtonMutate from "@erxes/ui/src/components/ButtonMutate";
 import {
-  IButtonMutateProps,
-  IRouterProps,
-  MutationVariables
-} from '@erxes/ui/src/types';
-import { mutations, queries } from '../graphql';
-
-import { AppConsumer } from 'coreui/appContext';
-import ButtonMutate from '@erxes/ui/src/components/ButtonMutate';
-import { ChannelsCountQueryResponse } from '../types';
-import { ChannelsQueryResponse } from '@erxes/ui-inbox/src/settings/channels/types';
-import React from 'react';
-import { RemovePipelineLabelMutationResponse } from '@erxes/ui-cards/src/boards/types';
-import Sidebar from '../components/Sidebar';
-import { gql } from '@apollo/client';
-import { graphql } from '@apollo/client/react/hoc';
-import inboxQueries from '@erxes/ui-inbox/src/inbox/graphql/queries';
-import { withRouter } from 'react-router-dom';
+  ChannelsCountQueryResponse,
+  ChannelsRemoveMutationResponse
+} from "../types";
+import { ChannelsQueryResponse } from "@erxes/ui-inbox/src/settings/channels/types";
+import React from "react";
+import Sidebar from "../components/Sidebar";
+import { gql } from "@apollo/client";
+import { graphql } from "@apollo/client/react/hoc";
+import inboxQueries from "@erxes/ui-inbox/src/inbox/graphql/queries";
+import { useNavigate } from "react-router-dom";
 
 type Props = {
   queryParams: any;
@@ -30,8 +28,7 @@ type FinalProps = {
   channelsQuery: ChannelsQueryResponse;
   channelsCountQuery: ChannelsCountQueryResponse;
 } & Props &
-  IRouterProps &
-  RemovePipelineLabelMutationResponse;
+  ChannelsRemoveMutationResponse;
 
 const SidebarContainer = (props: FinalProps) => {
   const {
@@ -39,24 +36,25 @@ const SidebarContainer = (props: FinalProps) => {
     channelsCountQuery,
     removeMutation,
     queryParams,
-    history,
     currentChannelId,
     currentUserId
   } = props;
-
+  const navigate = useNavigate();
   const channels = channelsQuery.channels || [];
   const channelsTotalCount = channelsCountQuery.channelsTotalCount || 0;
 
   // remove action
   const remove = channelId => {
-    confirm().then(() => {
+    confirm("This will permanently delete are you absolutely sure?", {
+      hasDeleteConfirm: true
+    }).then(() => {
       removeMutation({
         variables: { _id: channelId }
       })
         .then(() => {
-          Alert.success('You successfully deleted a channel.');
+          Alert.success("You successfully deleted a channel.");
 
-          history.push('/settings/channels');
+          navigate("/settings/channels");
         })
         .catch(error => {
           Alert.error(error.message);
@@ -84,7 +82,7 @@ const SidebarContainer = (props: FinalProps) => {
         isSubmitted={isSubmitted}
         type="submit"
         successMessage={`You successfully ${
-          object ? 'updated' : 'added'
+          object ? "updated" : "added"
         } a ${name}`}
       />
     );
@@ -124,7 +122,7 @@ const getRefetchQueries = (
     },
     {
       query: gql(queries.channelDetail),
-      variables: { _id: currentChannelId || '' }
+      variables: { _id: currentChannelId || "" }
     },
     { query: gql(queries.channelsCount) },
     {
@@ -139,22 +137,22 @@ const WithProps = withProps<Props>(
     graphql<Props, ChannelsQueryResponse, { perPage: number }>(
       gql(queries.channels),
       {
-        name: 'channelsQuery',
+        name: "channelsQuery",
         options: ({ queryParams }: { queryParams: any }) => ({
           variables: {
             perPage: queryParams.limit ? parseInt(queryParams.limit, 10) : 20
           },
-          fetchPolicy: 'network-only'
+          fetchPolicy: "network-only"
         })
       }
     ),
     graphql<Props, ChannelsCountQueryResponse, {}>(gql(queries.channelsCount), {
-      name: 'channelsCountQuery'
+      name: "channelsCountQuery"
     }),
     graphql<Props, RemovePipelineLabelMutationResponse, MutationVariables>(
       gql(mutations.channelRemove),
       {
-        name: 'removeMutation',
+        name: "removeMutation",
         options: ({ queryParams, currentChannelId, currentUserId }: Props) => ({
           refetchQueries: getRefetchQueries(
             queryParams,
@@ -164,7 +162,7 @@ const WithProps = withProps<Props>(
         })
       }
     )
-  )(withRouter<FinalProps>(SidebarContainer))
+  )(SidebarContainer)
 );
 
 export default (props: Props) => (
@@ -172,7 +170,7 @@ export default (props: Props) => (
     {({ currentUser }) => (
       <WithProps
         {...props}
-        currentUserId={(currentUser && currentUser._id) || ''}
+        currentUserId={(currentUser && currentUser._id) || ""}
       />
     )}
   </AppConsumer>

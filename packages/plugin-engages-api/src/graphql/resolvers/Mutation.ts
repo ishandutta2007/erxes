@@ -1,30 +1,28 @@
-import { checkPermission } from '@erxes/api-utils/src/permissions';
-import { IContext } from '../../connectionResolver';
-import { putCreateLog, putDeleteLog, putUpdateLog } from '../../logUtils';
-
-import { IEngageMessage } from '../../models/definitions/engages';
-import { CAMPAIGN_KINDS } from '../../constants';
-import { checkCampaignDoc, send } from '../../engageUtils';
+import { checkPermission } from "@erxes/api-utils/src/permissions";
+import { IContext } from "../../connectionResolver";
+import { putCreateLog, putDeleteLog, putUpdateLog } from "../../logUtils";
+import { sendToWebhook } from "@erxes/api-utils/src";
+import { debugError } from "@erxes/api-utils/src/debuggers";
+import { CAMPAIGN_KINDS } from "../../constants";
+import { checkCampaignDoc, send } from "../../engageUtils";
 import {
-  sendContactsMessage,
   sendCoreMessage,
-  sendLogsMessage,
-  sendToWebhook
-} from '../../messageBroker';
+  sendImapMessage
+} from "../../messageBroker";
+import { IEngageMessage } from "../../models/definitions/engages";
+import { sendEmail } from "../../sender";
+import { awsRequests } from "../../trackers/engageTracker";
 import {
-  updateConfigs,
   createTransporter,
-  getEditorAttributeUtil
-} from '../../utils';
-import { awsRequests } from '../../trackers/engageTracker';
-import { debug } from '../../configs';
-import { sendEmail } from '../../sender';
+  getEditorAttributeUtil,
+  updateConfigs
+} from "../../utils";
 
 interface IEngageMessageEdit extends IEngageMessage {
   _id: string;
 }
 
-const MODULE_ENGAGE = 'engage';
+const MODULE_ENGAGE = "engage";
 
 interface ITestEmailParams {
   from: string;
@@ -65,8 +63,8 @@ const engageMutations = {
     await sendToWebhook({
       subdomain,
       data: {
-        action: 'create',
-        type: 'engages:engageMessages',
+        action: "create",
+        type: "engages:engageMessages",
         params: engageMessage
       }
     });
@@ -152,15 +150,24 @@ const engageMutations = {
   async engageMessageSetLive(
     _root,
     { _id }: { _id: string },
-    { models, subdomain }: IContext
+    { models, subdomain, user }: IContext
   ) {
     const campaign = await models.EngageMessages.getEngageMessage(_id);
 
     if (campaign.isLive) {
-      throw new Error('Campaign is already live');
+      throw new Error("Campaign is already live");
     }
 
     await checkCampaignDoc(models, subdomain, campaign);
+
+    await sendCoreMessage({
+      subdomain,
+      action: "registerOnboardHistory",
+      data: {
+        type: "setCampaignLive",
+        user
+      }
+    });
 
     return models.EngageMessages.engageMessageSetLive(_id);
   },
@@ -168,7 +175,11 @@ const engageMutations = {
   /**
    * Engage message set pause
    */
-  engageMessageSetPause(_root, { _id }: { _id: string }, { models }: IContext) {
+  async engageMessageSetPause(
+    _root,
+    { _id }: { _id: string },
+    { models }: IContext
+  ) {
     return models.EngageMessages.engageMessageSetPause(_id);
   },
 
@@ -201,7 +212,7 @@ const engageMutations = {
           isLive: draftCampaign.isLive,
           isDraft: draftCampaign.isDraft
         },
-        description: `Campaign "${draftCampaign.title}" has been set live`
+        description: `Broadcast "${draftCampaign.title}" has been set live`
       },
       user
     );
@@ -212,7 +223,7 @@ const engageMutations = {
   async engagesUpdateConfigs(_root, { configsMap }, { models }: IContext) {
     await updateConfigs(models, configsMap);
 
-    return { status: 'ok' };
+    return { status: "ok" };
   },
 
   /**
@@ -247,40 +258,48 @@ const engageMutations = {
     { subdomain, models }: IContext
   ) {
     const { content, from, to, title } = args;
-
     if (!(content && from && to && title)) {
       throw new Error(
-        'Email content, title, from address or to address is missing'
+        "Email content, title, from address or to address is missing"
       );
     }
 
     let replacedContent = content;
 
-    const customer = await sendContactsMessage({
-      isRPC: true,
-      subdomain,
-      action: 'customers.findOne',
-      data: { customerPrimaryEmail: to }
-    });
+    const emails = to.split(",");
+    if (emails.length > 1) {
+      throw new Error("Test email can only be sent to one recipient");
+    }
 
     const targetUser = await sendCoreMessage({
       data: { email: to },
-      action: 'users.findOne',
+      action: "users.findOne",
       subdomain,
-      isRPC: true
+      isRPC: true,
+      defaultValue: null
     });
+
+    const fromUser = await sendCoreMessage({
+      data: { email: from },
+      action: "users.findOne",
+      subdomain,
+      isRPC: true,
+      defaultValue: null
+    });
+
+    if (!targetUser && !fromUser) {
+      throw new Error("User not found");
+    }
 
     const attributeUtil = await getEditorAttributeUtil(subdomain);
 
     replacedContent = await attributeUtil.replaceAttributes({
       content,
-      customer,
       user: targetUser
     });
 
     try {
       const transporter = await createTransporter(models);
-
       const response = await transporter.sendMail({
         from,
         to,
@@ -288,10 +307,9 @@ const engageMutations = {
         html: content,
         content: replacedContent
       });
-
       return JSON.stringify(response);
     } catch (e) {
-      debug.error(e.message);
+      debugError(e.message);
 
       return e;
     }
@@ -309,7 +327,7 @@ const engageMutations = {
       ...sourceCampaign.toObject(),
       createdAt: new Date(),
       createdBy: user._id,
-      title: `${sourceCampaign.title}-copied`,
+      title: `${sourceCampaign.title} - duplicated`,
       isDraft: true,
       isLive: false,
       runCount: 0,
@@ -355,28 +373,27 @@ const engageMutations = {
     { user, models, subdomain }: IContext
   ) {
     const { body, customerId, ...doc } = args;
-
     const customerQuery = customerId
       ? { _id: customerId }
       : { primaryEmail: doc.to };
 
-    const customer = await sendContactsMessage({
+    const customer = await sendCoreMessage({
       subdomain,
-      action: 'customers.findOne',
+      action: "customers.findOne",
       data: customerQuery,
       isRPC: true
     });
 
-    doc.body = body || '';
+    doc.body = body || "";
 
     try {
-      await sendEmail(models, {
+      await sendEmail(subdomain, models, {
         fromEmail: doc.from || '',
         email: {
           content: doc.body,
           subject: doc.subject,
           attachments: doc.attachments,
-          sender: doc.from || '',
+          sender: doc.from || "",
           cc: doc.cc || [],
           bcc: doc.bcc || []
         },
@@ -386,13 +403,13 @@ const engageMutations = {
         title: doc.subject
       });
     } catch (e) {
-      debug.error(e);
+      debugError(e);
       throw e;
     }
 
-    const customerIds = await sendContactsMessage({
+    const customerIds = await sendCoreMessage({
       subdomain,
-      action: 'customers.getCustomerIds',
+      action: "customers.getCustomerIds",
       data: {
         primaryEmail: { $in: doc.to }
       },
@@ -402,59 +419,74 @@ const engageMutations = {
     doc.userId = user._id;
 
     for (const cusId of customerIds) {
-      await sendLogsMessage({
+      await sendCoreMessage({
         subdomain,
-        action: 'emailDeliveries.create',
+        action: "emailDeliveries.create",
         data: {
           ...doc,
           customerId: cusId,
-          kind: 'transaction',
-          status: 'pending'
+          kind: "transaction",
+          status: "pending"
         },
         isRPC: true
       });
     }
 
+    if (doc.integrationId) {
+      try {
+        const imapSendMail = await sendImapMessage({
+          subdomain,
+          action: "imapMessage.create",
+          data: {
+            ...doc
+          },
+          isRPC: true
+        });
+        return imapSendMail;
+      } catch (e) {
+        throw e;
+      }
+    }
     return;
   }
 };
 
-checkPermission(engageMutations, 'engageMessageAdd', 'engageMessageAdd');
-checkPermission(engageMutations, 'engageSendMail', 'engageMessageAdd');
-checkPermission(engageMutations, 'engageMessageEdit', 'engageMessageEdit');
-checkPermission(engageMutations, 'engageMessageRemove', 'engageMessageRemove');
+checkPermission(engageMutations, "engageMessageAdd", "engageMessageAdd");
+checkPermission(engageMutations, "engageSendMail", "engageMessageAdd");
+checkPermission(engageMutations, "engageMessageEdit", "engageMessageEdit");
+checkPermission(engageMutations, "engageMessageRemove", "engageMessageRemove");
 checkPermission(
   engageMutations,
-  'engageMessageSetLive',
-  'engageMessageSetLive'
+  "engageMessageSetLive",
+  "engageMessageSetLive"
 );
 checkPermission(
   engageMutations,
-  'engageMessageSetPause',
-  'engageMessageSetPause'
+  "engageMessageSetPause",
+  "engageMessageSetPause"
 );
 checkPermission(
   engageMutations,
-  'engageMessageSetLiveManual',
-  'engageMessageSetLiveManual'
+  "engageMessageSetLiveManual",
+  "engageMessageSetLiveManual"
 );
 checkPermission(
   engageMutations,
-  'engageMessageVerifyEmail',
-  'engageMessageRemove'
+  "engageMessageVerifyEmail",
+  "engageMessageRemove"
 );
 checkPermission(
   engageMutations,
-  'engageMessageRemoveVerifiedEmail',
-  'engageMessageRemove'
-);
-
-checkPermission(
-  engageMutations,
-  'engageMessageSendTestEmail',
-  'engageMessageRemove'
+  "engageMessageRemoveVerifiedEmail",
+  "engageMessageRemove"
 );
 
-checkPermission(engageMutations, 'engageMessageCopy', 'engageMessageAdd');
+checkPermission(
+  engageMutations,
+  "engageMessageSendTestEmail",
+  "engageMessageRemove"
+);
+
+checkPermission(engageMutations, "engageMessageCopy", "engageMessageAdd");
 
 export default engageMutations;

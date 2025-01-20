@@ -11,6 +11,7 @@ interface IDocument {
   name: string;
   content: string;
   replacer: string;
+  code?: string;
 }
 
 export interface IDocumentDocument extends IDocument, Document {
@@ -25,8 +26,12 @@ const documentSchema = new Schema({
   subType: { type: String, optional: true },
   name: { type: String },
   content: { type: String },
-  replacer: { type: String }
+  replacer: { type: String },
+  code: { type: String },
+
 });
+
+documentSchema.index({ code: 1}, { unique: true});
 
 export interface IDocumentModel extends Model<IDocumentDocument> {
   saveDocument({ _id, doc }): void;
@@ -39,7 +44,7 @@ export const loadDocumentClass = models => {
      */
     public static async saveDocument({ _id, doc }) {
       if (_id) {
-        await models.Documents.update({ _id }, { $set: doc });
+        await models.Documents.updateOne({ _id }, { $set: doc });
         return models.Documents.findOne({ _id });
       }
 

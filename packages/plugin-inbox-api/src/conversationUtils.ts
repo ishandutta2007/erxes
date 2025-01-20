@@ -1,18 +1,12 @@
-import * as _ from 'underscore';
-import { CONVERSATION_STATUSES } from './models/definitions/constants';
-
-import { IListArgs } from './conversationQueryBuilder';
-import { fixDate } from '@erxes/api-utils/src';
-
-import { debug } from './configs';
-import {
-  sendCoreMessage,
-  sendSegmentsMessage,
-  sendTagsMessage
-} from './messageBroker';
-import { IModels } from './connectionResolver';
-import { fetchEs } from '@erxes/api-utils/src/elasticsearch';
-import { getIntegrationsKinds } from './utils';
+import * as _ from "underscore";
+import { CONVERSATION_STATUSES } from "./models/definitions/constants";
+import { IListArgs } from "./conversationQueryBuilder";
+import { fixDate } from "@erxes/api-utils/src";
+import { sendCoreMessage } from "./messageBroker";
+import { IModels } from "./connectionResolver";
+import { fetchEs } from "@erxes/api-utils/src/elasticsearch";
+import { getIntegrationsKinds } from "./utils";
+import { debugError } from "@erxes/api-utils/src/debuggers";
 
 export interface ICountBy {
   [index: string]: number;
@@ -50,7 +44,7 @@ const countByBrands = async (
 ): Promise<ICountBy> => {
   const brands = await sendCoreMessage({
     subdomain,
-    action: 'brands.find',
+    action: "brands.find",
     data: {
       query: {}
     },
@@ -74,11 +68,11 @@ const countByTags = async (
   qb: any,
   counts: ICountBy
 ): Promise<ICountBy> => {
-  const tags = await sendTagsMessage({
+  const tags = await sendCoreMessage({
     subdomain,
-    action: 'find',
+    action: "tagFind",
     data: {
-      type: 'inbox:conversation'
+      type: "inbox:conversation"
     },
     isRPC: true
   });
@@ -118,11 +112,11 @@ export const countBySegment = async (
   // Count cocs by segments
   let segments: any[] = [];
 
-  segments = await sendSegmentsMessage({
+  segments = await sendCoreMessage({
     subdomain,
-    action: 'find',
+    action: "segmentFind",
     data: {
-      contentType: 'inbox:conversation'
+      contentType: "inbox:conversation"
     },
     isRPC: true
   });
@@ -134,7 +128,7 @@ export const countBySegment = async (
       await qb.segmentFilter(s._id);
       counts[s._id] = await qb.runQueries();
     } catch (e) {
-      debug.error(`Error during segment count ${e.message}`);
+      debugError(`Error during segment count ${e.message}`);
       counts[s._id] = 0;
     }
   }
@@ -155,23 +149,23 @@ export const countByConversations = async (
   const qb = new CommonBuilder(models, subdomain, params, integrationIds, user);
 
   switch (only) {
-    case 'byChannels':
+    case "byChannels":
       await countByChannels(models, qb, counts);
       break;
 
-    case 'byIntegrationTypes':
+    case "byIntegrationTypes":
       await countByIntegrationTypes(qb, counts);
       break;
 
-    case 'byBrands':
+    case "byBrands":
       await countByBrands(subdomain, qb, counts);
       break;
 
-    case 'byTags':
+    case "byTags":
       await countByTags(subdomain, qb, counts);
       break;
 
-    case 'bySegment':
+    case "bySegment":
       await countBySegment(subdomain, qb, counts);
       break;
   }
@@ -211,9 +205,9 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
   // filter by segment
   public async segmentFilter(segmentId: string) {
-    const selector = await sendSegmentsMessage({
+    const selector = await sendCoreMessage({
       subdomain: this.subdomain,
-      action: 'fetchSegment',
+      action: "fetchSegment",
       data: {
         segmentId,
         options: {
@@ -238,7 +232,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
           must_not: [
             {
               exists: {
-                field: 'userRelevance'
+                field: "userRelevance"
               }
             }
           ]
@@ -253,13 +247,13 @@ export class CommonBuilder<IArgs extends IListArgs> {
     this.filterList = [
       {
         terms: {
-          'integrationId.keyword': this.integrationIds
+          "integrationId.keyword": this.integrationIds
         }
       }
     ];
 
     // filter by status
-    if (this.params.status === 'closed') {
+    if (this.params.status === "closed") {
       this.statusFilter([CONVERSATION_STATUSES.CLOSED]);
     } else {
       this.statusFilter([
@@ -291,7 +285,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     this.filterList.push({
       terms: {
-        'integrationId.keyword': (channel.integrationIds || []).filter(id =>
+        "integrationId.keyword": (channel.integrationIds || []).filter(id =>
           this.activeIntegrationIds.includes(id)
         )
       }
@@ -301,7 +295,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
   public integrationNotFound() {
     this.filterList.push({
       match: {
-        integrationId: 'integrationNotFound'
+        integrationId: "integrationNotFound"
       }
     });
   }
@@ -310,7 +304,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
   public async brandFilter(brandId: string) {
     const integrations = await this.models.Integrations.findIntegrations({
       brandId
-    }).select('_id');
+    }).select("_id");
 
     if (integrations.length === 0) {
       this.integrationNotFound();
@@ -319,7 +313,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     const integrationIds: string[] = _.intersection(
       this.integrationIds,
-      _.pluck(integrations, '_id')
+      _.pluck(integrations, "_id")
     );
 
     if (integrationIds.length === 0) {
@@ -329,7 +323,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     this.filterList.push({
       terms: {
-        'integrationId.keyword': integrationIds
+        "integrationId.keyword": integrationIds
       }
     });
   }
@@ -341,7 +335,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
         must_not: [
           {
             exists: {
-              field: 'assignedUserId'
+              field: "assignedUserId"
             }
           }
         ]
@@ -434,7 +428,7 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     this.filterList.push({
       terms: {
-        'integrationId.keyword': _.pluck(integrations, '_id')
+        "integrationId.keyword": _.pluck(integrations, "_id")
       }
     });
   }
@@ -484,11 +478,11 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     // filter by tag
     if (this.params.tag) {
-      const tagIds = this.params.tag.split(',');
+      const tagIds = this.params.tag.split(",");
 
       this.filterList.push({
         terms: {
-          'tagIds.keyword': tagIds
+          "tagIds.keyword": tagIds
         }
       });
     }
@@ -513,8 +507,8 @@ export class CommonBuilder<IArgs extends IListArgs> {
 
     const response = await fetchEs({
       subdomain: this.subdomain,
-      action: 'count',
-      index: 'conversations',
+      action: "count",
+      index: "conversations",
       body: queryOptions,
       defaultValue: 0
     });

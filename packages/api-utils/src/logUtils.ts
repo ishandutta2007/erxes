@@ -1,7 +1,8 @@
-import * as _ from 'underscore';
-import redis from './redis';
-import { IUserDocument } from './types';
-import { isEnabled } from './serviceDiscovery';
+import * as _ from "underscore";
+import redis from "./redis";
+import { IUserDocument } from "./types";
+import { isEnabled } from "./serviceDiscovery";
+import { sendMessage,  } from "./messageBroker";
 
 export interface ILogDataParams {
   type: string;
@@ -60,7 +61,7 @@ export const gatherNames = async (params: ILogParams): Promise<LogDesc[]> => {
 
   for (const item of items) {
     if (item && item._id) {
-      let name: string = '';
+      let name: string = "";
 
       for (const n of nameFields) {
         // first level field
@@ -86,7 +87,7 @@ export const gatherUsernames = async (
   return gatherNames({
     foreignKey,
     prevList,
-    nameFields: ['email', 'username'],
+    nameFields: ["email", "username"],
     items
   });
 };
@@ -96,9 +97,9 @@ interface IFinalLogParams extends ILogDataParams {
 }
 
 export const LOG_ACTIONS = {
-  CREATE: 'create',
-  UPDATE: 'update',
-  DELETE: 'delete'
+  CREATE: "create",
+  UPDATE: "update",
+  DELETE: "delete"
 };
 
 export type LogDesc = {
@@ -107,14 +108,13 @@ export type LogDesc = {
 
 export const putCreateLog = async (
   subdomain: string,
-  messageBroker,
   params: ILogDataParams,
   user: IUserDocument
 ) => {
-  const isAutomationsAvailable = await isEnabled('automations');
+  const isAutomationsAvailable = await isEnabled("automations");
 
   if (isAutomationsAvailable) {
-    messageBroker.sendMessage('automations:trigger', {
+    sendMessage("automations:trigger", {
       subdomain,
       data: {
         type: `${params.type}`,
@@ -123,10 +123,10 @@ export const putCreateLog = async (
     });
   }
 
-  const isWebhooksAvailable = await isEnabled('webhooks');
+  const isWebhooksAvailable = await isEnabled("webhooks");
 
   if (isWebhooksAvailable) {
-    messageBroker.sendMessage('webhooks:send', {
+    sendMessage("webhooks:send", {
       subdomain,
       data: {
         action: LOG_ACTIONS.CREATE,
@@ -136,12 +136,7 @@ export const putCreateLog = async (
     });
   }
 
-  return putLog(
-    subdomain,
-    messageBroker,
-    { ...params, action: LOG_ACTIONS.CREATE },
-    user
-  );
+  return putLog(subdomain, { ...params, action: LOG_ACTIONS.CREATE }, user);
 };
 
 /**
@@ -151,14 +146,13 @@ export const putCreateLog = async (
  */
 export const putUpdateLog = async (
   subdomain: string,
-  messageBroker,
   params: ILogDataParams,
   user: IUserDocument
 ) => {
-  const isAutomationsAvailable = await isEnabled('automations');
+  const isAutomationsAvailable = await isEnabled("automations");
 
   if (isAutomationsAvailable) {
-    messageBroker.sendMessage('automations:trigger', {
+    sendMessage("automations:trigger", {
       subdomain,
       data: {
         type: `${params.type}`,
@@ -167,10 +161,10 @@ export const putUpdateLog = async (
     });
   }
 
-  const isWebhooksAvailable = await isEnabled('webhooks');
+  const isWebhooksAvailable = await isEnabled("webhooks");
 
   if (isWebhooksAvailable) {
-    messageBroker.sendMessage('webhooks:send', {
+    sendMessage("webhooks:send", {
       subdomain,
       data: {
         action: LOG_ACTIONS.UPDATE,
@@ -180,12 +174,7 @@ export const putUpdateLog = async (
     });
   }
 
-  return putLog(
-    subdomain,
-    messageBroker,
-    { ...params, action: LOG_ACTIONS.UPDATE },
-    user
-  );
+  return putLog(subdomain, { ...params, action: LOG_ACTIONS.UPDATE }, user);
 };
 
 /**
@@ -195,14 +184,13 @@ export const putUpdateLog = async (
  */
 export const putDeleteLog = async (
   subdomain: string,
-  messageBroker,
   params: ILogDataParams,
   user: IUserDocument
 ) => {
-  const isWebhooksAvailable = await isEnabled('webhooks');
+  const isWebhooksAvailable = await isEnabled("webhooks");
 
   if (isWebhooksAvailable) {
-    messageBroker.sendMessage('webhooks:send', {
+    sendMessage("webhooks:send", {
       subdomain,
       data: {
         action: LOG_ACTIONS.DELETE,
@@ -212,22 +200,16 @@ export const putDeleteLog = async (
     });
   }
 
-  return putLog(
-    subdomain,
-    messageBroker,
-    { ...params, action: LOG_ACTIONS.DELETE },
-    user
-  );
+  return putLog(subdomain, { ...params, action: LOG_ACTIONS.DELETE }, user);
 };
 
 const putLog = async (
   subdomain: string,
-  messageBroker,
   params: IFinalLogParams,
   user: IUserDocument
 ) => {
-  const value = await redis.get('afterMutations');
-  const afterMutations = JSON.parse(value || '{}');
+  const value = await redis.get("afterMutations");
+  const afterMutations = JSON.parse(value || "{}");
 
   if (
     afterMutations[params.type] &&
@@ -235,7 +217,7 @@ const putLog = async (
     afterMutations[params.type][params.action].length
   ) {
     for (const service of afterMutations[params.type][params.action]) {
-      await messageBroker.sendMessage(`${service}:afterMutation`, {
+      await sendMessage(`${service}:afterMutation`, {
         subdomain,
         data: {
           ...params,
@@ -248,13 +230,7 @@ const putLog = async (
     }
   }
 
-  const isLoggerAvailable = await isEnabled('logs');
-
-  if (!isLoggerAvailable) {
-    return;
-  }
-
-  return messageBroker.sendMessage('putLog', {
+  return sendMessage("putLog", {
     subdomain,
     data: {
       ...params,
@@ -268,7 +244,6 @@ const putLog = async (
 };
 
 export interface IActivityLogParams {
-  messageBroker;
   action: string;
   data: any;
   automations?: any;
@@ -276,26 +251,26 @@ export interface IActivityLogParams {
 
 export const putActivityLog = async (
   subdomain: string,
-  params: IActivityLogParams
+  params: IActivityLogParams,
 ) => {
-  const { messageBroker, data } = params;
+  const { data } = params;
   const isAutomationsAvailable = await isEnabled('automations');
 
   try {
     if (isAutomationsAvailable && data.target) {
-      messageBroker.sendMessage('automations:trigger', {
+      sendMessage('automations:trigger', {
         subdomain,
         data: {
           type: `${data.contentType}`,
           targets: [data.target],
-          ...(data.automations || {})
-        }
+          ...(data.automations || {}),
+        },
       });
     }
 
-    return messageBroker.sendMessage('putActivityLog', {
+    return sendMessage('putActivityLog', {
       data: params,
-      subdomain
+      subdomain,
     });
   } catch (e) {
     return e.message;
@@ -311,7 +286,7 @@ const buildLabelList = (obj = {}): INameLabel[] => {
 
   for (const name of fieldNames) {
     const field: any = obj[name];
-    const label: string = field && field.label ? field.label : '';
+    const label: string = field && field.label ? field.label : "";
 
     list.push({ name, label });
   }
@@ -341,7 +316,7 @@ export const getSchemaLabels = (type: string, schemaMappings: ISchemaMap[]) => {
         }
 
         // nested object field names
-        if (typeof field === 'object' && field.type && field.type.obj) {
+        if (typeof field === "object" && field.type && field.type.obj) {
           fieldNames = fieldNames.concat(buildLabelList(field.type.obj));
         }
       }
@@ -349,59 +324,4 @@ export const getSchemaLabels = (type: string, schemaMappings: ISchemaMap[]) => {
   } // end schema name mapping
 
   return fieldNames;
-};
-
-export const logConsumers = (params: {
-  name;
-  consumeRPCQueue?;
-  getActivityContent?;
-  getContentTypeDetail?;
-  collectItems?;
-  getContentIds?;
-  getSchemalabels?;
-}) => {
-  const {
-    name,
-    consumeRPCQueue,
-    getActivityContent,
-    getContentTypeDetail,
-    collectItems,
-    getContentIds,
-    getSchemalabels
-  } = params;
-
-  if (getActivityContent) {
-    consumeRPCQueue(`${name}:logs.getActivityContent`, async args => ({
-      status: 'success',
-      data: await getActivityContent(args)
-    }));
-  }
-
-  if (getContentTypeDetail) {
-    consumeRPCQueue(`${name}:logs.getContentTypeDetail`, async args => ({
-      status: 'success',
-      data: await getContentTypeDetail(args)
-    }));
-  }
-
-  if (collectItems) {
-    consumeRPCQueue(`${name}:logs.collectItems`, async args => ({
-      status: 'success',
-      data: await collectItems(args)
-    }));
-  }
-
-  if (getContentIds) {
-    consumeRPCQueue(`${name}:logs.getContentIds`, async args => ({
-      status: 'success',
-      data: await getContentIds(args)
-    }));
-  }
-
-  if (getSchemalabels) {
-    consumeRPCQueue(`${name}:logs.getSchemaLabels`, args => ({
-      status: 'success',
-      data: getSchemalabels(args)
-    }));
-  }
 };

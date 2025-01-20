@@ -8,6 +8,7 @@ const commonParamsDef = `
   $brandIds: [String]
   $departmentIds: [String]
   $branchIds: [String]
+  $positionIds:[String]
   $customFieldsData: JSON
   $employeeId: String
 `;
@@ -21,6 +22,7 @@ const commonParams = `
   groupIds: $groupIds
   branchIds: $branchIds
   departmentIds: $departmentIds
+  positionIds: $positionIds
   brandIds: $brandIds
   customFieldsData: $customFieldsData
   employeeId: $employeeId
@@ -40,7 +42,6 @@ const usersEditProfile = `
     $email: String!
     $details: UserDetails
     $links: JSON
-    $password: String!
     $employeeId: String
   ) {
     usersEditProfile(
@@ -48,7 +49,6 @@ const usersEditProfile = `
       email: $email
       details: $details
       links: $links
-      password: $password
       employeeId: $employeeId
     ) {
       _id
@@ -159,6 +159,7 @@ const commonDeparmentParamsDef = `
   $code: String
   $supervisorId: String
   $userIds: [String]
+  $workhours: JSON
 `;
 
 const commonDeparmentParams = `
@@ -168,6 +169,7 @@ const commonDeparmentParams = `
   code: $code
   supervisorId: $supervisorId
   userIds: $userIds
+  workhours: $workhours
 `;
 
 const departmentsAdd = `
@@ -232,6 +234,20 @@ const unitsRemove = `
   }
 `;
 
+const commonPositionParamsDef = `
+  $title: String
+  $code: String
+  $parentId: String
+  $userIds: [String]
+`;
+
+const commonPositionParams = `
+  title: $title,
+  parentId: $parentId
+  code: $code
+  userIds: $userIds
+`;
+
 const commonBranchParamsDef = `
   $title: String
   $address: String
@@ -240,6 +256,7 @@ const commonBranchParamsDef = `
   $parentId: String
   $userIds: [String]
   $radius: Int
+  $workhours: JSON
   ${commonContactInfoParamsDef}
 `;
 
@@ -251,6 +268,7 @@ const commonBranchParams = `
   supervisorId: $supervisorId
   userIds: $userIds
   radius: $radius
+  workhours: $workhours
   ${commonContactInfoParams}
 `;
 
@@ -276,6 +294,27 @@ const branchesRemove = `
   }
 `;
 
+const positionsAdd = `
+mutation positionsAdd(${commonPositionParamsDef}){
+  positionsAdd(${commonPositionParams}){
+    _id
+  }
+}`;
+
+const positionsEdit = `
+  mutation positionsEdit($_id: String!, ${commonPositionParamsDef}) {
+    positionsEdit(_id: $_id, ${commonPositionParams}) {
+      _id
+    }
+  }
+`;
+
+const positionsRemove = `
+  mutation positionsRemove($ids: [String!]) {
+    positionsRemove(ids: $ids)
+  }
+`;
+
 export default {
   usersEditProfile,
   usersEdit,
@@ -296,5 +335,8 @@ export default {
   unitsRemove,
   branchesAdd,
   branchesEdit,
-  branchesRemove
+  branchesRemove,
+  positionsAdd,
+  positionsEdit,
+  positionsRemove
 };

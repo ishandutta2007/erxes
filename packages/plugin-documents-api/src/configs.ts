@@ -4,23 +4,17 @@ import resolvers from './graphql/resolvers';
 import { generateModels } from './connectionResolver';
 import { getSubdomain } from '@erxes/api-utils/src/core';
 import { getServices, getService } from '@erxes/api-utils/src/serviceDiscovery';
-import { initBroker, sendCommonMessage } from './messageBroker';
+import { setupMessageConsumers, sendCommonMessage } from './messageBroker';
 import * as permissions from './permissions';
-
-export let mainDb;
-export let graphqlPubsub;
-export let serviceDiscovery;
-
-export let debug;
+import common from './common';
 
 export default {
   name: 'documents',
   permissions,
-  graphql: sd => {
-    serviceDiscovery = sd;
+  graphql: () => {
     return {
       typeDefs,
-      resolvers
+      resolvers,
     };
   },
   segment: {},
@@ -30,6 +24,9 @@ export default {
     context.subdomain = subdomain;
     context.models = await generateModels(subdomain);
   },
+  meta: {
+    permissions,
+  },
 
   getHandlers: [
     {
@@ -38,17 +35,21 @@ export default {
         const { _id, copies, width, itemId } = req.query;
         const subdomain = getSubdomain(req);
         const models = await generateModels(subdomain);
-        const document = await models.Documents.findOne({ _id });
+
+        let document;
+        try {
+          document = await models.Documents.findOne({
+            $or: [{ _id }, { code: _id }],
+          });
+        } catch (e) {
+          document = await models.Documents.findOne({ code: _id });
+        }
 
         if (!document) {
           return res.send('Not found');
         }
 
         const userId = req.headers.userid;
-
-        if (!document) {
-          return res.send('Not found');
-        }
 
         if (!userId) {
           return next(new Error('Permission denied'));
@@ -57,7 +58,7 @@ export default {
         const services = await getServices();
 
         for (const serviceName of services) {
-          const service = await getService(serviceName, true);
+          const service = await getService(serviceName);
           const meta = service.config?.meta || {};
 
           if (meta && meta.documentPrintHook) {
@@ -67,10 +68,42 @@ export default {
                 action: 'documentPrintHook',
                 isRPC: true,
                 serviceName,
-                data: { document, userId }
+                data: { document, userId },
               });
             } catch (e) {
               return next(e);
+            }
+          }
+        }
+
+        const regex = /\{{ (\b\w+\.\b\w+\.\b\w+) }}/g;
+        const matches = document?.content?.match(regex) || [];
+        let replaceContentNormal = document?.content;
+        let array: string[] = [];
+        for (const x of matches) {
+          const pattern = x.replace('{{ ', '').replace(' }}', '').split('.');
+          const serviceName = pattern[0];
+          array.push(serviceName);
+        }
+        const uniqueServices = [...new Set(array)];
+        for (const serviceName of uniqueServices) {
+          if (services.includes(serviceName)) {
+            try {
+              const result = await sendCommonMessage({
+                subdomain,
+                serviceName: serviceName,
+                action: 'documents.replaceContentFields',
+                isRPC: true,
+                data: {
+                  ...(req.query || {}),
+                  content: replaceContentNormal,
+                  isArray: false,
+                },
+                timeout: 50000,
+              });
+              replaceContentNormal = result;
+            } catch (e) {
+              console.log(e);
             }
           }
         }
@@ -80,62 +113,21 @@ export default {
         let styles = '';
         let heads = '';
 
-        if (document.contentType === 'core:user') {
-          const user = await sendCommonMessage({
-            subdomain,
-            serviceName: 'core',
-            isRPC: true,
-            action: 'users.findOne',
-            data: {
-              _id: itemId
-            }
-          });
-
-          let content = document.content;
-
-          const details = user.details || {};
-
-          content = content.replace(/{{ username }}/g, user.username);
-          content = content.replace(/{{ email }}/g, user.email);
-          content = content.replace(
-            /{{ details.firstName }}/g,
-            details.firstName
-          );
-          content = content.replace(
-            /{{ details.lastName }}/g,
-            details.lastName
-          );
-          content = content.replace(
-            /{{ details.middleName }}/g,
-            details.middleName
-          );
-          content = content.replace(
-            /{{ details.position }}/g,
-            details.position
-          );
-          content = content.replace(/{{ details.avatar }}/g, details.avatar);
-          content = content.replace(
-            /{{ details.description }}/g,
-            details.description
-          );
-
-          for (const data of user.customFieldsData || []) {
-            const regex = new RegExp(
-              `{{ customFieldsData.${data.field} }}`,
-              'g'
-            );
-            content = content.replace(regex, data.stringValue);
-          }
-
-          replacedContents.push(content);
-        } else {
-          try {
-            const serviceName = document.contentType.includes(':')
-              ? document.contentType.substring(
-                  0,
-                  document.contentType.indexOf(':')
-                )
-              : document.contentType;
+        try {
+          if (document.contentType.includes('core:')) {
+            const [_serviceName, type] = document.contentType.split(':');
+            console.log({ _serviceName, type });
+            const replaceContent = common.replaceContent[type];
+            replacedContents = await replaceContent({
+              subdomain,
+              data: {
+                ...(req.query || {}),
+                content: replaceContentNormal,
+                contentType: document.contentType,
+              },
+            });
+          } else {
+            const [serviceName, contentType] = document.contentType.split(':');
 
             replacedContents = await sendCommonMessage({
               subdomain,
@@ -144,13 +136,14 @@ export default {
               isRPC: true,
               data: {
                 ...(req.query || {}),
-                content: document.content
+                content: replaceContentNormal,
+                contentType,
               },
-              timeout: 50000
+              timeout: 50000,
             });
-          } catch (e) {
-            replacedContents = [e.message];
           }
+        } catch (e) {
+          replacedContents = [e.message];
         }
 
         let results: string = '';
@@ -184,7 +177,7 @@ export default {
 
           if (copies) {
             results = `
-             ${results}
+              ${results}
               <div style="margin-right: 2mm; margin-bottom: 2mm; width: ${width}mm; float: left;">
                 ${replacedContent}
               </div>
@@ -200,7 +193,7 @@ export default {
             <meta charset="utf-8">
             ${heads}
           </head>
-        `
+        `,
         ];
 
         if (copies) {
@@ -257,16 +250,10 @@ export default {
             ${scripts}
         `;
         return res.send(multipliedResults + style + script);
-      }
-    }
+      },
+    },
   ],
 
-  onServerInit: async options => {
-    mainDb = options.db;
-
-    initBroker(options.messageBrokerClient);
-
-    debug = options.debug;
-    graphqlPubsub = options.pubsubClient;
-  }
+  onServerInit: async () => {},
+  setupMessageConsumers,
 };

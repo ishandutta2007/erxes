@@ -11,13 +11,14 @@ import { sendCommonMessage, sendCoreMessage } from '../messageBroker';
 import { generateRandomPassword, sendAfterMutation, sendSms } from '../utils';
 import {
   IClientPortal,
-  IClientPortalDocument
+  IClientPortalDocument,
 } from './definitions/clientPortal';
 import {
+  IInvitiation,
   INotifcationSettings,
   IUser,
   IUserDocument,
-  clientPortalUserSchema
+  clientPortalUserSchema,
 } from './definitions/clientPortalUser';
 import { DEFAULT_MAIL_CONFIG } from './definitions/constants';
 import { handleContacts, handleDeviceToken, putActivityLog } from './utils';
@@ -29,6 +30,7 @@ export interface ILoginParams {
   login: string;
   password: string;
   deviceToken?: string;
+  twoFactor?: { key?: string; device?: string };
 }
 
 interface IConfirmParams {
@@ -44,7 +46,8 @@ export interface IUserModel extends Model<IUserDocument> {
     phone?: string;
     code?: string;
   }): never;
-  invite(subdomain: string, doc: IUser): Promise<IUserDocument>;
+  invite(subdomain: string, doc: IInvitiation): Promise<IUserDocument>;
+  createTestUser(subdomain: string, doc: IInvitiation): Promise<IUserDocument>;
   getUser(doc: any): Promise<IUserDocument>;
   createUser(subdomain: string, doc: IUser): Promise<IUserDocument>;
   updateUser(
@@ -63,7 +66,7 @@ export interface IUserModel extends Model<IUserDocument> {
   comparePassword(password: string, userPassword: string): boolean;
   clientPortalResetPassword({
     token,
-    newPassword
+    newPassword,
   }: {
     token: string;
     newPassword: string;
@@ -71,7 +74,7 @@ export interface IUserModel extends Model<IUserDocument> {
   changePassword({
     _id,
     currentPassword,
-    newPassword
+    newPassword,
   }: {
     _id: string;
     currentPassword: string;
@@ -83,19 +86,24 @@ export interface IUserModel extends Model<IUserDocument> {
     email: string
   ): any;
   createTokens(_user: IUserDocument, secret: string): string[];
-  refreshTokens(
-    refreshToken: string
-  ): { token: string; refreshToken: string; user: IUserDocument };
-  login(
-    args: ILoginParams
-  ): { user: IUserDocument; clientPortal: IClientPortal };
+  refreshTokens(refreshToken: string): {
+    token: string;
+    refreshToken: string;
+    user: IUserDocument;
+  };
+  login(args: ILoginParams): {
+    user: IUserDocument;
+    clientPortal: IClientPortal;
+    isPassed2FA: boolean;
+  };
   imposeVerificationCode({
     codeLength,
     clientPortalId,
     phone,
     email,
     isRessetting,
-    expireAfter
+    expireAfter,
+    testUserOTP,
   }: {
     codeLength: number;
     clientPortalId: string;
@@ -103,17 +111,20 @@ export interface IUserModel extends Model<IUserDocument> {
     phone?: string;
     email?: string;
     isRessetting?: boolean;
+    testUserOTP?: number;
   }): string;
   changePasswordWithCode({
     phone,
     code,
-    password
+    password,
+    isSecondary,
   }: {
     phone: string;
     code: string;
     password: string;
+    isSecondary: boolean;
   }): string;
-  verifyUser(args: IVerificationParams): Promise<IUserDocument>;
+  verifyUser(subdomain, args: IVerificationParams): Promise<IUserDocument>;
   verifyUsers(
     subdomain: string,
     userids: string[],
@@ -146,6 +157,20 @@ export interface IUserModel extends Model<IUserDocument> {
     doc: any,
     deviceToken?: string
   ): IUserDocument;
+  setSecondaryPassword(
+    userId: string,
+    secondaryPassword: string,
+    oldPassword?: string
+  ): Promise<string>;
+  validatePassword(
+    userId: string,
+    password: string,
+    secondary?: boolean
+  ): boolean;
+  moveUser(
+    oldClientPortalId: string,
+    newClientPortalId: string
+  ): Promise<{ userIds: string[]; clientPortalId: string }>;
 }
 
 export const loadClientPortalUserClass = (models: IModels) => {
@@ -159,7 +184,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       idsToExclude?: string[] | string
     ) {
       const query: { status: {}; [key: string]: any } = {
-        status: { $ne: 'deleted' }
+        status: { $ne: 'deleted' },
       };
       let previousEntry;
 
@@ -174,7 +199,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       if (clientPortalUserFields.email) {
         // check duplication from primaryName
         previousEntry = await models.ClientPortalUsers.find({
-          email: clientPortalUserFields.email
+          email: clientPortalUserFields.email,
         });
 
         if (previousEntry.length > 0) {
@@ -186,7 +211,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         // check duplication from primaryName
         previousEntry = await models.ClientPortalUsers.find({
           ...query,
-          phone: clientPortalUserFields.phone
+          phone: clientPortalUserFields.phone,
         });
 
         if (previousEntry.length > 0) {
@@ -198,7 +223,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         // check duplication from code
         previousEntry = await models.ClientPortalUsers.find({
           ...query,
-          code: clientPortalUserFields.code
+          code: clientPortalUserFields.code,
         });
 
         if (previousEntry.length > 0) {
@@ -224,7 +249,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       const document = {
         ...doc,
         isEmailVerified: false,
-        isPhoneVerified: false
+        isPhoneVerified: false,
       };
 
       if (doc.email && !clientPortal.mailConfig) {
@@ -238,11 +263,11 @@ export const loadClientPortalUserClass = (models: IModels) => {
       if (doc.customFieldsData) {
         // clean custom field values
         doc.customFieldsData = await sendCommonMessage({
-          serviceName: 'forms',
+          serviceName: 'core',
           subdomain,
           action: 'fields.prepareCustomFieldsData',
           data: doc.customFieldsData,
-          isRPC: true
+          isRPC: true,
         });
       }
 
@@ -251,14 +276,12 @@ export const loadClientPortalUserClass = (models: IModels) => {
         models,
         clientPortalId,
         document,
-        password
+        password,
       });
 
       if (user.email && clientPortal.mailConfig) {
-        const {
-          token,
-          expires
-        } = await models.ClientPortalUsers.generateToken();
+        const { token, expires } =
+          await models.ClientPortalUsers.generateToken();
 
         user.registrationToken = token;
         user.registrationTokenExpires = expires;
@@ -282,10 +305,10 @@ export const loadClientPortalUserClass = (models: IModels) => {
             template: {
               name: 'base',
               data: {
-                content
-              }
-            }
-          }
+                content,
+              },
+            },
+          },
         });
       }
 
@@ -293,7 +316,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         const phoneCode = await this.imposeVerificationCode({
           clientPortalId,
           codeLength: clientPortal.otpConfig.codeLength,
-          phone: user.phone
+          phone: user.phone,
         });
 
         const smsBody =
@@ -324,12 +347,17 @@ export const loadClientPortalUserClass = (models: IModels) => {
       if (doc.customFieldsData) {
         // clean custom field values
         doc.customFieldsData = await sendCommonMessage({
-          serviceName: 'forms',
+          serviceName: 'core',
           subdomain,
           action: 'fields.prepareCustomFieldsData',
           data: doc.customFieldsData,
-          isRPC: true
+          isRPC: true,
         });
+      }
+
+      if (doc.password) {
+        this.checkPassword(doc.password);
+        doc.password = await this.generatePassword(doc.password);
       }
 
       await models.ClientPortalUsers.updateOne(
@@ -341,7 +369,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
     }
 
     /**
-     * Remove remove Client Portal Users
+     * Remove remove Business Portal Users
      */
     public static async removeUser(
       subdomain: string,
@@ -350,7 +378,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       // Removing every modules that associated with customer
 
       const users = await models.ClientPortalUsers.find({
-        _id: { $in: clientPortalUserIds }
+        _id: { $in: clientPortalUserIds },
       });
 
       for (const user of users) {
@@ -365,7 +393,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       }
 
       return models.ClientPortalUsers.deleteMany({
-        _id: { $in: clientPortalUserIds }
+        _id: { $in: clientPortalUserIds },
       });
     }
 
@@ -401,7 +429,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
       return {
         token,
-        expires: Date.now() + 86400000
+        expires: Date.now() + 86400000,
       };
     }
 
@@ -415,7 +443,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
     public static async clientPortalResetPassword({
       token,
-      newPassword
+      newPassword,
     }: {
       token: string;
       newPassword: string;
@@ -423,8 +451,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
       const user = await models.ClientPortalUsers.findOne({
         resetPasswordToken: token,
         resetPasswordExpires: {
-          $gt: Date.now()
-        }
+          $gt: Date.now(),
+        },
       });
 
       if (!user) {
@@ -441,7 +469,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       await models.ClientPortalUsers.findByIdAndUpdate(user._id, {
         password: await this.generatePassword(newPassword),
         resetPasswordToken: undefined,
-        resetPasswordExpires: undefined
+        resetPasswordExpires: undefined,
       });
 
       return models.ClientPortalUsers.findOne({ _id: user._id });
@@ -450,7 +478,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
     public static async changePassword({
       _id,
       currentPassword,
-      newPassword
+      newPassword,
     }: {
       _id: string;
       currentPassword: string;
@@ -464,7 +492,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       this.checkPassword(newPassword);
 
       const user = await models.ClientPortalUsers.findOne({
-        _id
+        _id,
       }).lean();
 
       if (!user) {
@@ -472,7 +500,9 @@ export const loadClientPortalUserClass = (models: IModels) => {
       }
 
       // check current password ============
-      const valid = await this.comparePassword(currentPassword, user.password);
+      const valid = user.password
+        ? await this.comparePassword(currentPassword, user.password)
+        : false;
 
       if (!valid) {
         throw new Error('Incorrect current password');
@@ -480,7 +510,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
       // set new password
       await models.ClientPortalUsers.findByIdAndUpdate(user._id, {
-        password: await this.generatePassword(newPassword)
+        password: await this.generatePassword(newPassword),
       });
 
       return models.ClientPortalUsers.findOne({ _id: user._id });
@@ -515,7 +545,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         // save token & expiration date
         await models.ClientPortalUsers.findByIdAndUpdate(user._id, {
           resetPasswordToken: token,
-          resetPasswordExpires: Date.now() + 86400000
+          resetPasswordExpires: Date.now() + 86400000,
         });
 
         return { token };
@@ -528,7 +558,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         clientPortalId: clientPortal._id,
         phone,
         email,
-        isRessetting: true
+        isRessetting: true,
       });
 
       return { phoneCode };
@@ -537,18 +567,20 @@ export const loadClientPortalUserClass = (models: IModels) => {
     public static async changePasswordWithCode({
       phone,
       code,
-      password
+      password,
+      isSecondary = false,
     }: {
       phone: string;
       code: string;
       password: string;
+      isSecondary: boolean;
     }) {
       const user = await models.ClientPortalUsers.findOne({
         $or: [
           { email: { $regex: new RegExp(`^${phone}$`, 'i') } },
-          { phone: { $regex: new RegExp(`^${phone}$`, 'i') } }
+          { phone: { $regex: new RegExp(`^${phone}$`, 'i') } },
         ],
-        resetPasswordToken: code
+        resetPasswordToken: code,
       }).lean();
 
       if (!user) {
@@ -563,18 +595,21 @@ export const loadClientPortalUserClass = (models: IModels) => {
       this.checkPassword(password);
 
       if (phone.includes('@')) {
+        const field = isSecondary ? 'secondaryPassword' : 'password';
         await models.ClientPortalUsers.findByIdAndUpdate(user._id, {
           isEmailVerified: true,
-          password: await this.generatePassword(password)
+          [field]: await this.generatePassword(password),
         });
 
         return 'success';
       }
 
       // set new password
+      const field = isSecondary ? 'secondaryPassword' : 'password';
+
       await models.ClientPortalUsers.findByIdAndUpdate(user._id, {
         isPhoneVerified: true,
-        password: await this.generatePassword(password)
+        [field]: await this.generatePassword(password),
       });
 
       return 'success';
@@ -585,15 +620,15 @@ export const loadClientPortalUserClass = (models: IModels) => {
         _id: _user._id,
         email: _user.email,
         firstName: _user.firstName,
-        lastName: _user.lastName
+        lastName: _user.lastName,
       };
 
       const createToken = await jwt.sign({ user }, secret, {
-        expiresIn: '1d'
+        expiresIn: '1d',
       });
 
       const createRefreshToken = await jwt.sign({ user }, secret, {
-        expiresIn: '7d'
+        expiresIn: '7d',
       });
 
       return [createToken, createRefreshToken];
@@ -627,7 +662,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       return {
         token: newToken,
         refreshToken: newRefreshToken,
-        user: dbUsers
+        user: dbUsers,
       };
     }
 
@@ -641,7 +676,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
       phone,
       email,
       expireAfter,
-      isRessetting
+      isRessetting,
+      testUserOTP,
     }: {
       codeLength: number;
       clientPortalId: string;
@@ -649,8 +685,11 @@ export const loadClientPortalUserClass = (models: IModels) => {
       email?: string;
       expireAfter?: number;
       isRessetting?: boolean;
+      testUserOTP?: number;
     }) {
-      const code = this.generateVerificationCode(codeLength);
+      const code = testUserOTP
+        ? testUserOTP
+        : this.generateVerificationCode(codeLength);
       const codeExpires = Date.now() + 60000 * (expireAfter || 5);
 
       let query: any = {};
@@ -659,7 +698,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       if (phone) {
         query = {
           phoneVerificationCode: code,
-          phoneVerificationCodeExpires: codeExpires
+          phoneVerificationCodeExpires: codeExpires,
         };
         userFindQuery = { phone, clientPortalId };
       }
@@ -667,7 +706,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       if (email) {
         query = {
           emailVerificationCode: code,
-          emailVerificationCodeExpires: codeExpires
+          emailVerificationCodeExpires: codeExpires,
         };
         userFindQuery = { email, clientPortalId };
       }
@@ -684,8 +723,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
           {
             $set: {
               resetPasswordToken: code,
-              resetPasswordExpires: codeExpires
-            }
+              resetPasswordExpires: codeExpires,
+            },
           }
         );
 
@@ -695,14 +734,14 @@ export const loadClientPortalUserClass = (models: IModels) => {
       await models.ClientPortalUsers.updateOne(
         { _id: user._id },
         {
-          $set: query
+          $set: query,
         }
       );
 
       return code;
     }
 
-    public static async verifyUser(args: IVerificationParams) {
+    public static async verifyUser(subdomain, args: IVerificationParams) {
       const { phoneOtp, emailOtp, userId, password } = args;
       const user = await models.ClientPortalUsers.findById(userId);
 
@@ -741,7 +780,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
       await user.save();
 
-      await putActivityLog(user);
+      await putActivityLog(subdomain, user);
 
       return user;
     }
@@ -750,7 +789,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
       login,
       password,
       deviceToken,
-      clientPortalId
+      clientPortalId,
+      twoFactor,
     }: ILoginParams) {
       if (!login || !password || !clientPortalId) {
         throw new Error('Invalid login');
@@ -760,9 +800,9 @@ export const loadClientPortalUserClass = (models: IModels) => {
         $or: [
           { email: { $regex: new RegExp(`^${login}$`, 'i') } },
           { username: { $regex: new RegExp(`^${login}$`, 'i') } },
-          { phone: { $regex: new RegExp(`^${login}$`, 'i') } }
+          { phone: { $regex: new RegExp(`^${login}$`, 'i') } },
         ],
-        clientPortalId
+        clientPortalId,
       });
 
       if (!user || !user.password) {
@@ -796,8 +836,12 @@ export const loadClientPortalUserClass = (models: IModels) => {
       }
 
       const valid = await this.comparePassword(password, user.password);
+      const secondaryPassCheck = await this.comparePassword(
+        password,
+        user.secondaryPassword || ''
+      );
 
-      if (!valid) {
+      if (!valid && !secondaryPassCheck) {
         // bad password
         throw new Error('Invalid login');
       }
@@ -807,19 +851,63 @@ export const loadClientPortalUserClass = (models: IModels) => {
         throw new Error('Account not verified');
       }
 
+      let isFound;
+      if (cp.twoFactorConfig?.enableTwoFactor) {
+        if (twoFactor && twoFactor.key && twoFactor.device) {
+          isFound = user.twoFactorDevices?.find((x) => x.key === twoFactor.key);
+        } else {
+          throw new Error('TwoFactor argument is required');
+        }
+      }
+
       await handleDeviceToken(user, deviceToken);
 
       this.updateSession(user._id);
 
       return {
         user,
-        clientPortal: cp
+        clientPortal: cp,
+        isPassed2FA: !!isFound,
       };
+    }
+
+    public static async createTestUser(
+      subdomain: string,
+      { password, clientPortalId, ...doc }: IInvitiation
+    ) {
+      if (!password) {
+        password = generateRandomPassword();
+      }
+
+      if (password) {
+        this.checkPassword(password);
+      }
+
+      const user = await handleContacts({
+        subdomain,
+        models,
+        clientPortalId,
+        document: doc,
+        password,
+      });
+
+      const clientPortal = await models.ClientPortals.getConfig(clientPortalId);
+
+      await sendAfterMutation(
+        subdomain,
+        'clientportal:user',
+        'create',
+        user,
+        user,
+        `User's profile has been created on ${clientPortal.name}`
+      );
+
+      return user;
     }
 
     public static async invite(
       subdomain: string,
-      { password, clientPortalId, ...doc }: IUser
+      { password, clientPortalId, ...doc }: IInvitiation
     ) {
       if (!password) {
         password = generateRandomPassword();
@@ -836,41 +924,44 @@ export const loadClientPortalUserClass = (models: IModels) => {
         models,
         clientPortalId,
         document: doc,
-        password
+        password,
       });
-
-      const { token, expires } = await models.ClientPortalUsers.generateToken();
-
-      user.registrationToken = token;
-      user.registrationTokenExpires = expires;
-
-      await user.save();
 
       const clientPortal = await models.ClientPortals.getConfig(clientPortalId);
 
-      const config = clientPortal.mailConfig || {
-        invitationContent: DEFAULT_MAIL_CONFIG.INVITE
-      };
+      if (!doc.disableVerificationMail) {
+        const { token, expires } =
+          await models.ClientPortalUsers.generateToken();
 
-      const link = `${clientPortal.url}/verify?token=${token}`;
+        user.registrationToken = token;
+        user.registrationTokenExpires = expires;
 
-      let content = config.invitationContent.replace(/{{ link }}/, link);
-      content = content.replace(/{{ password }}/, plainPassword);
+        await user.save();
 
-      await sendCoreMessage({
-        subdomain,
-        action: 'sendEmail',
-        data: {
-          toEmails: [doc.email],
-          title: `${clientPortal.name} invitation`,
-          template: {
-            name: 'base',
-            data: {
-              content
-            }
-          }
-        }
-      });
+        const config = clientPortal.mailConfig || {
+          invitationContent: DEFAULT_MAIL_CONFIG.INVITE,
+        };
+
+        const link = `${clientPortal.url}/verify?token=${token}`;
+
+        let content = config.invitationContent.replace(/{{ link }}/, link);
+        content = content.replace(/{{ password }}/, plainPassword);
+
+        await sendCoreMessage({
+          subdomain,
+          action: 'sendEmail',
+          data: {
+            toEmails: [doc.email],
+            title: `${clientPortal.name} invitation`,
+            template: {
+              name: 'base',
+              data: {
+                content,
+              },
+            },
+          },
+        });
+      }
 
       await sendAfterMutation(
         subdomain,
@@ -890,7 +981,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
         token,
         password,
         passwordConfirmation,
-        username
+        username,
       }: {
         token: string;
         password: string;
@@ -901,8 +992,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
       const user = await models.ClientPortalUsers.findOne({
         registrationToken: token,
         registrationTokenExpires: {
-          $gt: Date.now()
-        }
+          $gt: Date.now(),
+        },
       });
 
       if (!user || !token) {
@@ -927,7 +1018,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
       await models.ClientPortalUsers.updateOne(
         { _id: user._id },
         {
-          $set: doc
+          $set: doc,
         }
       );
 
@@ -958,7 +1049,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
       const users = await models.ClientPortalUsers.find({
         _id: { $in: userIds },
-        ...qryOption
+        ...qryOption,
       });
 
       if (!users || !users.length) {
@@ -968,12 +1059,12 @@ export const loadClientPortalUserClass = (models: IModels) => {
       await models.ClientPortalUsers.updateMany(
         { _id: { $in: userIds } },
         {
-          $set: set
+          $set: set,
         }
       );
 
       for (const user of users) {
-        await putActivityLog(user);
+        await putActivityLog(subdomain, user);
 
         await sendAfterMutation(
           subdomain,
@@ -997,9 +1088,9 @@ export const loadClientPortalUserClass = (models: IModels) => {
       const query: any = {
         $set: {
           lastSeenAt: now,
-          isOnline: true
+          isOnline: true,
         },
-        $inc: { sessionCount: 1 }
+        $inc: { sessionCount: 1 },
       };
 
       // update
@@ -1026,8 +1117,8 @@ export const loadClientPortalUserClass = (models: IModels) => {
         { _id },
         {
           $set: {
-            notificationSettings: { ...doc }
-          }
+            notificationSettings: { ...doc },
+          },
         }
       );
 
@@ -1045,7 +1136,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
     ) {
       let user = await models.ClientPortalUsers.findOne({
         phone,
-        clientPortalId: clientPortal._id
+        clientPortalId: clientPortal._id,
       });
 
       if (!user) {
@@ -1053,7 +1144,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
           subdomain,
           models,
           clientPortalId: clientPortal._id,
-          document: { phone }
+          document: { phone },
         });
       }
 
@@ -1067,14 +1158,14 @@ export const loadClientPortalUserClass = (models: IModels) => {
 
       const config = clientPortal.otpConfig || {
         codeLength: 4,
-        expireAfter: 1
+        expireAfter: 1,
       };
 
       const phoneCode = await this.imposeVerificationCode({
         clientPortalId: clientPortal._id,
         codeLength: config.codeLength,
         phone: user.phone,
-        expireAfter: config.expireAfter
+        expireAfter: config.expireAfter,
       });
 
       return { userId: user._id, phoneCode };
@@ -1089,9 +1180,9 @@ export const loadClientPortalUserClass = (models: IModels) => {
       let user = await models.ClientPortalUsers.findOne({
         $or: [
           { email: { $regex: new RegExp(`^${doc.email}$`, 'i') } },
-          { phone: { $regex: new RegExp(`^${doc.phone}$`, 'i') } }
+          { phone: { $regex: new RegExp(`^${doc.phone}$`, 'i') } },
         ],
-        clientPortalId: clientPortal._id
+        clientPortalId: clientPortal._id,
       });
 
       if (!user) {
@@ -1099,7 +1190,7 @@ export const loadClientPortalUserClass = (models: IModels) => {
           subdomain,
           models,
           clientPortalId: clientPortal._id,
-          document: doc
+          document: doc,
         });
       }
 
@@ -1112,6 +1203,119 @@ export const loadClientPortalUserClass = (models: IModels) => {
       this.updateSession(user._id);
 
       return user;
+    }
+
+    public static async setSecondaryPassword(
+      userId,
+      secondaryPassword,
+      oldPassword
+    ) {
+      // check if already secondaryPassword exists or not null
+      const user = await models.ClientPortalUsers.findOne({
+        _id: userId,
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const newPassword = await this.generatePassword(secondaryPassword);
+
+      if (
+        user.secondaryPassword === null ||
+        user.secondaryPassword === undefined ||
+        !user.secondaryPassword ||
+        user.secondaryPassword === ''
+      ) {
+        // create secondary password
+        await models.ClientPortalUsers.updateOne(
+          { _id: userId },
+          { $set: { secondaryPassword: newPassword } }
+        );
+
+        return 'Secondary password created';
+      }
+
+      // check if old password is correct or not
+      if (!oldPassword) {
+        throw new Error('Old password is required');
+      }
+
+      const valid = await models.ClientPortalUsers.comparePassword(
+        oldPassword,
+        user.secondaryPassword || ''
+      );
+
+      if (!valid) {
+        // bad password
+        throw new Error('Invalid old password');
+      }
+
+      // update secondary password
+      await models.ClientPortalUsers.updateOne(
+        { _id: userId },
+        { $set: { secondaryPassword: newPassword } }
+      );
+
+      return 'Secondary password changed';
+    }
+
+    public static async validatePassword(
+      userId: string,
+      password: string,
+      secondary?: boolean
+    ) {
+      const user = await models.ClientPortalUsers.findOne({
+        _id: userId,
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (secondary) {
+        return this.comparePassword(password, user.secondaryPassword || '');
+      }
+
+      return this.comparePassword(password, user.password || '');
+    }
+
+    public static async moveUser(oldClientPortalId, newClientPortalId) {
+      const oldUsers = await models.ClientPortalUsers.find({
+        clientPortalId: oldClientPortalId,
+      });
+
+      const newUsers = await models.ClientPortalUsers.find({
+        clientPortalId: newClientPortalId,
+      });
+
+      if (!oldUsers || !oldUsers.length) {
+        throw new Error('Users not found');
+      }
+
+      const emailsInNewPortal = newUsers.map((user) => user.email);
+      const phonesInNewPortal = newUsers.map((user) => user.phone);
+
+      // Filter users1 to exclude those with matching email or phone in users2
+      const usersToUpdate = oldUsers.filter((user) => {
+        const emailMatch = user.email && emailsInNewPortal.includes(user.email);
+        const phoneMatch = user.phone && phonesInNewPortal.includes(user.phone);
+        return !(emailMatch || phoneMatch); // Include users who don't match
+      });
+
+      if (!usersToUpdate.length) {
+        throw new Error('No users updated because of duplicate email/phone');
+      }
+
+      // Get the IDs of the users to update
+      const userIdsToUpdate = usersToUpdate.map((user) => user._id);
+
+      const updatedUsers = await models.ClientPortalUsers.updateMany(
+        { _id: { $in: userIdsToUpdate } },
+        { $set: { clientPortalId: newClientPortalId, modifiedAt: new Date() } }
+      );
+
+      return updatedUsers;
     }
   }
 

@@ -8,7 +8,9 @@ import { field } from './utils';
 
 export interface IAssignmentCampaign extends ICommonCampaignFields {
   segmentIds: string[];
+  fieldId: string;
   voucherCampaignId: string;
+  allowMultiWin?: boolean;
 }
 
 export interface IAssignmentCampaignDocument
@@ -21,5 +23,11 @@ export interface IAssignmentCampaignDocument
 export const assignmentCampaignSchema = new Schema({
   ...commonCampaignSchema,
   segmentIds: field({ type: [String], label: 'Segment Data' }),
+  fieldId: field({ type: String, label: 'Fied Id', optional: true }),
+  allowMultiWin: field({
+    type: Boolean,
+    label: 'Allow multiple Win',
+    optional: true
+  }),
   voucherCampaignId: field({ type: String, label: 'Voucher Campaign Id' })
 });

@@ -1,4 +1,3 @@
-import * as mongoose from 'mongoose';
 import {
   removeCompanies,
   removeCustomers,
@@ -6,61 +5,55 @@ import {
   removeTasks,
   removeTickets,
   removePurchases
-} from '../../messageBroker';
-
-import { connect } from '../utils';
-import { removeProducts } from '../../messageBroker';
+} from "../../messageBroker";
+import { removeProducts } from "../../messageBroker";
 
 // tslint:disable-next-line
-const { parentPort, workerData } = require('worker_threads');
+const { parentPort, workerData } = require("worker_threads");
 
-connect()
-  .then(async () => {
+async function main() {
+  try {
     const { result, contentType, subdomain } = workerData;
-
-    const type = contentType.split(':')[1];
-
+    const type = contentType.split(":")[1];
     switch (type) {
-      case 'company':
+      case "company":
         await removeCompanies(subdomain, result);
         break;
-      case 'customer':
+      case "customer":
         await removeCustomers(subdomain, result);
         break;
-      case 'lead':
+      case "lead":
         await removeCustomers(subdomain, result);
         break;
 
-      case 'deal':
+      case "deal":
         await removeDeals(subdomain, result);
         break;
-      case 'purchase':
+      case "purchase":
         await removePurchases(subdomain, result);
         break;
-      case 'task':
+      case "task":
         await removeTasks(subdomain, result);
         break;
-      case 'ticket':
+      case "ticket":
         await removeTickets(subdomain, result);
         break;
-      case 'product':
+      case "product":
         await removeProducts(subdomain, result);
       default:
         break;
     }
 
-    mongoose.connection.close();
-
     parentPort.postMessage({
-      action: 'remove',
-      message: 'Successfully finished the job'
+      action: "remove",
+      message: "Successfully finished the job"
     });
-  })
-  .catch(e => {
-    mongoose.connection.close();
-
+  } catch (e) {
     parentPort.postMessage({
-      action: 'remove',
+      action: "remove",
       message: `Finished job with error ${e.message}`
     });
-  });
+  }
+}
+
+main();

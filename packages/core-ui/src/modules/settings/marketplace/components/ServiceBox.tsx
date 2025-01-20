@@ -1,14 +1,24 @@
-import { Price, ReadMore, Service } from './styles';
+import { Description, Price, Service, ServiceText } from './styles';
 
 import Icon from 'modules/common/components/Icon';
 import React from 'react';
+import Tip from 'modules/common/components/Tip';
 import { __ } from 'modules/common/utils';
+import { Plugin } from '../types';
 
 type Props = {
-  plugin: any;
+  plugin: Plugin;
 };
 
-class ServiceBox extends React.Component<Props, {}> {
+class ServiceBox extends React.Component<Props, { showMore: boolean }> {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      showMore: false
+    };
+  }
+
   render() {
     const { plugin } = this.props;
 
@@ -20,23 +30,50 @@ class ServiceBox extends React.Component<Props, {}> {
       return null;
     }
 
-    const { prices, shortDescription, title } = plugin || {};
-    const domain = window.location.host;
+    const { price, shortDescription, title } = plugin || {};
+    // const domain = window.location.host;
+    const showmore = (shortDescription || '').includes('<ul');
 
     return (
-      <Service>
+      <Service
+        // href={`https://erxes.io/marketplace-global?domain=${domain}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         <div>
-          <Price>${prices ? prices.oneTime || prices.monthly : 0}</Price>
           <h5>{title}</h5>
-          <div dangerouslySetInnerHTML={{ __html: shortDescription }} />
+          <Price>
+            ${price ? price.oneTime || price.monthly : 0}
+            <span>
+              {price && price.oneTime
+                ? '/ One Time'
+                : price && price.monthly
+                  ? '/ Monthly'
+                  : ''}
+            </span>
+          </Price>
+          <ServiceText showMore={this.state.showMore}>
+            <Description
+              showmore={this.state.showMore}
+              className="description"
+              dangerouslySetInnerHTML={{ __html: shortDescription }}
+            />
+            {showmore && (
+              <Tip
+                text={this.state.showMore ? 'Show less' : 'Show more'}
+                placement="top"
+              >
+                <span
+                  onClick={() =>
+                    this.setState({ showMore: !this.state.showMore })
+                  }
+                >
+                  <Icon icon="angle-down" />
+                </span>
+              </Tip>
+            )}
+          </ServiceText>
         </div>
-        <ReadMore
-          href={`https://erxes.io/marketplace-global?domain=${domain}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span>{__('Read more')}</span> <Icon icon="rightarrow" size={16} />
-        </ReadMore>
       </Service>
     );
   }

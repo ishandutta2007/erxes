@@ -19,21 +19,19 @@ const loginMiddleware = async (req, res) => {
     'pages_messaging,pages_manage_ads,pages_manage_engagement,pages_manage_metadata,pages_read_user_content'
   );
 
-  const DOMAIN = getEnv({ name: 'DOMAIN' });
-
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
+  const API_DOMAIN = DOMAIN.includes('zrok') ? DOMAIN : `${DOMAIN}/gateway`;
   const FACEBOOK_LOGIN_REDIRECT_URL = await getConfig(
     models,
     'FACEBOOK_LOGIN_REDIRECT_URL',
-    `${DOMAIN}/gateway/pl:facebook/fblogin`
+    `${API_DOMAIN}/pl:facebook/fblogin`
   );
-
   const conf = {
     client_id: FACEBOOK_APP_ID,
     client_secret: FACEBOOK_APP_SECRET,
     scope: FACEBOOK_PERMISSIONS,
     redirect_uri: FACEBOOK_LOGIN_REDIRECT_URL
   };
-
   debugRequest(debugFacebook, req);
 
   // we don't have a code yet
@@ -43,7 +41,7 @@ const loginMiddleware = async (req, res) => {
       client_id: conf.client_id,
       redirect_uri: conf.redirect_uri,
       scope: conf.scope,
-      state: DOMAIN
+      state: `${API_DOMAIN}/pl:facebook`
     });
 
     // checks whether a user denied the app facebook login/permissions
@@ -62,9 +60,7 @@ const loginMiddleware = async (req, res) => {
     client_secret: conf.client_secret,
     code: req.query.code
   };
-
   debugResponse(debugFacebook, req, JSON.stringify(config));
-
   // If this branch executes user is already being redirected back with
   // code (whatever that is)
   // code is set
@@ -81,9 +77,7 @@ const loginMiddleware = async (req, res) => {
       'me?fields=id,first_name,last_name',
       access_token
     );
-
     const name = `${userAccount.first_name} ${userAccount.last_name}`;
-
     const account = await models.Accounts.findOne({ uid: userAccount.id });
 
     if (account) {
@@ -91,13 +85,12 @@ const loginMiddleware = async (req, res) => {
         { _id: account._id },
         { $set: { token: access_token } }
       );
-
       const integrations = await models.Integrations.find({
         accountId: account._id
       });
 
       for (const integration of integrations) {
-        await repairIntegrations(models, integration.erxesApiId);
+        await repairIntegrations(subdomain, models, integration.erxesApiId);
       }
     } else {
       await models.Accounts.create({
@@ -108,8 +101,10 @@ const loginMiddleware = async (req, res) => {
       });
     }
 
-    const url = `${DOMAIN}/settings/fb-authorization?fbAuthorized=true`;
-
+    const reactAppUrl = !DOMAIN.includes('zrok')
+      ? DOMAIN
+      : 'http://localhost:3000';
+    const url = `${reactAppUrl}/settings/fb-authorization?fbAuthorized=true`;
     debugResponse(debugFacebook, req, url);
 
     return res.redirect(url);

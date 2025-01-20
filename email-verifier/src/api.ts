@@ -1,172 +1,123 @@
-import * as EmailValidator from 'email-deep-validator';
+import * as dotenv from 'dotenv';
+
 import {
   EMAIL_VALIDATION_SOURCES,
   EMAIL_VALIDATION_STATUSES,
-  Emails
+  Emails,
 } from './models';
-import { getArray, setArray } from './redisClient';
-import { debugBase, debugError, sendRequest } from './utils';
+import {
+  bulkClearOut,
+  verifyOnClearout,
+  debugBase,
+  getEnv,
+  isValidDomain,
+  isValidEmail,
+  sendRequest,
+  verifyOnMailsso,
+  bulkMailsso,
+} from './utils';
 
-const { TRUE_MAIL_API_KEY, EMAIL_VERIFICATION_TYPE = 'truemail' } = process.env;
-
-const singleTrueMail = async (email: string) => {
-  try {
-    const url = `https://truemail.io/api/v1/verify/single?access_token=${TRUE_MAIL_API_KEY}&email=${email}`;
-
-    const response = await sendRequest({
-      url,
-      method: 'GET'
-    });
-
-    if (typeof response === 'string') {
-      return JSON.parse(response);
-    }
-
-    return response;
-  } catch (e) {
-    debugError(`Error occured during single true mail validation ${e.message}`);
-    throw e;
-  }
-};
-
-const bulkTrueMail = async (unverifiedEmails: string[], hostname: string) => {
-  const url = `https://truemail.io/api/v1/tasks/bulk?access_token=${TRUE_MAIL_API_KEY}`;
-
-  try {
-    const result = await sendRequest({
-      url,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      method: 'POST',
-      body: {
-        file: unverifiedEmails.map(e => ({ email: e }))
-      }
-    });
-
-    let data;
-    let error;
-
-    if (typeof result === 'string') {
-      data = JSON.parse(result).data;
-      error = JSON.parse(result).error;
-    } else {
-      data = result.data;
-      error = result.error;
-    }
-
-    if (data) {
-      const taskIds = await getArray('erxes_email_verifier_task_ids');
-
-      taskIds.push({ taskId: data.task_id, hostname });
-
-      setArray('erxes_email_verifier_task_ids', taskIds);
-    } else if (error) {
-      throw new Error(error.message);
-    }
-  } catch (e) {
-    // request may fail
-    throw e;
-  }
-};
+dotenv.config();
 
 export const single = async (email: string, hostname: string) => {
-  const emailOnDb = await Emails.findOne({ email });
+  const MAIL_VERIFIER_SERVICE = getEnv({
+    name: 'MAIL_VERIFIER_SERVICE',
+    defaultValue: 'mailsso',
+  });
+
+  email = email.toString();
+
+  if (!isValidEmail(email)) {
+    debugBase(`This email is not valid`, email);
+    return { email, status: EMAIL_VALIDATION_STATUSES.INVALID };
+  }
+
+  if (!isValidDomain(email)) {
+    debugBase(`This domain is not valid`, email);
+    return { email, status: EMAIL_VALIDATION_STATUSES.INVALID };
+  }
+
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+  const emailOnDb = await Emails.findOne({
+    email,
+    verifiedAt: { $gt: oneMonthAgo },
+  });
 
   if (emailOnDb) {
-    debugBase(`This email is already verified`);
-
-    return sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        email: { email, status: emailOnDb.status },
-        source: EMAIL_VALIDATION_SOURCES.ERXES
-      }
-    });
-  }
-
-  const emailValidator = new EmailValidator();
-  const { validDomain, validMailbox } = await emailValidator.verify(email);
-
-  if (validDomain && validMailbox) {
-    return sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        email: { email, status: EMAIL_VALIDATION_STATUSES.VALID },
-        source: EMAIL_VALIDATION_SOURCES.ERXES
-      }
-    });
-  }
-
-  let response: { status?: string; result?: string } = {};
-
-  if (EMAIL_VERIFICATION_TYPE === 'truemail') {
+    debugBase(`This email is already verified`, email);
     try {
-      debugBase(
-        `Email is not found on verifier DB. Sending request to truemail`
-      );
-      response = await singleTrueMail(email);
-
-      debugBase(`Received single email validation status`);
+      return sendRequest({
+        url: `${hostname}/verifier/webhook`,
+        method: 'POST',
+        body: {
+          email: { email, status: emailOnDb.status },
+          source: EMAIL_VALIDATION_SOURCES.ERXES,
+        },
+      });
     } catch (e) {
-      // request may fail
       throw e;
     }
   }
 
-  if (response.status === 'success') {
-    const doc = { email, status: response.result };
-
-    if (
-      doc.status === EMAIL_VALIDATION_STATUSES.VALID ||
-      doc.status === EMAIL_VALIDATION_STATUSES.INVALID
-    ) {
-      await Emails.createEmail(doc);
-    }
-
-    debugBase(`Sending single email validation status to erxes-api`);
-
-    return sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        email: doc,
-        source: EMAIL_VALIDATION_SOURCES.TRUEMAIL
-      }
-    });
+  if (MAIL_VERIFIER_SERVICE === 'clearout') {
+    return verifyOnClearout(email, hostname);
   }
 
-  // if status is not success
-  return sendRequest({
-    url: `${hostname}/verifier/webhook`,
-    method: 'POST',
-    body: {
-      email: { email, status: EMAIL_VALIDATION_STATUSES.UNKNOWN },
-      source: EMAIL_VALIDATION_SOURCES.TRUEMAIL
-    }
-  });
+  if (MAIL_VERIFIER_SERVICE === 'mailsso') {
+    return verifyOnMailsso(email, hostname);
+  }
 };
 
 export const bulk = async (emails: string[], hostname: string) => {
-  const emailsOnDb = await Emails.find({ email: { $in: emails } });
+  const MAIL_VERIFIER_SERVICE = getEnv({
+    name: 'MAIL_VERIFIER_SERVICE',
+    defaultValue: 'mailsso',
+  });
+
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+  const emailsOnDb = await Emails.find({
+    email: { $in: emails },
+    verifiedAt: { $gt: oneMonthAgo },
+  });
 
   const emailsMap: Array<{ email: string; status: string }> = emailsOnDb.map(
     ({ email, status }) => ({
       email,
-      status
+      status,
     })
   );
 
-  const verifiedEmails = emailsMap.map(verified => ({
+
+  const verifiedEmails = emailsMap.map((verified) => ({
     email: verified.email,
-    status: verified.status
+    status: verified.status,
   }));
 
-  const unverifiedEmails = emails.filter(
-    email => !verifiedEmails.some(e => e.email === email)
+  let unverifiedEmails: string[] = emails.filter(
+    (email) => !verifiedEmails.some((e) => e.email === email)
   );
+  const invalidEntries = unverifiedEmails.filter(
+    (email) => !isValidEmail(email) || !isValidDomain(email)
+  );
+
+  unverifiedEmails = unverifiedEmails.filter(
+    (email) => isValidEmail(email) && isValidDomain(email)
+  );
+  
+  if (invalidEntries.length > 0) {
+    debugBase(`Sending invalid emails to erxes-api`, invalidEntries);
+    await sendRequest({
+      url: `${hostname}/verifier/webhook`,
+      method: 'POST',
+      body: {
+        emails: invalidEntries,
+      },
+    });
+  }
 
   if (verifiedEmails.length > 0) {
     try {
@@ -177,85 +128,30 @@ export const bulk = async (emails: string[], hostname: string) => {
         method: 'POST',
         body: {
           emails: verifiedEmails,
-          source: EMAIL_VALIDATION_SOURCES.ERXES
-        }
+        },
       });
     } catch (e) {
-      // request may fail
       throw e;
     }
   }
 
   if (unverifiedEmails.length > 0) {
-    debugBase(`Sending  unverified email to truemail`);
+    if (MAIL_VERIFIER_SERVICE === 'clearout') {
+      try {
+        debugBase(`Sending  unverified email to clearout`);
+        await bulkClearOut(unverifiedEmails, hostname);
+      } catch (e) {
+        throw e;
+      }
+    }
 
-    return bulkTrueMail(unverifiedEmails, hostname);
-  }
-};
-
-export const checkTask = async (taskId: string) => {
-  const url = `https://truemail.io/api/v1/tasks/${taskId}/status?access_token=${TRUE_MAIL_API_KEY}`;
-
-  const response = await sendRequest({
-    url,
-    method: 'GET'
-  });
-
-  return JSON.parse(response).data;
-};
-
-export const getTrueMailBulk = async (taskId: string, hostname: string) => {
-  debugBase(`Downloading bulk email validation result`);
-
-  const url = `https://truemail.io/api/v1/tasks/${taskId}/download?access_token=${TRUE_MAIL_API_KEY}&timeout=30000`;
-
-  const response = await sendRequest({
-    url,
-    method: 'GET'
-  });
-
-  const rows = response.split('\n');
-  const emails: Array<{ email: string; status: string }> = [];
-
-  for (const row of rows) {
-    const rowArray = row.split(',');
-
-    if (rowArray.length > 2) {
-      const email = rowArray[0];
-      const status = rowArray[2];
-
-      emails.push({
-        email,
-        status
-      });
-
-      if (
-        status === EMAIL_VALIDATION_STATUSES.VALID ||
-        status === EMAIL_VALIDATION_STATUSES.INVALID
-      ) {
-        const found = await Emails.findOne({ email });
-
-        if (!found) {
-          const doc = {
-            email,
-            status,
-            created: new Date()
-          };
-
-          await Emails.createEmail(doc);
-        }
+    if (MAIL_VERIFIER_SERVICE === 'mailsso') {
+      try {
+        await bulkMailsso(unverifiedEmails, hostname);
+      } catch (e) {
+        throw e;
       }
     }
   }
-
-  debugBase(`Sending bulk email validation result to erxes-api`);
-
-  await sendRequest({
-    url: `${hostname}/verifier/webhook`,
-    method: 'POST',
-    body: {
-      emails,
-      source: EMAIL_VALIDATION_SOURCES.TRUEMAIL
-    }
-  });
 };
+

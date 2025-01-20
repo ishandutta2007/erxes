@@ -1,4 +1,5 @@
 module.exports = {
+  srcDir: __dirname,
   name: 'inbox',
   port: 3009,
   scope: 'inbox',
@@ -26,20 +27,6 @@ module.exports = {
       icon: 'icon-chat',
       location: 'mainNavigation',
       permission: 'showConversations'
-    },
-    {
-      text: 'Bookings',
-      url: '/bookings',
-      icon: 'icon-paste',
-      location: 'mainNavigation',
-      permission: 'showIntegrations'
-    },
-    {
-      text: 'Forms',
-      url: '/forms',
-      icon: 'icon-laptop',
-      location: 'mainNavigation',
-      permission: 'showForms'
     },
     {
       text: 'Skills',

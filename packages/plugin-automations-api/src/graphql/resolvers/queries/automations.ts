@@ -1,13 +1,14 @@
-import { paginate } from '@erxes/api-utils/src';
+import { STATUSES, UI_ACTIONS } from '../../../constants';
 import {
   checkPermission,
   requireLogin
 } from '@erxes/api-utils/src/permissions';
+import { getService, getServices } from '@erxes/api-utils/src/serviceDiscovery';
+
 import { IContext } from '../../../connectionResolver';
-import { sendSegmentsMessage } from '../../../messageBroker';
 import { ITrigger } from '../../../models/definitions/automaions';
-import { serviceDiscovery } from '../../../configs';
-import { STATUSES, UI_ACTIONS } from '../../../constants';
+import { paginate } from '@erxes/api-utils/src';
+import { sendSegmentsMessage } from '../../../messageBroker';
 
 interface IListArgs {
   status: string;
@@ -18,6 +19,7 @@ interface IListArgs {
   sortField: string;
   sortDirection: number;
   tagIds: string[];
+  triggerTypes: string[];
 }
 
 interface IHistoriesParams {
@@ -32,7 +34,7 @@ interface IHistoriesParams {
 }
 
 const generateFilter = (params: IListArgs) => {
-  const { status, searchValue, tagIds } = params;
+  const { status, searchValue, tagIds, triggerTypes, ids } = params;
 
   const filter: any = { status: { $nin: [STATUSES.ARCHIVED, 'template'] } };
 
@@ -46,6 +48,58 @@ const generateFilter = (params: IListArgs) => {
 
   if (tagIds) {
     filter.tagIds = { $in: tagIds };
+  }
+
+  if (triggerTypes?.length) {
+    filter['triggers.type'] = { $in: triggerTypes };
+  }
+
+  if (ids?.length) {
+    filter._id = { $in: ids };
+  }
+
+  return filter;
+};
+
+const generateHistoriesFilter = (params: any) => {
+  const {
+    automationId,
+    triggerType,
+    triggerId,
+    status,
+    beginDate,
+    endDate,
+    targetId,
+    targetIds
+  } = params;
+  const filter: any = { automationId };
+
+  if (status) {
+    filter.status = status;
+  }
+
+  if (triggerId) {
+    filter.triggerId = triggerId;
+  }
+
+  if (triggerType) {
+    filter.triggerType = triggerType;
+  }
+
+  if (beginDate) {
+    filter.createdAt = { $gte: beginDate };
+  }
+
+  if (endDate) {
+    filter.createdAt = { $lte: endDate };
+  }
+
+  if (targetId) {
+    filter.targetId = targetId;
+  }
+
+  if (targetIds?.length) {
+    filter.targetId = { $in: targetIds };
   }
 
   return filter;
@@ -69,10 +123,8 @@ const automationQueries = {
 
     const filter = generateFilter(params);
 
-    const automations = paginate(
-      models.Automations.find(filter)
-        .sort({ createdAt: -1 })
-        .lean(),
+    const automations = await paginate(
+      models.Automations.find(filter).sort({ createdAt: -1 }).lean(),
       { perPage, page }
     );
 
@@ -98,7 +150,7 @@ const automationQueries = {
   /**
    * Automations note list
    */
-  automationNotes(
+  async automationNotes(
     _root,
     params: { automationId: string },
     { models }: IContext
@@ -111,44 +163,32 @@ const automationQueries = {
   /**
    * Automations history list
    */
-  automationHistories(_root, params: IHistoriesParams, { models }: IContext) {
-    const {
-      page,
-      perPage,
-      automationId,
-      triggerType,
-      triggerId,
-      status,
-      beginDate,
-      endDate
-    } = params;
+  async automationHistories(
+    _root,
+    params: IHistoriesParams,
+    { models }: IContext
+  ) {
+    const { page, perPage } = params;
 
-    const filter: any = { automationId };
+    const filter: any = generateHistoriesFilter(params);
 
-    if (status) {
-      filter.status = status;
-    }
+    return await paginate(
+      models.Executions.find(filter).sort({ createdAt: -1 }),
+      {
+        page,
+        perPage
+      }
+    );
+  },
 
-    if (triggerId) {
-      filter.triggerId = triggerId;
-    }
+  async automationHistoriesTotalCount(
+    _root,
+    params: IHistoriesParams,
+    { models }: IContext
+  ) {
+    const filter: any = generateHistoriesFilter(params);
 
-    if (triggerType) {
-      filter.triggerType = triggerType;
-    }
-
-    if (beginDate) {
-      filter.createdAt = { $gte: beginDate };
-    }
-
-    if (endDate) {
-      filter.createdAt = { $lte: endDate };
-    }
-
-    return paginate(models.Executions.find(filter).sort({ createdAt: -1 }), {
-      page,
-      perPage
-    });
+    return await models.Executions.find(filter).countDocuments();
   },
 
   async automationConfigPrievewCount(
@@ -205,7 +245,7 @@ const automationQueries = {
   },
 
   async automationConstants(_root, {}) {
-    const services = await serviceDiscovery.getServices();
+    const services = await getServices();
 
     const constants: {
       triggersConst: ITrigger[];
@@ -220,7 +260,7 @@ const automationQueries = {
     };
 
     for (const serviceName of services) {
-      const service = await serviceDiscovery.getService(serviceName, true);
+      const service = await getService(serviceName);
       const meta = service.config?.meta || {};
 
       if (meta && meta.automations && meta.automations.constants) {
@@ -241,10 +281,12 @@ const automationQueries = {
         }
 
         if (!!pluginConstants?.emailRecipientTypes?.length) {
-          const updatedEmailRecipIentTypes = pluginConstants.emailRecipientTypes.map(
-            eRT => ({ ...eRT, serviceName })
-          );
-          constants.actionsConst = constants.actionsConst.map(actionConst =>
+          const updatedEmailRecipIentTypes =
+            pluginConstants.emailRecipientTypes.map((eRT) => ({
+              ...eRT,
+              serviceName
+            }));
+          constants.actionsConst = constants.actionsConst.map((actionConst) =>
             actionConst.type === 'sendEmail'
               ? {
                   ...actionConst,

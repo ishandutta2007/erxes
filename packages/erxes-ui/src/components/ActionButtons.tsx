@@ -1,16 +1,19 @@
-import React from 'react';
-import styled from 'styled-components';
-import colors from '../styles/colors';
+import React from "react";
+import colors from "../styles/colors";
+import styled from "styled-components";
 
 export const ActionButton = styled.div`
-  display: inline-block;
+  display: inline-flex;
+  margin-right: 30px;
 
   * {
     padding: 0;
     margin-left: 8px;
+    margin-right: 0;
 
     &:first-child {
       margin-left: 0;
+      padding: 0;
     }
   }
 
@@ -20,6 +23,10 @@ export const ActionButton = styled.div`
 
   a {
     color: ${colors.colorCoreGray};
+  }
+
+  &:last-child {
+    margin-right: 0;
   }
 `;
 

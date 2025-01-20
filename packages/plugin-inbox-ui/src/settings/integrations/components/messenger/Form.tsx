@@ -1,15 +1,15 @@
-import { Alert, __ } from 'coreui/utils';
+import { Alert, __ } from '@erxes/ui/src/utils';
 import { Appearance, Availability, Greeting, Intro, Options } from './steps';
 import {
   Content,
   LeftContent,
-  MessengerPreview
+  MessengerPreview,
 } from '@erxes/ui-inbox/src/settings/integrations/styles';
 import {
   ControlWrapper,
   Indicator,
   Preview,
-  StepWrapper
+  StepWrapper,
 } from '@erxes/ui/src/components/step/styles';
 import {
   IIntegration,
@@ -17,7 +17,8 @@ import {
   IMessengerApps,
   IMessengerData,
   ISkillData,
-  IUiOptions
+  IUiOptions,
+  IExternalLink,
 } from '@erxes/ui-inbox/src/settings/integrations/types';
 import { Step, Steps } from '@erxes/ui/src/components/step';
 
@@ -74,6 +75,7 @@ type State = {
   logoPreviewStyle: any;
   logoPreviewUrl: string;
   facebook: string;
+  instagram: string;
   twitter: string;
   youtube: string;
   messages: IMessages;
@@ -86,6 +88,7 @@ type State = {
   forceLogoutWhenResolve?: boolean;
   showVideoCallRequest?: boolean;
   messengerApps: IMessengerApps;
+  externalLinks: IExternalLink[];
 };
 
 class CreateMessenger extends React.Component<Props, State> {
@@ -104,9 +107,10 @@ class CreateMessenger extends React.Component<Props, State> {
       forceLogoutWhenResolve: false,
       showVideoCallRequest: false,
       botEndpointUrl: '',
-      botShowInitialMessage: false
+      botShowInitialMessage: false,
     };
     const links = configData.links || {};
+    const externalLinks = configData.externalLinks || [];
     const messages = configData.messages || {};
     const uiOptions = integration.uiOptions || {};
     const channels = integration.channels || [];
@@ -119,7 +123,7 @@ class CreateMessenger extends React.Component<Props, State> {
       skillData: configData.skillData,
       brandId: integration.brandId || '',
       languageCode,
-      channelIds: channels.map(item => item._id) || [],
+      channelIds: channels.map((item) => item._id) || [],
       color: uiOptions.color || '#6569DF',
       textColor: uiOptions.textColor || '#fff',
       wallpaper: uiOptions.wallpaper || '1',
@@ -135,26 +139,28 @@ class CreateMessenger extends React.Component<Props, State> {
       timezone: configData.timezone || '',
       responseRate: configData.responseRate || 'A few minutes',
       showTimezone: configData.showTimezone || false,
-      onlineHours: (configData.onlineHours || []).map(h => ({
+      onlineHours: (configData.onlineHours || []).map((h) => ({
         _id: Math.random(),
-        ...h
+        ...h,
       })),
       showVideoCallRequest: configData.showVideoCallRequest,
       logo: uiOptions.logo || '',
       logoPreviewStyle: {},
       logoPreviewUrl: uiOptions.logo || '/images/erxes.png',
       facebook: links.facebook || '',
+      instagram: links.instagram || '',
       twitter: links.twitter || '',
       youtube: links.youtube || '',
       messages: { ...this.generateMessages(messages) },
-      messengerApps
+      messengerApps,
+      externalLinks,
     };
   }
 
   generateMessages(integrationMessages) {
     const messages = {};
 
-    LANGUAGES.forEach(item => {
+    LANGUAGES.forEach((item) => {
       const message = integrationMessages[item.value] || {};
 
       messages[item.value] = {
@@ -162,11 +168,11 @@ class CreateMessenger extends React.Component<Props, State> {
           title:
             message && message.greetings ? message.greetings.title || '' : '',
           message:
-            message && message.greetings ? message.greetings.message || '' : ''
+            message && message.greetings ? message.greetings.message || '' : '',
         },
         welcome: message.welcome || '',
         away: message.away || '',
-        thank: message.thank || ''
+        thank: message.thank || '',
       };
     });
 
@@ -174,14 +180,18 @@ class CreateMessenger extends React.Component<Props, State> {
   }
 
   onChange = <T extends keyof State>(key: T, value: State[T]) => {
-    this.setState(({ [key]: value } as unknown) as Pick<State, keyof State>);
+    this.setState({ [key]: value } as unknown as Pick<State, keyof State>);
+  };
+
+  onExternalLinksChange = (newExternalLinks: IExternalLink[]) => {
+    this.setState({ externalLinks: newExternalLinks });
   };
 
   handleMessengerApps = (messengerApps: IMessengerApps) => {
     this.setState({ messengerApps });
   };
 
-  save = e => {
+  save = (e) => {
     e.preventDefault();
 
     const {
@@ -193,6 +203,7 @@ class CreateMessenger extends React.Component<Props, State> {
       channelIds,
       messages,
       facebook,
+      instagram,
       twitter,
       youtube,
       requireAuth,
@@ -202,7 +213,8 @@ class CreateMessenger extends React.Component<Props, State> {
       forceLogoutWhenResolve,
       showVideoCallRequest,
       messengerApps,
-      skillData
+      skillData,
+      externalLinks,
     } = this.state;
 
     if (!languageCode) {
@@ -215,6 +227,24 @@ class CreateMessenger extends React.Component<Props, State> {
 
     if (!brandId) {
       return Alert.error('Choose a brand');
+    }
+
+    if (channelIds.length < 1) {
+      return Alert.error('Choose a channel');
+    }
+
+    if (messengerApps.websites && messengerApps.websites.length > 0) {
+      for (const website of messengerApps.websites) {
+        if (website.url === '') {
+          return Alert.error(`Set Website URL`);
+        }
+        if (website.description === '') {
+          return Alert.error(`Set Website Description`);
+        }
+        if (website.buttonText === '') {
+          return Alert.error(`Set Website Button Text`);
+        }
+      }
     }
 
     if (skillData && Object.keys(skillData).length !== 0) {
@@ -237,8 +267,9 @@ class CreateMessenger extends React.Component<Props, State> {
 
     const links = {
       facebook: linkify(facebook),
+      instagram: linkify(instagram),
       twitter: linkify(twitter),
-      youtube: linkify(youtube)
+      youtube: linkify(youtube),
     };
 
     this.props.save({
@@ -256,10 +287,10 @@ class CreateMessenger extends React.Component<Props, State> {
         timezone: this.state.timezone,
         responseRate: this.state.responseRate,
         showTimezone: this.state.showTimezone,
-        onlineHours: (this.state.onlineHours || []).map(oh => ({
+        onlineHours: (this.state.onlineHours || []).map((oh) => ({
           day: oh.day,
           from: oh.from,
-          to: oh.to
+          to: oh.to,
         })),
         supporterIds: this.state.supporterIds,
         messages,
@@ -269,25 +300,27 @@ class CreateMessenger extends React.Component<Props, State> {
         hideWhenOffline,
         forceLogoutWhenResolve,
         showVideoCallRequest,
-        links
+        links,
+        externalLinks,
       },
       uiOptions: {
         color: this.state.color,
         textColor: this.state.textColor,
         wallpaper: this.state.wallpaper,
-        logo: this.state.logo
+        logo: this.state.logo,
       },
-      messengerApps
+      messengerApps,
     });
   };
 
-  onStepClick = name => {
+  onStepClick = (name) => {
     this.setState({
-      isStepActive:
-        name === 'greeting' || name === 'hours' || name === 'addon'
-          ? true
-          : false,
-      activeStep: name
+      isStepActive: !!(
+        name === 'greeting' ||
+        name === 'hours' ||
+        name === 'addon'
+      ),
+      activeStep: name,
     });
   };
 
@@ -339,6 +372,7 @@ class CreateMessenger extends React.Component<Props, State> {
       notifyCustomer,
       logoPreviewStyle,
       facebook,
+      instagram,
       twitter,
       youtube,
       messages,
@@ -352,7 +386,8 @@ class CreateMessenger extends React.Component<Props, State> {
       showVideoCallRequest,
       channelIds,
       skillData,
-      messengerApps
+      messengerApps,
+      externalLinks,
     } = this.state;
 
     const { integration } = this.props;
@@ -361,7 +396,7 @@ class CreateMessenger extends React.Component<Props, State> {
     const breadcrumb = [
       { title: __('Settings'), link: '/settings' },
       { title: __('Integrations'), link: '/settings/integrations' },
-      { title: __('Messenger') }
+      { title: __('Messenger') },
     ];
 
     return (
@@ -395,9 +430,12 @@ class CreateMessenger extends React.Component<Props, State> {
                   supporterIds={supporterIds}
                   messages={messages}
                   facebook={facebook}
+                  instagram={instagram}
                   languageCode={languageCode}
                   twitter={twitter}
                   youtube={youtube}
+                  externalLinks={externalLinks}
+                  onExternalLinksChange={this.onExternalLinksChange}
                 />
               </Step>
 
@@ -494,7 +532,7 @@ class CreateMessenger extends React.Component<Props, State> {
           </LeftContent>
 
           <MessengerPreview>
-            <Preview fullHeight={true}>
+            <Preview $fullHeight={true}>
               <CommonPreview
                 teamMembers={this.props.teamMembers}
                 message={message}
@@ -516,6 +554,7 @@ class CreateMessenger extends React.Component<Props, State> {
                 showVideoCallRequest={showVideoCallRequest}
                 messengerApps={messengerApps}
                 facebook={facebook}
+                instagram={instagram}
                 twitter={twitter}
                 youtube={youtube}
               />

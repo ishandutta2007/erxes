@@ -7,17 +7,19 @@ import { Info } from '@erxes/ui/src/styles/main';
 import React from 'react';
 import Row from './Row';
 import { __ } from 'modules/common/utils';
+import { IColumnWithChosenField, IImportColumn } from '../../types';
+import { FieldsCombinedByType } from '@erxes/ui-forms/src/settings/properties/types';
 
 type Props = {
-  columns: any[];
-  fields: any[];
-  columnWithChosenField: any;
-  onChangeColumn: (column, value, contentType) => void;
+  columns: IImportColumn;
+  fields: FieldsCombinedByType[];
+  columnWithChosenField: IColumnWithChosenField;
+  onChangeColumn: (column, value, contentType, columns) => void;
   contentType: string;
 };
 
 class MapColumn extends React.Component<Props, {}> {
-  //fix this function after
+  // fix this function after
   renderText = value => {
     switch (value) {
       case 'customer':

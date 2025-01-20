@@ -17,6 +17,8 @@ export interface ITimeclock {
   inDeviceType?: string;
   outDeviceType?: string;
   branchName?: string;
+
+  shiftNotClosed?: boolean;
 }
 export interface ITimelog {
   _id: string;
@@ -40,6 +42,10 @@ export interface IAbsence {
   absenceTimeType: string;
   requestDates: string[];
   totalHoursOfAbsence: string;
+
+  note?: string;
+
+  absenceType?: string;
 }
 export interface IAbsenceType {
   _id: string;
@@ -49,8 +55,11 @@ export interface IAbsenceType {
   shiftRequest: boolean;
 
   requestType: string;
+  requestToType: string;
   requestTimeType: string;
   requestHoursPerDay?: number;
+  absenceUserIds?: [string];
+  branchIds?: [string];
 }
 
 export interface IReport {
@@ -93,6 +102,12 @@ export interface IUserReport {
   totalAbsenceMins?: number;
   totalMinsAbsenceThisMonth?: number;
   absenceInfo?: IUserAbsenceInfo;
+
+  index?: number;
+
+  schedules?: ISchedule[];
+  timeclocks?: ITimeclock[];
+  requests?: IAbsence[];
 }
 
 export interface IUserAbsenceInfo {
@@ -138,6 +153,7 @@ export interface ISchedule {
   totalBreakInMins?: number;
 }
 export interface IShift {
+  _id?: string;
   user?: IUser;
   date?: Date;
   shiftStart: Date;
@@ -157,19 +173,11 @@ export interface IScheduleConfig {
   lunchBreakInMins: number;
   shiftStart: string;
   shiftEnd: string;
+  locations: any[];
+  startFlexible?: boolean;
+  endFlexible?: boolean;
+  overtimeExists?: boolean;
   configDays: IScheduleConfigDays[];
-}
-
-export interface IScheduleConfigOrder {
-  _id?: string;
-  userId: string;
-  orderedList: IScheduleConfigOrderItem[];
-}
-export interface IScheduleConfigOrderItem {
-  scheduleConfigId: string;
-  order: number;
-  pinned: boolean;
-  label?: string;
 }
 
 export interface IScheduleConfigDays {
@@ -183,6 +191,7 @@ export interface IScheduleForm {
 }
 
 export interface IScheduleDate {
+  _id?: string;
   overnightShift?: boolean;
 
   scheduleConfigId?: string;
@@ -234,10 +243,6 @@ export type PayDatesQueryResponse = {
   loading: boolean;
 };
 
-export type ScheduleConfigOrderQueryResponse = {
-  scheduleConfigOrder: IScheduleConfigOrder;
-} & QueryResponse;
-
 export type HolidaysQueryResponse = {
   holidays: IAbsence[];
 } & QueryResponse;
@@ -249,7 +254,13 @@ export type ScheduleConfigQueryResponse = {
 export type DepartmentsQueryResponse = {
   timeclockDepartments: IDepartment[];
   departments: IDepartment[];
-};
+} & QueryResponse;
+export type DepartmentsQueryAdminResponse = {
+  departments: IDepartment[];
+} & QueryResponse;
+export type DeviceConfigsQueryResponse = {
+  deviceConfigs: { list: IDeviceConfig[]; totalCount: number };
+} & QueryResponse;
 
 export type ScheduleQueryResponse = {
   schedulesMain: { list: ISchedule[]; totalCount: number };
@@ -260,8 +271,16 @@ export type BranchesQueryResponse = {
   timeclockBranches: IBranch[];
 } & QueryResponse;
 
+export type BranchesQueryAdminResponse = {
+  branches: IBranch[];
+} & QueryResponse;
+
 export type ReportsQueryResponse = {
   timeclockReports: { list: IReport[]; totalCount: number };
+} & QueryResponse;
+
+export type ReportByUsersQueryResponse = {
+  timeclockReportByUsers: { list: [IUserReport]; totalCount: number };
 } & QueryResponse;
 
 export type MutationVariables = {
@@ -301,6 +320,16 @@ export type ScheduleMutationVariables = {
   scheduleConfigId?: string;
   totalBreakInMins?: number | string;
   status?: string;
+};
+
+export type TimeLogMutationResponse = {
+  extractTimeLogsFromMsSQLMutation: (params: {
+    variables: { startDate: string; endDate: string; params: any };
+  }) => Promise<any>;
+
+  createTimeClockFromLogMutation: (params: {
+    variables: { userId: string; timelog: Date; inDevice?: string };
+  }) => Promise<any>;
 };
 
 export type TimeClockMutationResponse = {
@@ -441,5 +470,5 @@ export type ScheduleMutationResponse = {
     variables: ScheduleMutationVariables;
   }) => Promise<any>;
 
-  scheduleConfigOrderEditMutation: (params: { variables: any }) => Promise<any>;
+  editScheduleMutation: (params: { variables: any }) => Promise<any>;
 };

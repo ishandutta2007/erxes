@@ -1,12 +1,12 @@
-import client from '@erxes/ui/src/apolloClient';
-import { gql } from '@apollo/client';
-import FilterByParams from '@erxes/ui/src/components/FilterByParams';
-import Spinner from '@erxes/ui/src/components/Spinner';
-import { Alert } from '@erxes/ui/src/utils';
-import { queries } from '@erxes/ui-inbox/src/inbox/graphql';
-import { NoHeight } from '@erxes/ui-inbox/src/inbox/styles';
-import { generateParams } from '@erxes/ui-inbox/src/inbox/utils';
-import React from 'react';
+import { Alert } from "@erxes/ui/src/utils";
+import FilterByParams from "@erxes/ui/src/components/FilterByParams";
+import { NoHeight } from "@erxes/ui-inbox/src/inbox/styles";
+import React from "react";
+import Spinner from "@erxes/ui/src/components/Spinner";
+import client from "@erxes/ui/src/apolloClient";
+import { generateParams } from "@erxes/ui-inbox/src/inbox/utils";
+import { gql } from "@apollo/client";
+import { queries } from "@erxes/ui-inbox/src/inbox/graphql";
 
 type Props = {
   query?: { queryName: string; dataName: string; variables?: any };
@@ -48,7 +48,7 @@ export default class FilterList extends React.PureComponent<Props, State> {
     this.state = {
       fields: props.fields || [],
       counts: {},
-      loading
+      loading,
     };
   }
 
@@ -60,17 +60,18 @@ export default class FilterList extends React.PureComponent<Props, State> {
     // Fetching filter lists channels, brands, tags etc
     if (query) {
       const { queryName, dataName, variables = {} } = query;
+
       client
         .query({
           query: gql(queries[queryName]),
-          variables
+          variables,
         })
         .then(({ data, loading }: any) => {
           if (this.mounted) {
             this.setState({ fields: data[dataName], loading });
           }
         })
-        .catch(e => {
+        .catch((e) => {
           Alert.error(e.message);
         });
     }
@@ -80,7 +81,7 @@ export default class FilterList extends React.PureComponent<Props, State> {
       .query({
         query: gql(queries.conversationCounts),
         variables: { ...generateParams({ ...queryParams }), only: counts },
-        fetchPolicy: ignoreCache ? 'network-only' : 'cache-first'
+        fetchPolicy: ignoreCache ? "network-only" : "cache-first",
         // context: {
         //   fetchOptions: { signal: this.abortController.signal }
         // }
@@ -94,7 +95,7 @@ export default class FilterList extends React.PureComponent<Props, State> {
           }
         }
       })
-      .catch(e => {
+      .catch((e) => {
         Alert.error(e.message);
       });
   }

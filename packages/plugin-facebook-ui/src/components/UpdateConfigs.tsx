@@ -1,19 +1,19 @@
-import React from 'react';
-
-import { __ } from '@erxes/ui/src/utils/core';
-import { IConfigsMap } from '@erxes/ui-settings/src/general/types';
+import Button from '@erxes/ui/src/components/Button';
 import CollapseContent from '@erxes/ui/src/components/CollapseContent';
-import Info from '@erxes/ui/src/components/Info';
+import ControlLabel from '@erxes/ui/src/components/form/Label';
 import { FormControl } from '@erxes/ui/src/components/form';
 import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import Button from '@erxes/ui/src/components/Button';
+import { IConfigsMap } from '@erxes/ui-settings/src/general/types';
+import Icon from '@erxes/ui/src/components/Icon';
+import Info from '@erxes/ui/src/components/Info';
+import React from 'react';
+import { __ } from '@erxes/ui/src/utils/core';
 
 const KEY_LABELS = {
   FACEBOOK_APP_ID: 'Facebook App Id',
   FACEBOOK_APP_SECRET: 'Facebook App Secret',
   FACEBOOK_VERIFY_TOKEN: 'Facebook Verify Token',
-  FACEBOOK_PERMISSIONS: 'Facebook Permissions'
+  FACEBOOK_PERMISSIONS: 'Facebook Permissions',
 };
 
 type Props = {
@@ -50,7 +50,7 @@ export default class UpdateConfigs extends React.Component<Props, State> {
     type?: string,
     description?: string,
     defaultValue?: string,
-    label?: string
+    label?: string,
   ) => {
     const { configsMap } = this.state;
 
@@ -73,11 +73,15 @@ export default class UpdateConfigs extends React.Component<Props, State> {
     };
 
     return (
-      <CollapseContent title="Facebook">
+      <CollapseContent
+        beforeTitle={<Icon icon="facebook" />}
+        transparent={true}
+        title="Facebook"
+      >
         <Info>
           <a
             target="_blank"
-            href="https://erxes.org/administrator/system-config#facebook"
+            href="https://docs.erxes.io/"
             rel="noopener noreferrer"
           >
             {__('Learn how to set Facebook Integration Variables')}
@@ -90,7 +94,7 @@ export default class UpdateConfigs extends React.Component<Props, State> {
           'FACEBOOK_PERMISSIONS',
           '',
           '',
-          'pages_messaging,pages_manage_ads,pages_manage_engagement,pages_manage_metadata,pages_read_user_content'
+          'pages_messaging,pages_manage_ads,pages_manage_engagement,pages_manage_metadata,pages_read_user_content',
         )}
         <Button onClick={onClick}>{__('Save')}</Button>
       </CollapseContent>

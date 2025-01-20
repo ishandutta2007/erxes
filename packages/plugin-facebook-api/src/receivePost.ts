@@ -22,7 +22,7 @@ const receivePost = async (
 
   const userId = params.from.id;
 
-  const customer = await getOrCreateCustomer(
+  await getOrCreateCustomer(
     models,
     subdomain,
     pageId,
@@ -30,14 +30,7 @@ const receivePost = async (
     INTEGRATION_KINDS.POST
   );
 
-  await getOrCreatePost(
-    models,
-    subdomain,
-    params,
-    pageId,
-    userId,
-    customer.erxesApiId || ''
-  );
+  await getOrCreatePost(models, subdomain, params, pageId, userId);
 };
 
 export default receivePost;

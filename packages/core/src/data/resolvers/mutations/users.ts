@@ -1,6 +1,6 @@
 import {
   checkPermission,
-  requireLogin
+  requireLogin,
 } from '@erxes/api-utils/src/permissions';
 import * as telemetry from 'erxes-telemetry';
 import { ILink } from '@erxes/api-utils/src/types';
@@ -9,16 +9,33 @@ import { authCookieOptions } from '@erxes/api-utils/src/core';
 import {
   IDetail,
   IEmailSignature,
-  IUser
+  IUser,
 } from '../../../db/models/definitions/users';
 import {
   sendInboxMessage,
-  sendIntegrationsMessage
+  sendIntegrationsMessage,
 } from '../../../messageBroker';
 import { putCreateLog, putUpdateLog } from '../../logUtils';
 import { resetPermissionsCache } from '../../permissions/utils';
-import utils, { getEnv, sendRequest } from '../../utils';
+import utils, { getEnv, sendEmail } from '../../utils';
 import { IContext, IModels } from '../../../connectionResolver';
+import fetch from 'node-fetch';
+import * as jwt from 'jsonwebtoken';
+import { getOrganizationDetail } from '@erxes/api-utils/src/saas/saas';
+import {
+  updateOrganization,
+  updateOrganizationDomain,
+  updateOrganizationInfo,
+} from '../../../organizations';
+import { debugError } from '@erxes/api-utils/src/debuggers';
+import redis from '@erxes/api-utils/src/redis';
+import Workos from '@workos-inc/node';
+import { isEnabled } from '@erxes/api-utils/src/serviceDiscovery';
+
+export const EMAIL_TRANSPORTS = {
+  SES: 'ses',
+  SENDGRID: 'sendgrid',
+};
 
 interface IUsersEdit extends IUser {
   channelIds?: string[];
@@ -36,13 +53,13 @@ const sendInvitationEmail = (
   subdomain: string,
   {
     email,
-    token
+    token,
   }: {
     email: string;
     token: string;
   }
 ) => {
-  const DOMAIN = getEnv({ name: 'DOMAIN' });
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
   const confirmationUrl = `${DOMAIN}/confirmation?token=${token}`;
 
   utils.sendEmail(
@@ -54,9 +71,9 @@ const sendInvitationEmail = (
         name: 'userInvitation',
         data: {
           content: confirmationUrl,
-          domain: DOMAIN
-        }
-      }
+          domain: DOMAIN,
+        },
+      },
     },
     models
   );
@@ -71,7 +88,7 @@ const userMutations = {
       firstName,
       lastName,
       purpose,
-      subscribeEmail
+      subscribeEmail,
     }: {
       email: string;
       password: string;
@@ -95,28 +112,28 @@ const userMutations = {
       details: {
         fullName: `${firstName} ${lastName || ''}`,
         firstName,
-        lastName
-      }
+        lastName,
+      },
     };
 
     await models.Users.createUser(doc);
 
     if (subscribeEmail && process.env.NODE_ENV === 'production') {
-      await sendRequest({
-        url: 'https://erxes.io/subscribe',
+      await fetch('https://erxes.io/subscribe', {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           email,
           purpose,
           firstName,
-          lastName
-        }
+          lastName,
+        }),
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     await models.Configs.createOrUpdateConfig({
       code: 'UPLOAD_SERVICE_TYPE',
-      value: 'local'
+      value: 'local',
     });
 
     return 'success';
@@ -125,18 +142,35 @@ const userMutations = {
   /*
    * Login
    */
-  async login(_root, args: ILogin, { res, requestInfo, models }: IContext) {
-    const response = await models.Users.login(args);
+  async login(
+    _root,
+    args: ILogin,
+    { res, requestInfo, models, subdomain }: IContext
+  ) {
+    const response = await models.Users.login({ ...args, subdomain });
+    const VERSION = getEnv({ name: 'VERSION' });
 
     const { token } = response;
 
     const sameSite = getEnv({ name: 'SAME_SITE' });
-    const DOMAIN = getEnv({ name: 'DOMAIN' });
+    const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
 
     const cookieOptions: any = { secure: requestInfo.secure };
-
     if (sameSite && sameSite === 'none' && res.req.headers.origin !== DOMAIN) {
       cookieOptions.sameSite = sameSite;
+    }
+
+    if (VERSION && VERSION === 'saas') {
+      const organization = await getOrganizationDetail({ subdomain, models });
+
+      if (organization.domain && organization.dnsStatus === 'active') {
+        cookieOptions.secure = true;
+        cookieOptions.sameSite = 'none';
+      }
+
+      await updateOrganization(models, subdomain, {
+        $set: { lastActiveDate: Date.now() },
+      });
     }
 
     res.cookie('auth-token', token, authCookieOptions(cookieOptions));
@@ -166,7 +200,7 @@ const userMutations = {
     const token = await models.Users.forgotPassword(email);
 
     // send email ==============
-    const DOMAIN = getEnv({ name: 'DOMAIN' });
+    const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
 
     const link = `${DOMAIN}/reset-password?token=${token}`;
 
@@ -178,9 +212,9 @@ const userMutations = {
         template: {
           name: 'resetPassword',
           data: {
-            content: link
-          }
-        }
+            content: link,
+          },
+        },
       },
       models
     );
@@ -202,7 +236,7 @@ const userMutations = {
   /*
    * Reset member's password
    */
-  usersResetMemberPassword(
+  async usersResetMemberPassword(
     _root,
     args: { _id: string; newPassword: string },
     { models }: IContext
@@ -213,7 +247,7 @@ const userMutations = {
   /*
    * Change user password
    */
-  usersChangePassword(
+  async usersChangePassword(
     _root,
     args: { currentPassword: string; newPassword: string },
     { user, models }: IContext
@@ -234,9 +268,9 @@ const userMutations = {
 
     // clean custom field values
     if (doc.customFieldsData) {
-      doc.customFieldsData = doc.customFieldsData.map(cd => ({
+      doc.customFieldsData = doc.customFieldsData.map((cd) => ({
         ...cd,
-        stringValue: cd.value ? cd.value.toString() : ''
+        stringValue: cd.value ? cd.value.toString() : '',
       }));
     }
 
@@ -247,9 +281,10 @@ const userMutations = {
         ...doc,
         details: {
           ...doc.details,
-          fullName: `${doc.details.firstName || ''} ${doc.details.lastName ||
-            ''}`
-        }
+          fullName: `${doc.details.firstName || ''} ${
+            doc.details.lastName || ''
+          }`,
+        },
       };
     }
 
@@ -257,7 +292,7 @@ const userMutations = {
 
     if (args.departmentIds || args.branchIds) {
       await models.UserMovements.manageUserMovement({
-        user: updatedUser
+        user: updatedUser,
       });
     }
 
@@ -265,7 +300,7 @@ const userMutations = {
       await sendInboxMessage({
         subdomain,
         action: 'updateUserChannels',
-        data: { channelIds, userId: _id }
+        data: { channelIds, userId: _id },
       });
     }
 
@@ -279,7 +314,7 @@ const userMutations = {
         description: 'edit profile',
         object: userOnDb,
         newData: updatedDoc,
-        updatedDocument: updatedUser
+        updatedDocument: updatedUser,
       },
       user
     );
@@ -295,14 +330,12 @@ const userMutations = {
     {
       username,
       email,
-      password,
       details,
       links,
-      employeeId
+      employeeId,
     }: {
       username: string;
       email: string;
-      password: string;
       details: IDetail;
       links: ILink;
       employeeId: string;
@@ -311,28 +344,18 @@ const userMutations = {
   ) {
     const userOnDb = await models.Users.getUser(user._id);
 
-    const valid = await models.Users.comparePassword(
-      password,
-      userOnDb.password
-    );
-
-    if (!password || !valid) {
-      // bad password
-      throw new Error('Invalid password. Try again');
-    }
-
     const doc = {
       username,
       email,
       details: {
         ...details,
-        fullName: `${details.firstName || ''} ${details.lastName || ''}`
+        fullName: `${details.firstName || ''} ${details.lastName || ''}`,
       },
       links,
-      employeeId
+      employeeId,
     };
 
-    const updatedUser = models.Users.editProfile(user._id, doc);
+    const updatedUser = await models.Users.editProfile(user._id, doc);
 
     await putUpdateLog(
       models,
@@ -342,7 +365,7 @@ const userMutations = {
         description: 'edit profile',
         object: userOnDb,
         newData: doc,
-        updatedDocument: updatedUser
+        updatedDocument: updatedUser,
       },
       user
     );
@@ -370,7 +393,7 @@ const userMutations = {
         type: 'user',
         description: 'changed status',
         object: updatedUser,
-        updatedDocument: updatedUser
+        updatedDocument: updatedUser,
       },
       user
     );
@@ -384,7 +407,7 @@ const userMutations = {
   async usersInvite(
     _root,
     {
-      entries
+      entries,
     }: {
       entries: Array<{
         email: string;
@@ -422,7 +445,7 @@ const userMutations = {
         await models.Users.updateOne(
           { _id: createdUser?._id },
           {
-            $addToSet: { branchIds: entry.branchId }
+            $addToSet: { branchIds: entry.branchId },
           }
         );
       }
@@ -431,16 +454,17 @@ const userMutations = {
         await models.Users.updateOne(
           { _id: createdUser?._id },
           {
-            $addToSet: { departmentIds: entry.departmentId }
+            $addToSet: { departmentIds: entry.departmentId },
           }
         );
       }
-      if (entry.channelIds) {
+
+      if (entry.channelIds && isEnabled('inbox')) {
         sendInboxMessage({
           subdomain,
           action: 'updateUserChannels',
           data: { channelIds: entry.channelIds, userId: createdUser?._id },
-          isRPC: true
+          isRPC: true,
         });
       }
 
@@ -453,7 +477,7 @@ const userMutations = {
           type: 'user',
           description: 'invited user',
           object: createdUser,
-          newData: createdUser || {}
+          newData: createdUser || {},
         },
         user
       );
@@ -484,7 +508,7 @@ const userMutations = {
       password,
       passwordConfirmation,
       fullName,
-      username
+      username,
     }: {
       token: string;
       password: string;
@@ -499,7 +523,7 @@ const userMutations = {
       password,
       passwordConfirmation,
       fullName,
-      username
+      username,
     });
 
     await sendIntegrationsMessage({
@@ -508,9 +532,9 @@ const userMutations = {
       data: {
         type: 'addUserId',
         payload: {
-          _id: user._id
-        }
-      }
+          _id: user._id,
+        },
+      },
     });
 
     await putUpdateLog(
@@ -520,14 +544,14 @@ const userMutations = {
         type: 'user',
         description: 'confirm invitation',
         object: user,
-        updatedDocument: user
+        updatedDocument: user,
       },
       user
     );
     return user;
   },
 
-  usersConfigEmailSignatures(
+  async usersConfigEmailSignatures(
     _root,
     { signatures }: { signatures: IEmailSignature[] },
     { user, models }: IContext
@@ -535,13 +559,202 @@ const userMutations = {
     return models.Users.configEmailSignatures(user._id, signatures);
   },
 
-  usersConfigGetNotificationByEmail(
+  async usersConfigGetNotificationByEmail(
     _root,
     { isAllowed }: { isAllowed: boolean },
     { user, models }: IContext
   ) {
     return models.Users.configGetNotificationByEmail(user._id, isAllowed);
-  }
+  },
+
+  async usersSetChatStatus(
+    _root,
+    { _id, status }: { _id: string; status: string },
+    { models }: IContext
+  ) {
+    const getUser = await models.Users.getUser(_id);
+
+    if (!getUser) {
+      throw new Error('User not found');
+    }
+
+    return await models.Users.updateUser(_id, { chatStatus: status });
+  },
+  /*
+   * Upgrade organization plan status
+   */
+  async editOrganizationInfo(
+    _root,
+    {
+      icon,
+      link,
+      name,
+      iconColor,
+      textColor,
+      domain,
+      favicon,
+      description,
+      backgroundColor,
+      logo,
+    }: {
+      logo: string;
+      icon: string;
+      link: string;
+      name: string;
+      favicon: string;
+      domain: string;
+      iconColor: string;
+      textColor: string;
+      description: string;
+      backgroundColor: string;
+    },
+    { subdomain, res, requestInfo }: IContext
+  ) {
+    return updateOrganizationInfo(
+      {
+        subdomain,
+        icon,
+        link,
+        name,
+        logo,
+        iconColor,
+        description,
+        backgroundColor,
+        favicon,
+        domain,
+        textColor,
+      },
+      res,
+      requestInfo.cookies
+    );
+  },
+
+  async editOrganizationDomain(
+    _root,
+    {
+      domain,
+      type,
+    }: {
+      domain: string;
+      type: string;
+    },
+    { subdomain }: IContext
+  ) {
+    return updateOrganizationDomain({
+      subdomain,
+      type,
+      domain,
+    });
+  },
+
+  async loginWithGoogle(_root, _params, { models, subdomain }: IContext) {
+    try {
+      const workosClient = new Workos(
+        getEnv({ name: 'WORKOS_API_KEY', subdomain })
+      );
+
+      const CORE_DOMAIN = getEnv({ name: 'CORE_DOMAIN', subdomain });
+
+      const state = await jwt.sign(
+        {
+          subdomain,
+          redirectUri: `https://${subdomain}.api.erxes.io/api/sso-callback`,
+        },
+        models.Users.getSecret(),
+        { expiresIn: '1d' }
+      );
+
+      const authorizationURL = workosClient.sso.getAuthorizationURL({
+        provider: 'GoogleOAuth',
+        redirectURI: `${CORE_DOMAIN}/saas-sso-callback`,
+        clientID: getEnv({ name: 'WORKOS_PROJECT_ID', subdomain }),
+        state,
+      });
+
+      await updateOrganization(models, subdomain, {
+        $set: { lastActiveDate: Date.now() },
+      });
+
+      return authorizationURL;
+    } catch (e) {
+      throw new Error(e.message);
+    }
+  },
+
+  async loginWithMagicLink(
+    _root,
+    { email }: { email: string },
+    { models, subdomain }: IContext
+  ) {
+    try {
+      const workosClient = new Workos(
+        getEnv({ name: 'WORKOS_API_KEY', subdomain })
+      );
+
+      const user = await models.Users.findOne({
+        email: { $regex: new RegExp(`^${email}$`, 'i') },
+      });
+
+      if (user) {
+        const CORE_DOMAIN = getEnv({ name: 'CORE_DOMAIN', subdomain });
+
+        const token = await jwt.sign(
+          {
+            user: models.Users.getTokenFields(user),
+            subdomain,
+            redirectUri: `https://${subdomain}.api.erxes.io/api/ml-callback`,
+          },
+          models.Users.getSecret(),
+          { expiresIn: '1d' }
+        );
+
+        // validated tokens are checked at user middleware
+        await models.Users.updateOne(
+          { _id: user._id },
+          { $push: { validatedTokens: token } }
+        );
+
+        // will use subdomain when workos callback data arrives
+        await redis.set('subdomain', subdomain);
+
+        const session = await workosClient.passwordless.createSession({
+          email,
+          type: 'MagicLink',
+          state: token,
+          redirectURI: `${CORE_DOMAIN}/saas-ml-callback`,
+        });
+
+        await sendEmail(
+          subdomain,
+          {
+            toEmails: [email],
+            title: 'Login to erxes',
+            template: {
+              name: 'magicLogin',
+              data: { loginUrl: session.link, email },
+            },
+            transportMethod: EMAIL_TRANSPORTS.SENDGRID,
+            getOrganizationDetail,
+          },
+          models
+        );
+
+        await updateOrganization(models, subdomain, {
+          $set: { lastActiveDate: Date.now() },
+        });
+
+        return 'success';
+      }
+
+      return 'Invalid login';
+    } catch (e) {
+      debugError(
+        `Error occurred when sending magic link: ${JSON.stringify(e)}`
+      );
+
+      throw new Error(e.message);
+    }
+  },
 };
 
 requireLogin(userMutations, 'usersChangePassword');

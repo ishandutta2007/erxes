@@ -11,6 +11,7 @@ import SelectDate from './SelectDate';
 import SelectOption from './SelectOption';
 import { RenderDynamicComponent } from '@erxes/ui/src/utils/core';
 import AttriibutionForms from '../../../../containers/forms/actions/AttriibutionForms';
+import { Row } from '@erxes/ui-settings/src/styles';
 
 type Props = {
   onChange: (config: any) => void;
@@ -31,6 +32,10 @@ type Props = {
   customAttributions?: FieldsCombinedByType[];
   additionalContent?: JSX.Element;
   attrWithSegmentConfig?: boolean;
+  required?: boolean;
+  componentClass?: string;
+  placeholder?: string;
+  textLimit?: number;
 };
 
 type State = {
@@ -73,13 +78,8 @@ class PlaceHolderInput extends React.Component<Props, State> {
   };
 
   renderSelect() {
-    const {
-      fieldType,
-      options,
-      inputName,
-      isMulti,
-      optionsAllowedTypes
-    } = this.props;
+    const { fieldType, options, inputName, isMulti, optionsAllowedTypes } =
+      this.props;
     if (!['select', ...(optionsAllowedTypes || [])].includes(fieldType || '')) {
       return '';
     }
@@ -144,50 +144,49 @@ class PlaceHolderInput extends React.Component<Props, State> {
       return '';
     }
 
+    const updatedProps = {
+      inputName: inputName,
+      config: this.state.config,
+      setConfig: conf => this.onSelect(conf),
+      triggerType: this.props.triggerType,
+      onlySet: this.getOnlySet(),
+      fieldType: fieldType,
+      attrType: attrType,
+      attrTypes: attrTypes,
+      customAttributions: this.props.customAttributions
+    };
+
     if (attrWithSegmentConfig) {
       return (
         <AttriibutionForms segmentId={triggerConfig?.contentId}>
           {config => {
-            return (
-              <Attribution
-                inputName={inputName}
-                config={this.state.config}
-                setConfig={conf => this.onSelect(conf)}
-                triggerType={this.props.triggerType}
-                onlySet={this.getOnlySet()}
-                fieldType={fieldType}
-                attrConfig={config}
-                customAttributions={this.props.customAttributions}
-              />
-            );
+            return <Attribution {...updatedProps} attrConfig={config} />;
           }}
         </AttriibutionForms>
       );
     }
 
-    return (
-      <Attribution
-        inputName={inputName}
-        config={this.state.config}
-        setConfig={conf => this.onSelect(conf)}
-        triggerType={this.props.triggerType}
-        onlySet={this.getOnlySet()}
-        fieldType={fieldType}
-        attrType={attrType}
-        attrTypes={attrTypes}
-        customAttributions={this.props.customAttributions}
-      />
-    );
+    return <Attribution {...updatedProps} />;
   }
 
   onChange = e => {
-    const { inputName, fieldType } = this.props;
+    const { inputName, fieldType, componentClass, textLimit } = this.props;
     if (['select'].includes(fieldType || '')) {
       return;
     }
 
     const { config } = this.state;
     const value = (e.target as HTMLInputElement).value;
+
+    if (
+      componentClass === 'textarea' &&
+      textLimit &&
+      value.length > textLimit &&
+      (config[inputName] || '')?.length < value.length
+    ) {
+      return;
+    }
+
     config[inputName] = value;
 
     this.setState({ config });
@@ -212,8 +211,16 @@ class PlaceHolderInput extends React.Component<Props, State> {
 
   onKeyDown = e => {
     if (e.keyCode === 8) {
+      const { value } = e.currentTarget as HTMLInputElement;
       const { config, inputName } = this.props;
-      config[inputName] = '';
+
+      const pattern = /\{\{[^\}]*\}\}$/;
+
+      if (value.match(pattern)) {
+        config[inputName] = value.replace(pattern, '');
+      } else {
+        config[inputName] = value;
+      }
 
       this.setState({ config });
       this.props.onChange(config);
@@ -249,7 +256,10 @@ class PlaceHolderInput extends React.Component<Props, State> {
       inputName,
       label,
       fieldType = 'string',
-      additionalContent
+      additionalContent,
+      required,
+      componentClass,
+      placeholder
     } = this.props;
 
     let converted: string = config[inputName] || '';
@@ -279,19 +289,21 @@ class PlaceHolderInput extends React.Component<Props, State> {
       <BoardHeader>
         <FormGroup>
           <div className="header-row">
-            <ControlLabel>{label}</ControlLabel>
-            <div>
+            <ControlLabel required={required}>{label}</ControlLabel>
+            <Row>
               {this.renderSelect()}
               {this.renderDate()}
               {this.renderAttribution()}
               {this.renderExtraContent()}
               {additionalContent}
-            </div>
+            </Row>
           </div>
 
           <FormControl
             name={inputName}
             value={converted}
+            componentclass={componentClass}
+            placeholder={placeholder}
             onChange={this.onChange}
             onKeyPress={this.onKeyPress}
             onKeyDown={this.onKeyDown}

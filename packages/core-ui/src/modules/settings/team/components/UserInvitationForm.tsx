@@ -1,26 +1,27 @@
-import { Alert, __, generateTree } from 'modules/common/utils';
-import { FormTable, InviteOption, RemoveRow } from '../styles';
+import { Alert, __, generateTree } from "modules/common/utils";
+import { FormTable, InviteOption, RemoveRow } from "../styles";
 import {
   IBranch,
   IDepartment,
   IInvitationEntry,
-  IUnit
-} from '@erxes/ui/src/team/types';
-import { IButtonMutateProps, IFormProps, IOption } from '@erxes/ui/src/types';
-import { LinkButton, ModalFooter } from '@erxes/ui/src/styles/main';
+  IUnit,
+} from "@erxes/ui/src/team/types";
+import { IButtonMutateProps, IFormProps, IOption } from "@erxes/ui/src/types";
+import { LinkButton, ModalFooter } from "@erxes/ui/src/styles/main";
 
-import Button from '@erxes/ui/src/components/Button';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { Description } from '@erxes/ui-settings/src/styles';
-import Form from '@erxes/ui/src/components/form/Form';
-import FormControl from '@erxes/ui/src/components/form/Control';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import { ICommonFormProps } from '@erxes/ui-settings/src/common/types';
-import { IUserGroup } from '@erxes/ui-settings/src/permissions/types';
-import Icon from '@erxes/ui/src/components/Icon';
-import Info from '@erxes/ui/src/components/Info';
-import React from 'react';
-import Select from 'react-select-plus';
+import Button from "@erxes/ui/src/components/Button";
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import { Description } from "@erxes/ui-settings/src/styles";
+import Form from "@erxes/ui/src/components/form/Form";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import FormGroup from "@erxes/ui/src/components/form/Group";
+import { ICommonFormProps } from "@erxes/ui-settings/src/common/types";
+import { IUserGroup } from "@erxes/ui-settings/src/permissions/types";
+import Icon from "@erxes/ui/src/components/Icon";
+import Info from "@erxes/ui/src/components/Info";
+import React from "react";
+
+import Select from "react-select";
 
 type Props = {
   renderButton: (props: IButtonMutateProps) => JSX.Element;
@@ -37,15 +38,33 @@ type State = {
   isSubmitted: boolean;
 };
 
-const generateEmptyEntry = () => ({
-  email: '',
-  password: '',
-  groupId: '',
+const generateEmptyEntry = (email?: string) => ({
+  email: email ? email : "",
+  password: "",
+  groupId: "",
   channelIds: [],
-  departmentId: '',
-  unitId: '',
-  branchId: ''
+  departmentId: "",
+  unitId: "",
+  branchId: "",
 });
+
+const generetaOption = (array: IBranch[] = []): IOption[] => {
+  const generateList = () => {
+    let list: any[] = array.map((item) => {
+      if (!array.find((dep) => dep._id === item.parentId)) {
+        return { ...item, parentId: null };
+      }
+      return item;
+    });
+
+    return list;
+  };
+
+  return generateTree(generateList(), null, (node, level) => ({
+    value: node._id,
+    label: `${"--- ".repeat(level)} ${node.title}`,
+  }));
+};
 
 class UserInvitationForm extends React.Component<Props, State> {
   constructor(props: Props) {
@@ -54,7 +73,7 @@ class UserInvitationForm extends React.Component<Props, State> {
     this.state = {
       entries: Array(3).fill(generateEmptyEntry()),
       addMany: false,
-      isSubmitted: false
+      isSubmitted: false,
     };
   }
 
@@ -75,18 +94,18 @@ class UserInvitationForm extends React.Component<Props, State> {
   onChange = (
     i: number,
     type:
-      | 'email'
-      | 'password'
-      | 'groupId'
-      | 'channelIds'
-      | 'departmentId'
-      | 'unitId'
-      | 'branchId',
+      | "email"
+      | "password"
+      | "groupId"
+      | "channelIds"
+      | "departmentId"
+      | "unitId"
+      | "branchId",
     e
   ) => {
-    let value: string | string[] = '';
+    let value: string | string[] = "";
 
-    if (type === 'channelIds') {
+    if (type === "channelIds") {
       const selectedValues: string[] = [];
 
       for (const option of e) {
@@ -95,11 +114,11 @@ class UserInvitationForm extends React.Component<Props, State> {
 
       value = selectedValues;
     } else if (
-      type === 'departmentId' ||
-      type === 'unitId' ||
-      type === 'branchId'
+      type === "departmentId" ||
+      type === "unitId" ||
+      type === "branchId"
     ) {
-      value = e ? e.value : '';
+      value = e ? e.value : "";
     } else {
       const elm = e.target as HTMLInputElement;
 
@@ -115,7 +134,7 @@ class UserInvitationForm extends React.Component<Props, State> {
 
   onAddMoreInput = () => {
     this.setState({
-      entries: [...this.state.entries, generateEmptyEntry()]
+      entries: [...this.state.entries, generateEmptyEntry()],
     });
   };
 
@@ -126,17 +145,17 @@ class UserInvitationForm extends React.Component<Props, State> {
   addInvitees = () => {
     const { entries } = this.state;
 
-    const values = (document.getElementById(
-      'multipleEmailValue'
-    ) as HTMLInputElement).value;
+    const values = (
+      document.getElementById("multipleEmailValue") as HTMLInputElement
+    ).value;
 
     if (!values) {
-      return Alert.warning('No email address found!');
+      return Alert.warning("No email address found!");
     }
 
-    const emails = values.split(',');
+    const emails = values.split(",");
 
-    emails.map(e => entries.splice(0, 0, generateEmptyEntry()));
+    emails.map((e) => entries.splice(0, 0, generateEmptyEntry(e)));
 
     this.setState({ addMany: false });
   };
@@ -145,6 +164,16 @@ class UserInvitationForm extends React.Component<Props, State> {
     const { entries } = this.state;
 
     this.setState({ entries: entries.filter((item, index) => index !== i) });
+  };
+
+  beforeSubmit = () => {
+    const { entries } = this.state;
+
+    for (const entry of entries) {
+      if (!entry.email || !entry.groupId) {
+        return Alert.warning("Please fill all required fields");
+      }
+    }
   };
 
   renderRemoveInput = (i: number) => {
@@ -171,11 +200,11 @@ class UserInvitationForm extends React.Component<Props, State> {
             Enter multiple email addresses
           </ControlLabel>
           <Description>
-            {__('Please separate each email address with comma.')}
+            {__("Please separate each email address with comma.")}
           </Description>
           <FormControl
             id="multipleEmailValue"
-            componentClass="textarea"
+            componentclass="textarea"
             rows={5}
             required={true}
           />
@@ -200,18 +229,18 @@ class UserInvitationForm extends React.Component<Props, State> {
   generateChannelOptions(
     array: Array<{ _id: string; name?: string; title?: string }>
   ): IOption[] {
-    return array.map(item => {
+    return array.map((item) => {
       return {
         value: item._id,
-        label: item.name || item.title || ''
+        label: item.name || item.title || "",
       };
     });
   }
 
   generateGroupsChoices = () => {
-    return this.props.usersGroups.map(group => ({
+    return this.props.usersGroups.map((group) => ({
       value: group._id,
-      label: group.name
+      label: group.name,
     }));
   };
 
@@ -223,6 +252,18 @@ class UserInvitationForm extends React.Component<Props, State> {
     if (addMany) {
       return this.renderMultipleEmail();
     }
+
+    const channelOptions = this.generateChannelOptions(this.props.channels);
+    const unitOptions = this.generateChannelOptions(this.props.units);
+    const departmentOptions = generateTree(
+      this.props.departments,
+      null,
+      (node, level) => ({
+        value: node._id,
+        label: `${"---".repeat(level)} ${node.title}`,
+      })
+    );
+    const branchOptions = generetaOption(this.props.branches);
 
     return (
       <>
@@ -265,7 +306,7 @@ class UserInvitationForm extends React.Component<Props, State> {
                     placeholder="name@example.com"
                     value={input.email}
                     autoFocus={i === 0}
-                    onChange={this.onChange.bind(this, i, 'email')}
+                    onChange={this.onChange.bind(this, i, "email")}
                     required={true}
                     autoComplete="off"
                   />
@@ -278,7 +319,7 @@ class UserInvitationForm extends React.Component<Props, State> {
                     type="password"
                     placeholder="Password"
                     value={input.password}
-                    onChange={this.onChange.bind(this, i, 'password')}
+                    onChange={this.onChange.bind(this, i, "password")}
                     required={true}
                     autoComplete="new-password"
                   />
@@ -288,64 +329,61 @@ class UserInvitationForm extends React.Component<Props, State> {
                   <FormControl
                     {...formProps}
                     name="groupId"
-                    componentClass="select"
+                    componentclass="select"
                     options={[
-                      { value: '', label: 'Choose group ...' },
-                      ...this.generateGroupsChoices()
+                      { value: "", label: "Choose group ..." },
+                      ...this.generateGroupsChoices(),
                     ]}
-                    onChange={this.onChange.bind(this, i, 'groupId')}
+                    onChange={this.onChange.bind(this, i, "groupId")}
                     required={true}
                   />
                 </td>
 
                 <td>
                   <Select
-                    value={entries[i].channelIds}
-                    options={this.generateChannelOptions(this.props.channels)}
-                    onChange={this.onChange.bind(this, i, 'channelIds')}
-                    placeholder={__('Choose channels ...')}
-                    multi={true}
-                  />
-                </td>
-
-                <td>
-                  <Select
-                    value={entries[i].unitId}
-                    options={this.generateChannelOptions(this.props.units)}
-                    onChange={this.onChange.bind(this, i, 'unitId')}
-                    placeholder={__('Choose unit ...')}
-                  />
-                </td>
-
-                <td>
-                  <Select
-                    value={entries[i].departmentId}
-                    options={generateTree(
-                      this.props.departments,
-                      null,
-                      (node, level) => ({
-                        value: node._id,
-                        label: `${'---'.repeat(level)} ${node.title}`
-                      })
+                    value={channelOptions.filter((o) =>
+                      entries[i].channelIds.includes(o.value)
                     )}
-                    onChange={this.onChange.bind(this, i, 'departmentId')}
-                    placeholder={__('Choose department ...')}
+                    options={channelOptions}
+                    onChange={this.onChange.bind(this, i, "channelIds")}
+                    placeholder={__("Choose channels ...")}
+                    isMulti={true}
                   />
                 </td>
 
                 <td>
                   <Select
-                    value={entries[i].branchId}
-                    options={generateTree(
-                      this.props.branches,
-                      null,
-                      (node, level) => ({
-                        value: node._id,
-                        label: `${'---'.repeat(level)} ${node.title}`
-                      })
+                    isClearable={true}
+                    value={unitOptions.find(
+                      (o) => o.value === entries[i].unitId
                     )}
-                    onChange={this.onChange.bind(this, i, 'branchId')}
-                    placeholder={__('Choose branch ...')}
+                    options={unitOptions}
+                    onChange={this.onChange.bind(this, i, "unitId")}
+                    placeholder={__("Choose unit ...")}
+                  />
+                </td>
+
+                <td>
+                  <Select
+                    isClearable={true}
+                    value={departmentOptions.find(
+                      (o) => o.value === entries[i].departmentId
+                    )}
+                    options={departmentOptions}
+                    onChange={this.onChange.bind(this, i, "departmentId")}
+                    placeholder={__("Choose department ...")}
+                  />
+                </td>
+
+                <td>
+                  <Select
+                    isClearable={true}
+                    value={branchOptions.find(
+                      (o) => o.value === entries[i].branchId
+                    )}
+                    options={branchOptions}
+                    onChange={this.onChange.bind(this, i, "branchId")}
+                    placeholder={__("Choose branch ...")}
                   />
                 </td>
 
@@ -357,11 +395,11 @@ class UserInvitationForm extends React.Component<Props, State> {
 
         <InviteOption>
           <LinkButton onClick={this.onAddMoreInput}>
-            <Icon icon="add" /> {__('Add another')}
-          </LinkButton>{' '}
-          {__('or')}{' '}
+            <Icon icon="add" /> {__("Add another")}
+          </LinkButton>{" "}
+          {__("or")}{" "}
           <LinkButton onClick={this.onAddManyEmail}>
-            {__('add many at once')}{' '}
+            {__("add many at once")}{" "}
           </LinkButton>
         </InviteOption>
 
@@ -371,10 +409,11 @@ class UserInvitationForm extends React.Component<Props, State> {
           </Button>
 
           {renderButton({
-            name: 'team member invitation',
+            name: "team member invitation",
             values: this.generateDoc(),
             isSubmitted,
-            callback: closeModal
+            beforeSubmit: this.beforeSubmit,
+            callback: closeModal,
           })}
         </ModalFooter>
       </>

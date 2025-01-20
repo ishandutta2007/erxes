@@ -1,26 +1,26 @@
-import React from 'react';
-
-import { isEnabled } from '@erxes/ui/src/utils/core';
-import { IAttachmentPreview } from '@erxes/ui/src/types';
-import Message from '@erxes/ui-inbox/src/inbox/components/conversationDetail/workarea/conversation/messages/Message';
-import { ContenFooter, ContentBox } from '@erxes/ui/src/layout/styles';
 import {
   AddMessageMutationVariables,
   IConversation,
   IMessage
-} from '@erxes/ui-inbox/src/inbox/types';
-import MailConversation from '@erxes/ui-inbox/src/inbox/components/conversationDetail/workarea/mail/MailConversation';
-import { __ } from 'coreui/utils';
-
+} from "@erxes/ui-inbox/src/inbox/types";
+import { ContenFooter, ContentBox } from "@erxes/ui/src/layout/styles";
 import {
   ConversationWrapper,
-  RenderConversationWrapper,
-  MailSubject
-} from './styles';
-import TypingIndicator from './TypingIndicator';
-import ActionBar from './ActionBar';
-import RespondBox from '../../../containers/conversationDetail/RespondBox';
-import CallPro from './callpro/Callpro';
+  MailSubject,
+  RenderConversationWrapper
+} from "./styles";
+
+import ActionBar from "./ActionBar";
+import CallPro from "./callpro/Callpro";
+import GrandStream from "./grandStream/GrandStream";
+import { IAttachmentPreview } from "@erxes/ui/src/types";
+import MailConversation from "@erxes/ui-inbox/src/inbox/components/conversationDetail/workarea/mail/MailConversation";
+import Message from "@erxes/ui-inbox/src/inbox/components/conversationDetail/workarea/conversation/messages/Message";
+import React from "react";
+import RespondBox from "../../../containers/conversationDetail/RespondBox";
+import TypingIndicator from "./TypingIndicator";
+import { __ } from "coreui/utils";
+import { isEnabled } from "@erxes/ui/src/utils/core";
 
 type Props = {
   queryParams?: any;
@@ -57,7 +57,9 @@ export default class WorkArea extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
 
-    this.state = { attachmentPreview: null };
+    this.state = {
+      attachmentPreview: null
+    };
 
     this.node = React.createRef();
   }
@@ -125,7 +127,7 @@ export default class WorkArea extends React.Component<Props, State> {
   };
 
   isMailConversation = (kind: string) =>
-    kind.includes('nylas') || kind === 'gmail' ? true : false;
+    kind.includes("nylas") || kind === "gmail" ? true : false;
 
   renderExtraHeading = (kind: string, conversationMessage: IMessage) => {
     if (!conversationMessage) {
@@ -135,7 +137,7 @@ export default class WorkArea extends React.Component<Props, State> {
     if (this.isMailConversation(kind)) {
       const { mailData } = conversationMessage;
 
-      return <MailSubject>{mailData && (mailData.subject || '')}</MailSubject>;
+      return <MailSubject>{mailData && (mailData.subject || "")}</MailSubject>;
     }
 
     return null;
@@ -177,9 +179,9 @@ export default class WorkArea extends React.Component<Props, State> {
     const firstMessage = messages[0];
 
     const { integration } = currentConversation;
-    const kind = integration && integration.kind.split('-')[0];
+    const kind = integration && integration.kind.split("-")[0];
 
-    if (kind === 'callpro') {
+    if (kind === "callpro") {
       return (
         <>
           <CallPro conversation={currentConversation} />
@@ -188,7 +190,7 @@ export default class WorkArea extends React.Component<Props, State> {
       );
     }
 
-    if (kind.includes('nylas') || kind === 'gmail') {
+    if (kind.includes("nylas") || kind === "gmail") {
       return (
         <MailConversation
           conversation={currentConversation}
@@ -197,12 +199,20 @@ export default class WorkArea extends React.Component<Props, State> {
       );
     }
 
-    if (kind === 'imap') {
+    if (kind === "imap") {
       return (
         <>
           {content}
-          {isEnabled('internalnotes') &&
-            this.renderMessages(messages, firstMessage)}
+          {this.renderMessages(messages, firstMessage)}
+        </>
+      );
+    }
+
+    if (kind === "calls") {
+      return (
+        <>
+          <GrandStream conversation={currentConversation} />
+          {this.renderMessages(messages, firstMessage)}
         </>
       );
     }
@@ -216,18 +226,17 @@ export default class WorkArea extends React.Component<Props, State> {
       addMessage,
       typingInfo,
       refetchMessages,
-      refetchDetail,
-      content
+      refetchDetail
     } = this.props;
 
     const { kind } = currentConversation.integration;
 
     const showInternal =
       this.isMailConversation(kind) ||
-      kind === 'lead' ||
-      kind === 'booking' ||
-      kind === 'imap' ||
-      kind === 'webhook';
+      kind === "lead" ||
+      kind === "imap" ||
+      kind === "calls" ||
+      kind === "webhook";
 
     const typingIndicator = typingInfo ? (
       <TypingIndicator>{typingInfo}</TypingIndicator>
@@ -236,7 +245,8 @@ export default class WorkArea extends React.Component<Props, State> {
     const respondBox = () => {
       const data = (
         <RespondBox
-          showInternal={isEnabled('internalnotes') ? showInternal : false}
+          showInternal={showInternal}
+          disableInternalState={showInternal ? true : false}
           conversation={currentConversation}
           setAttachmentPreview={this.setAttachmentPreview}
           addMessage={addMessage}
@@ -245,8 +255,8 @@ export default class WorkArea extends React.Component<Props, State> {
         />
       );
 
-      if (kind === 'imap') {
-        return isEnabled('internalnotes') && data;
+      if (kind === "imap") {
+        return data;
       }
 
       return data;
@@ -259,7 +269,7 @@ export default class WorkArea extends React.Component<Props, State> {
         <ContentBox>
           <ConversationWrapper
             id="conversationWrapper"
-            innerRef={this.node}
+            ref={this.node}
             onScroll={this.onScroll}
           >
             <RenderConversationWrapper>

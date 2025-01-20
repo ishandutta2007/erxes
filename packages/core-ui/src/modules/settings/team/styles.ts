@@ -11,10 +11,8 @@ const ButtonContainer = styled.div`
 
 const FlexRow = styled.div`
   display: flex;
-  margin-bottom: ${dimensions.unitSpacing}px;
-  padding: 5px 30px 5px 0;
+  flex-direction: column;
   position: relative;
-  align-items: center;
 
   > label {
     margin: 0;
@@ -25,12 +23,6 @@ const FlexRow = styled.div`
   > *:first-child,
   input {
     margin-right: ${dimensions.unitSpacing}px;
-    flex: 3;
-  }
-
-  > *:nth-child(2),
-  > div {
-    flex: 2;
   }
 `;
 
@@ -95,8 +87,8 @@ const SideList = styledTS<{
         props.isActive
           ? colors.colorPrimary
           : !props.level || props.level === 0
-          ? colors.colorCoreBlue
-          : colors.colorCoreGreen};
+            ? colors.colorCoreBlue
+            : colors.colorCoreGreen};
     }
   }
 
@@ -111,8 +103,77 @@ const StructureList = styled(SidebarList)`
   }
 `;
 
-let DescriptionContent = styled.div`
+const StructureEditButton = styled.div`
+  cursor: pointer;
+  padding: 10px;
+  color: ${colors.textSecondary};
+
+  &:hover {
+    color: ${colors.textPrimary};
+  }
+`;
+
+const DescriptionContent = styled.div`
   text-align: center;
+  display: flex;
+
+  h4 {
+    margin-left: 8px;
+    font-size: 16px;
+    padding-bottom: 0;
+  }
+`;
+
+const DateGrid = styled.div`
+  margin: 0 0 20px;
+  display: flex;
+
+  div {
+    flex: 1;
+
+    input {
+      border-radius: 4px;
+      display: block;
+      border: 2px solid ${colors.borderPrimary};
+      padding: 4px 8px;
+    }
+
+    input[type='time']::-webkit-calendar-picker-indicator {
+      display: none;
+    }
+
+    &:first-child {
+      margin-right: 10px;
+    }
+  }
+
+  &:last-child {
+    margin: 20px 0 0;
+  }
+`;
+
+const ToggleSection = styled.div`
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid ${colors.borderPrimary};
+  border-radius: 5px;
+`;
+
+const Row = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const Features = styledTS<{ isToggled: boolean }>(styled.span)`
+  transition: all ease .3s;
+  filter: ${props => !props.isToggled && `blur(4px)`};
+  pointer-events: ${props => !props.isToggled && `none`};
 `;
 
 export {
@@ -124,5 +185,10 @@ export {
   FormTable,
   SideList,
   StructureList,
-  DescriptionContent
+  DescriptionContent,
+  StructureEditButton,
+  DateGrid,
+  ToggleSection,
+  Row,
+  Features
 };

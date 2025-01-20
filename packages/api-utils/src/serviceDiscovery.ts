@@ -1,66 +1,54 @@
 import * as dotenv from 'dotenv';
-import redisClient from './redis';
-import * as Redis from 'ioredis';
+import redis from './redis';
 dotenv.config();
 
-const REDIS_CHANNEL_REFRESH_ENABLED_SERVICES = 'refresh_enabled_services';
-
-const {
-  NODE_ENV,
-  LOAD_BALANCER_ADDRESS,
-  ENABLED_SERVICES_PATH,
-  REDIS_HOST,
-  REDIS_PORT,
-  REDIS_PASSWORD,
-  SKIP_REDIS
-} = process.env;
-let enabledServicesCache: string[] = [];
+const { NODE_ENV, LOAD_BALANCER_ADDRESS, ENABLED_SERVICES_JSON, MONGO_URL } =
+  process.env;
 
 const isDev = NODE_ENV === 'development';
 
-if (!ENABLED_SERVICES_PATH) {
+if (!ENABLED_SERVICES_JSON) {
   throw new Error(
-    'ENABLED_SERVICES_PATH environment variable is not configured.'
+    'ENABLED_SERVICES_JSON environment variable is not configured.',
   );
 }
 
-function refreshEnabledServices() {
-  if (!ENABLED_SERVICES_PATH) {
-    throw new Error(
-      'ENABLED_SERVICES_PATH environment variable is not configured.'
-    );
-  }
+const enabledServices = JSON.parse(ENABLED_SERVICES_JSON) || [];
 
-  delete require.cache[require.resolve(ENABLED_SERVICES_PATH)];
-  enabledServicesCache = require(ENABLED_SERVICES_PATH) || [];
-  enabledServicesCache.push('core');
+if (!Array.isArray(enabledServices)) {
+  throw new Error(
+    "ENABLED_SERVICES_JSON environment variable's value must be JSON array",
+  );
 }
 
-function ensureCache() {
-  if (!enabledServicesCache || enabledServicesCache.length === 0) {
-    refreshEnabledServices();
-  }
-}
+enabledServices.push('core');
 
-export const redis = redisClient;
-
-const generateKey = name => `service:config:${name}`;
+const keyForConfig = (name) => `service:config:${name}`;
 
 export const getServices = async (): Promise<string[]> => {
-  ensureCache();
-  return [...enabledServicesCache];
+  return enabledServices;
 };
 
-export const getService = async (name: string, config?: boolean) => {
-  const result: { address: string; config: any } = {
+type ServiceInfo = { address: string; config: any };
+const serviceInfoCache: { [name in string]: Readonly<ServiceInfo> } = {};
+
+export const getService = async (
+  name: string,
+): Promise<Readonly<ServiceInfo>> => {
+  if (serviceInfoCache[name]) {
+    return serviceInfoCache[name];
+  }
+
+  const result: ServiceInfo = {
     address: (await redis.get(`service:${name}`)) || '',
-    config: { meta: {} }
+    config: { meta: {} },
   };
 
-  if (config) {
-    const value = await redis.get(generateKey(name));
-    result.config = JSON.parse(value || '{}');
-  }
+  const configJson = await redis.get(keyForConfig(name));
+  result.config = JSON.parse(configJson || '{}');
+
+  Object.freeze(result);
+  serviceInfoCache[name] = result;
 
   return result;
 };
@@ -68,30 +56,25 @@ export const getService = async (name: string, config?: boolean) => {
 export const join = async ({
   name,
   port,
-  dbConnectionString,
   hasSubscriptions = false,
-  hasDashboard = false,
   importExportTypes,
-  meta
+  meta,
 }: {
   name: string;
   port: string;
-  dbConnectionString: string;
   hasSubscriptions?: boolean;
-  hasDashboard?: boolean;
   importExportTypes?: any;
   meta?: any;
 }) => {
   await redis.set(
-    generateKey(name),
+    keyForConfig(name),
 
     JSON.stringify({
-      dbConnectionString,
+      dbConnectionString: MONGO_URL,
       hasSubscriptions,
-      hasDashboard,
       importExportTypes,
-      meta
-    })
+      meta,
+    }),
   );
 
   const address =
@@ -107,17 +90,14 @@ export const leave = async (name, _port) => {
   console.log(`$service:${name} left`);
 };
 
-export const isEnabled = name => {
+export const isEnabled = (name) => {
   if (name === 'core') return true;
-  ensureCache();
-  return enabledServicesCache.includes(name);
+  return enabledServices.includes(name);
 };
-
-export const isAvailable = isEnabled;
 
 const pluginAddressCache = {};
 
-export const getPluginAddress = async name => {
+export const getPluginAddress = async (name) => {
   if (!pluginAddressCache[name]) {
     pluginAddressCache[name] = await redis.get(`service:${name}`);
   }
@@ -125,22 +105,5 @@ export const getPluginAddress = async name => {
 };
 
 export const getEnabledServices = async () => {
-  ensureCache();
-  return [...enabledServicesCache];
+  return enabledServices;
 };
-
-export const publishRefreshEnabledServices = async () => {
-  await redis.publish(REDIS_CHANNEL_REFRESH_ENABLED_SERVICES, '');
-};
-
-(async () => {
-  if (SKIP_REDIS) return;
-
-  const redisSubscriber = new Redis({
-    host: REDIS_HOST,
-    port: parseInt(REDIS_PORT || '6379', 10),
-    password: REDIS_PASSWORD
-  });
-  await redisSubscriber.subscribe(REDIS_CHANNEL_REFRESH_ENABLED_SERVICES);
-  await redisSubscriber.on('message', refreshEnabledServices);
-})();

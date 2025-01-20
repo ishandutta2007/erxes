@@ -1,44 +1,79 @@
-import React from 'react';
-import { Route } from 'react-router-dom';
-import queryString from 'query-string';
+import React from "react";
+import { Route, Routes } from "react-router-dom";
+import queryString from "query-string";
 
-import asyncComponent from '@erxes/ui/src/components/AsyncComponent';
-import { Authorization } from './containers/Authorization';
+import asyncComponent from "@erxes/ui/src/components/AsyncComponent";
+import { Authorization } from "./containers/Authorization";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-const CreateFacebook = asyncComponent(() =>
-  import(/* webpackChunkName: "Settings CreateFacebook" */ './containers/Form')
+const CreateFacebook = asyncComponent(
+  () =>
+    import(
+      /* webpackChunkName: "Settings CreateFacebook" */ "./containers/Form"
+    )
 );
 
-const createFacebook = ({ location, history }) => {
+const MessengerBotForm = asyncComponent(
+  () =>
+    import(
+      /* webpackChunkName: "Settings Messenger Bots" */ "./automations/bots/containers/Form"
+    )
+);
+
+const CreateFacebookComponent = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const queryParams = queryString.parse(location.search);
 
   const callBack = () => {
-    history.push('/settings/integrations/');
+    navigate("/settings/integrations/");
   };
 
   return <CreateFacebook callBack={callBack} kind={queryParams.kind} />;
 };
 
-const auth = ({ location }) => (
-  <Authorization queryParams={queryString.parse(location.search)} />
-);
+const FbMessengerBot = () => {
+  const location = useLocation();
+
+  const { id } = useParams();
+  const queryParams = queryString.parse(location.search);
+
+  return <MessengerBotForm _id={id} queryParams={queryParams} />;
+};
+
+const Auth = () => {
+  const location = useLocation();
+
+  return <Authorization queryParams={queryString.parse(location.search)} />;
+};
 
 const routes = () => (
-  <React.Fragment>
+  <Routes>
     <Route
       key="/settings/integrations/createFacebook"
-      exact={true}
       path="/settings/integrations/createFacebook"
-      component={createFacebook}
+      element={<CreateFacebookComponent />}
     />
 
     <Route
       key="/settings/fb-authorization"
-      exact={true}
       path="/settings/fb-authorization"
-      component={auth}
+      element={<Auth />}
     />
-  </React.Fragment>
+
+    <Route
+      key="/settings/facebook-messenger-bot"
+      path="/settings/facebook-messenger-bot/edit/:id"
+      element={<FbMessengerBot />}
+    />
+
+    <Route
+      key="/settings/facebook-messenger-bot"
+      path="/settings/facebook-messenger-bot/create"
+      element={<FbMessengerBot />}
+    />
+  </Routes>
 );
 
 export default routes;

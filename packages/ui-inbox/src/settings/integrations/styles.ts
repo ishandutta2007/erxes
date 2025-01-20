@@ -226,7 +226,7 @@ const Resipients = styledTS<{ isActive?: boolean }>(styled.a)`
   padding-left: ${dimensions.unitSpacing}px;
   font-size: 12px;
   color: ${colors.colorCoreLightGray};
-  display: ${props => props.isActive && 'none'};
+  display: ${(props) => props.isActive && 'none'};
   font-weight: 500;
 
   &:hover {
@@ -313,7 +313,7 @@ const SpaceBetweenRow = styled.div`
 
 const Subject = styledTS<{ noBorder?: boolean }>(styled.div)`
   padding: ${dimensions.unitSpacing}px ${dimensions.coreSpacing}px;
-  border-bottom:${props =>
+  border-bottom:${(props) =>
     !props.noBorder && `1px solid ${colors.borderPrimary}`};
 
   input {
@@ -324,7 +324,7 @@ const Subject = styledTS<{ noBorder?: boolean }>(styled.div)`
 
 const ShowReplyButtonWrapper = styled.div`
   position: absolute;
-  z-index: 100;
+  z-index: 1;
   width: 100%;
   height: 50px;
   bottom: 42px;
@@ -387,7 +387,8 @@ const LeftContent = styled.div`
 const Row = styled.div`
   display: flex;
 
-  .Select {
+  .Select,
+  .css-b62m3t-container {
     flex: 1;
   }
 
@@ -398,62 +399,65 @@ const Row = styled.div`
   }
 `;
 
-const SearchInput = styledTS<{ isInPopover: boolean }>(styled.div)`
+const SearchInput = styled.div`
   position: relative;
 
   input {
-    border: 1px solid ${colors.borderPrimary};
-    padding: 20px 20px 20px 30px;
-    border-radius: 5px;
-    width: ${props => (props.isInPopover ? '270px' : '500px')};
-    margin:  ${props => props.isInPopover && '10px 20px 0'};
+    border-bottom: 1px solid ${colors.borderPrimary};
+    padding: ${dimensions.unitSpacing}px ${dimensions.coreSpacing}px;
     background: ${colors.colorWhite};
 
-    @media (max-width: 1300px) {
-      min-width: 260px;
+    &:focus {
+      outline: 0;
     }
   }
+`;
 
-  i {
-    position: absolute;
-    top: 10px;
-    left: 30px;
-    font-size: 15px;
-    color: ${colors.colorCoreGray};
+const LogoWrapper = styledTS<{ backgroundColor?: string }>(styled.div)`
+  height: 100px;
+  padding-bottom: 15px;
+  border-radius: 4px;
+
+  > img {
+    background-color: ${(props) => (props.backgroundColor ? props.backgroundColor : '#6569DF')} !important;
+    padding: 3px;
+    height: 100%;
+    border-radius: 4px;
   }
 `;
 
 export {
-  MessengerPreview,
-  IntegrationName,
-  BrandName,
-  Options,
-  Description,
-  Script,
-  RefreshPermission,
-  GoogleButton,
   AccountBox,
-  AccountTitle,
   AccountItem,
-  FacebookButton,
-  ImageWrapper,
-  TextWrapper,
+  AccountTitle,
   Attachments,
-  FlexRow,
-  Row,
-  Subject,
-  ToolBar,
+  BrandName,
   Content,
-  LeftContent,
-  MailEditorWrapper,
   ControlWrapper,
-  Resipients,
-  Uploading,
-  SpaceBetweenRow,
+  Description,
   EditorFooter,
+  FacebookButton,
   FileSize,
-  ShowReplyButtonWrapper,
-  ShowReplies,
+  FlexRow,
+  GoogleButton,
+  ImageWrapper,
+  IntegrationName,
+  LeftContent,
+  LogoWrapper,
+  MailEditorWrapper,
+  MessengerPreview,
+  Options,
   PopoverLinkWrapper,
-  SearchInput
+  RefreshPermission,
+  Resipients,
+  Row,
+  Script,
+  SearchInput,
+  ShowReplies,
+  ShowReplyButtonWrapper,
+  SpaceBetweenRow,
+  Subject,
+  TextWrapper,
+  ToolBar,
+  Uploading,
 };

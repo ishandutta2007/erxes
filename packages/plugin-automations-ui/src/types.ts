@@ -12,6 +12,10 @@ export type ITrigger = {
   actionId?: string;
   style?: any;
   config?: any;
+  position?: any;
+  isAvailableOptionalConnect?: boolean;
+  isCustom?: boolean;
+  workflowId?: string;
 
   count?: number;
 };
@@ -150,6 +154,7 @@ export type DetailQueryResponse = {
 };
 
 export type AutomationHistoriesQueryResponse = {
+  automationHistoriesTotalCount: number;
   automationHistories: IAutomationHistory[];
   loading: boolean;
 };

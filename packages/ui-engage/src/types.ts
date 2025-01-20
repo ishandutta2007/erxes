@@ -38,7 +38,11 @@ export interface IEngageSms {
   content: string;
   fromIntegrationId: string;
 }
-
+export interface IEngageNotification {
+  title: string;
+  content: string;
+  isMobile: boolean;
+}
 export interface IEngageStats {
   send: number;
   delivery: number;
@@ -62,6 +66,10 @@ export interface IEngageSmsStats {
   delivery_unconfirmed: number;
   webhook_delivered: number;
   error?: number;
+}
+
+export interface IEngageNotificationStats {
+  read: number;
 }
 
 export interface IEmailDelivery {
@@ -105,6 +113,8 @@ export interface IEngageMessageDoc {
   isLive?: boolean;
   email?: IEngageEmail;
   messenger?: IEngageMessenger;
+  notification?: IEngageNotification;
+  cpId?: string;
   scheduleDate?: IEngageScheduleDate;
   shortMessage?: IEngageSms;
 }
@@ -113,6 +123,7 @@ export interface IEngageMessage extends IEngageMessageDoc {
   _id: string;
   stopDate: Date;
   createdDate: Date;
+  createdAt: Date;
   messengerReceivedCustomerIds?: string[];
   brand: IBrand;
   segments: ISegment[];
@@ -128,6 +139,7 @@ export interface IEngageMessage extends IEngageMessageDoc {
   stats?: IEngageStats;
   logs?: Array<{ message: string }>;
   smsStats?: IEngageSmsStats;
+  notificationStats?: IEngageNotificationStats;
   fromIntegration?: IIntegration;
   createdUserName?: string;
 }
@@ -239,8 +251,8 @@ export type TagAdd = (params: {
 
 export type IEmailFormProps = {
   onChange: (
-    name: 'email' | 'content' | 'fromUserId' | 'scheduleDate',
-    value?: IEngageEmail | IEngageScheduleDate | string
+    name: 'email' | 'content' | 'fromUserId',
+    value?: IEngageEmail | string
   ) => void;
   message?: string;
   users: IUser[];
@@ -249,7 +261,6 @@ export type IEmailFormProps = {
   email: IEngageEmail;
   fromUserId: string;
   content: string;
-  scheduleDate: IEngageScheduleDate;
   isSaved?: boolean;
 };
 
@@ -280,3 +291,27 @@ export type EngageLogsQueryResponse = {
   engageLogs: IEngageLog[];
   fetchMore: any;
 } & QueryResponse;
+
+export type EmailDeliveryItem = {
+  _id: string;
+  subject?: string;
+  status?: string;
+  body?: string;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  attachments: JSON[];
+  from?: string;
+  kind?: string;
+  userId?: string;
+  customerId?: string;
+  createdAt?: Date;
+  fromUser?: IUser;
+  fromEmail?: string;
+  customerName?: string;
+  email?: string;
+  engage?: {
+    _id: string;
+    title: string;
+  }
+}

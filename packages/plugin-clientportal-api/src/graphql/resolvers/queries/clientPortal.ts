@@ -1,23 +1,26 @@
 // TODO: check if related stages are selected in client portal config
 import { paginate } from '@erxes/api-utils/src';
 
-import { IContext } from '../../../connectionResolver';
+import { IContext, IModels } from '../../../connectionResolver';
 import {
-  sendCardsMessage,
   sendCommonMessage,
-  sendContactsMessage,
-  sendCoreMessage,
-  sendKbMessage
+  sendKbMessage,
+  sendTasksMessage,
+  sendTicketsMessage,
 } from '../../../messageBroker';
-import { getCards } from '../../../utils';
+import { getCards, getUserCards } from '../../../utils';
 
-const getByHost = async (models, requestInfo) => {
+const getByHost = async (models: IModels, requestInfo, clientPortalName?) => {
   const origin = requestInfo.headers.origin;
   const pattern = `.*${origin}.*`;
 
-  const config = await models.ClientPortals.findOne({
-    url: { $regex: pattern }
-  });
+  let config = await models.ClientPortals.findOne({ url: { $regex: pattern } });
+
+  if (clientPortalName) {
+    config = await models.ClientPortals.findOne({
+      name: clientPortalName,
+    });
+  }
 
   if (!config) {
     throw new Error('Not found');
@@ -29,10 +32,29 @@ const getByHost = async (models, requestInfo) => {
 const configClientPortalQueries = {
   async clientPortalGetConfigs(
     _root,
-    args: { page?: number; perPage?: number },
+    args: { kind?: string; page?: number; perPage?: number; search?: string },
     { models }: IContext
   ) {
-    return paginate(models.ClientPortals.find({}), args);
+    const { kind, search } = args;
+
+    if (search) {
+      const res = await models.ClientPortals.find({
+        $or: [
+          { name: { $regex: new RegExp(`^${search}$`, 'i') } },
+          { domain: { $regex: new RegExp(`^${search}$`, 'i') } },
+          { url: { $regex: new RegExp(search, 'i') } },
+        ],
+      }).lean();
+      return res
+    }
+
+    const query: any = {};
+
+    if (kind) {
+      query.kind = kind;
+    }
+
+    return paginate(models.ClientPortals.find(query), args);
   },
 
   async clientPortalConfigsTotalCount(_root, _args, { models }: IContext) {
@@ -42,9 +64,9 @@ const configClientPortalQueries = {
   /**
    * Get last config
    */
-  clientPortalGetLast(_root, _args, { models }: IContext) {
-    return models.ClientPortals.findOne({}).sort({
-      createdAt: -1
+  async clientPortalGetLast(_root, { kind }, { models }: IContext) {
+    return models.ClientPortals.findOne({ kind }).sort({
+      createdAt: -1,
     });
   },
 
@@ -58,10 +80,10 @@ const configClientPortalQueries = {
 
   async clientPortalGetConfigByDomain(
     _root,
-    _args,
+    { clientPortalName },
     { models, requestInfo }: IContext
   ) {
-    return getByHost(models, requestInfo);
+    return await getByHost(models, requestInfo, clientPortalName);
   },
 
   async clientPortalGetTaskStages(
@@ -71,13 +93,13 @@ const configClientPortalQueries = {
   ) {
     const config = await getByHost(models, requestInfo);
 
-    return sendCardsMessage({
+    return sendTasksMessage({
       subdomain,
       action: 'stages.find',
       data: {
-        pipelineId: config.taskPublicPipelineId
+        pipelineId: config.taskPublicPipelineId,
       },
-      isRPC: true
+      isRPC: true,
     });
   },
 
@@ -88,26 +110,26 @@ const configClientPortalQueries = {
   ) {
     const config = await getByHost(models, requestInfo);
 
-    const stage = await sendCardsMessage({
+    const stage = await sendTasksMessage({
       subdomain,
       action: 'stages.findOne',
       data: {
-        _id: stageId
+        _id: stageId,
       },
-      isRPC: true
+      isRPC: true,
     });
 
     if (config.taskPublicPipelineId !== stage.pipelineId) {
       throw new Error('Invalid request');
     }
 
-    return sendCardsMessage({
+    return sendTasksMessage({
       subdomain,
       action: 'tasks.find',
       data: {
-        stageId
+        stageId,
       },
-      isRPC: true
+      isRPC: true,
     });
   },
 
@@ -121,10 +143,10 @@ const configClientPortalQueries = {
       action: 'topics.findOne',
       data: {
         query: {
-          _id
-        }
+          _id,
+        },
       },
-      isRPC: true
+      isRPC: true,
     });
   },
 
@@ -144,14 +166,18 @@ const configClientPortalQueries = {
     return getCards('purchase', context, _args);
   },
 
-  clientPortalTicket(_root, { _id }: { _id: string }, { subdomain }: IContext) {
-    return sendCardsMessage({
+  async clientPortalTicket(
+    _root,
+    { _id }: { _id: string },
+    { subdomain }: IContext
+  ) {
+    return sendTicketsMessage({
       subdomain,
       action: 'tickets.findOne',
       data: {
-        _id
+        _id,
       },
-      isRPC: true
+      isRPC: true,
     });
   },
 
@@ -163,11 +189,13 @@ const configClientPortalQueries = {
     {
       categoryIds,
       searchValue,
-      topicId
+      topicId,
+      isPrivate,
     }: {
       searchValue?: string;
       categoryIds: string[];
       topicId?: string;
+      isPrivate: Boolean;
     },
     { subdomain }: IContext
   ) {
@@ -179,10 +207,10 @@ const configClientPortalQueries = {
           $or: [
             { title: { $regex: `.*${searchValue.trim()}.*`, $options: 'i' } },
             { content: { $regex: `.*${searchValue.trim()}.*`, $options: 'i' } },
-            { summary: { $regex: `.*${searchValue.trim()}.*`, $options: 'i' } }
-          ]
+            { summary: { $regex: `.*${searchValue.trim()}.*`, $options: 'i' } },
+          ],
         },
-        { topicId }
+        { topicId },
       ];
     }
 
@@ -190,17 +218,28 @@ const configClientPortalQueries = {
       selector.categoryId = { $in: categoryIds };
     }
 
+    if (!isPrivate) {
+      selector.isPrivate = { $in: [null, false] };
+    }
+
+    if (isPrivate) {
+      selector.isPrivate = { $in: [null, false, true] };
+    }
+
     return sendKbMessage({
       subdomain,
       action: 'articles.find',
       data: {
-        query: selector,
+        query: {
+          ...selector,
+          status: { $ne: 'draft' },
+        },
         sort: {
-          createdDate: -1
-        }
+          createdDate: -1,
+        },
       },
       isRPC: true,
-      defaultValue: []
+      defaultValue: [],
     });
   },
 
@@ -210,39 +249,39 @@ const configClientPortalQueries = {
     { models, subdomain }: IContext
   ) {
     const configs = await models.FieldConfigs.find({
-      allowedClientPortalIds: _id
+      allowedClientPortalIds: _id,
     });
 
     const required = await models.FieldConfigs.find({
       allowedClientPortalIds: _id,
-      requiredOn: _id
+      requiredOn: _id,
     });
 
     if (!configs || configs.length === 0) {
       return [];
     }
 
-    const fieldIds = configs.map(config => config.fieldId);
+    const fieldIds = configs.map((config) => config.fieldId);
     const fields = await sendCommonMessage({
       subdomain,
-      serviceName: 'forms',
-      action: 'fields.find',
+      serviceName: 'core',
+      action: "fields.find",
       data: {
         query: {
           _id: { $in: fieldIds },
-          contentType: 'clientportal:user'
-        }
+          contentType: 'clientportal:user',
+        },
       },
       isRPC: true,
-      defaultValue: []
+      defaultValue: [],
     });
 
     if (!required.length || required.length === 0) {
       return fields;
     }
 
-    return fields.map(field => {
-      const found = required.find(config => config.fieldId === field._id);
+    return fields.map((field) => {
+      const found = required.find((config) => config.fieldId === field._id);
 
       if (!found) {
         return field;
@@ -250,10 +289,183 @@ const configClientPortalQueries = {
 
       return {
         ...field,
-        isRequired: true
+        isRequired: true,
       };
     });
-  }
+  },
+
+  async clientPortalCardUsers(
+    _root,
+    { contentType, contentTypeId, userKind },
+    { models }: IContext
+  ) {
+    const userIds = await models.ClientPortalUserCards.getUserIds(
+      contentType,
+      contentTypeId
+    );
+
+    if (!userIds || userIds.length === 0) {
+      return [];
+    }
+
+    const users = await models.ClientPortalUsers.aggregate([
+      {
+        $match: {
+          _id: { $in: userIds },
+        },
+      },
+      {
+        $lookup: {
+          from: 'client_portals',
+          localField: 'clientPortalId',
+          foreignField: '_id',
+          as: 'clientPortal',
+        },
+      },
+      {
+        $unwind: '$clientPortal',
+      },
+      {
+        $match: {
+          'clientPortal.kind': userKind,
+        },
+      },
+    ]);
+
+    return users;
+  },
+
+  async clientPortalUserTickets(
+    _root,
+    { userId }: { userId: string },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const id = userId || (cpUser && cpUser._id);
+
+    if (!id) {
+      return [];
+    }
+    return getUserCards(id, 'ticket', models, subdomain);
+  },
+
+  async clientPortalUserDeals(
+    _root,
+    { userId }: { userId: string },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const id = userId || (cpUser && cpUser._id);
+
+    if (!id) {
+      return [];
+    }
+
+    return getUserCards(id, 'deal', models, subdomain);
+  },
+
+  async clientPortalUserPurchases(
+    _root,
+    { userId }: { userId: string },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const id = userId || (cpUser && cpUser._id);
+
+    if (!id) {
+      return [];
+    }
+
+    return getUserCards(id, 'purchase', models, subdomain);
+  },
+
+  async clientPortalUserTasks(
+    _root,
+    { userId }: { userId: string },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const id = userId || (cpUser && cpUser._id);
+
+    if (!id) {
+      return [];
+    }
+
+    return getUserCards(id, 'task', models, subdomain);
+  },
+
+  async clientPortalParticipantDetail(
+    _root,
+    {
+      _id,
+      contentType,
+      contentTypeId,
+      cpUserId,
+    }: {
+      _id: string;
+      contentType: string;
+      contentTypeId: string;
+      cpUserId: string;
+    },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const filter = {} as any;
+    if (_id) filter._id = _id;
+    if (contentType) filter.contentType = contentType;
+    if (contentTypeId) filter.contentTypeId = contentTypeId;
+    if (cpUserId) filter.cpUserId = cpUserId;
+    return models.ClientPortalUserCards.findOne(filter);
+  },
+  async clientPortalParticipants(
+    _root,
+    {
+      contentType,
+      contentTypeId,
+      userKind,
+    }: {
+      contentType: string;
+      contentTypeId: string;
+      userKind: string;
+    },
+    { models, cpUser, subdomain }: IContext
+  ) {
+    const userIds = await models.ClientPortalUserCards.getUserIds(
+      contentType,
+      contentTypeId
+    );
+
+    if (!userIds || userIds.length === 0) {
+      return [];
+    }
+
+    const users = await models.ClientPortalUsers.aggregate([
+      {
+        $match: {
+          _id: { $in: userIds },
+        },
+      },
+      {
+        $lookup: {
+          from: 'client_portals',
+          localField: 'clientPortalId',
+          foreignField: '_id',
+          as: 'clientPortal',
+        },
+      },
+      {
+        $unwind: '$clientPortal',
+      },
+      {
+        $match: {
+          'clientPortal.kind': userKind,
+        },
+      },
+    ]);
+
+    const filter = {} as any;
+
+    if (contentType) filter.contentType = contentType;
+    if (contentTypeId) filter.contentTypeId = contentTypeId;
+    if (users?.length > 0) filter.cpUserId = { $in: users.map((d) => d._id) };
+    else return [];
+    return models.ClientPortalUserCards.find(filter);
+  },
 };
 
 export default configClientPortalQueries;

@@ -49,6 +49,7 @@ export type NotificationModuleType = {
 export type NotificationModule = {
   name: string;
   description: string;
+  icon: string;
   types: NotificationModuleType[];
 };
 
@@ -75,7 +76,9 @@ export type GetNotificationByEmailMutationVariables = {
 
 export type GetNotificationByEmailMutationResponse = {
   configGetNotificationByEmailMutation: ({
-    variables: GetNotificationByEmailMutationVariables
+    variables
+  }: {
+    variables: GetNotificationByEmailMutationVariables;
   }) => Promise<any>;
 };
 
@@ -85,6 +88,8 @@ export type SaveNotificationConfigMutationVariables = {
 
 export type SaveNotificationConfigMutationResponse = {
   saveNotificationConfigurationsMutation: ({
+    variables
+  }: {
     variables: SaveNotificationConfigMutationVariables
   }) => Promise<any>;
 };

@@ -1,25 +1,24 @@
 import {
   attachmentInput,
-  attachmentType
+  attachmentType,
+  pdfAttachmentType,
+  pdfAttachmentInput
 } from '@erxes/api-utils/src/commonTypeDefs';
 
-export const types = (isContactsEnabled: boolean) => `
+export const types = (cmsAvailable: boolean) => `
 ${attachmentType}
 ${attachmentInput}
+${pdfAttachmentType}
+${pdfAttachmentInput}
 
-${
-  isContactsEnabled
-    ? `
-      extend type Customer @key(fields: "_id") {
-        _id: String! @external
-      }
+  extend type Customer @key(fields: "_id") {
+    _id: String! @external
+  }
 
-      extend type Company @key(fields: "_id") {
-        _id: String! @external
-      }
-      `
-    : ''
-}
+  extend type Company @key(fields: "_id") {
+    _id: String! @external
+  }
+
 
 type VerificationRequest {
   status: String
@@ -27,7 +26,12 @@ type VerificationRequest {
   description: String
   verifiedBy: String
 }
-
+type TwoFactorDevice {
+  key: String
+  device: String
+  date: Date
+  
+}
   input ClientPortalUserUpdate {
     firstName: String
     lastName: String
@@ -44,7 +48,10 @@ type VerificationRequest {
     isOnline: Boolean
     avatar: String
   }
-
+  input TwoFactor {
+    key: String
+    device: String
+  }
   type ClientPortalUser @key(fields: "_id") {
     _id: String!
     createdAt: Date
@@ -82,19 +89,26 @@ type VerificationRequest {
 
     verificationRequest: VerificationRequest
 
-    ${
-      isContactsEnabled
-        ? `
+
         customer: Customer
         company: Company
-      `
-        : ''
-    }
+
+    twoFactorDevices:[TwoFactorDevice]
   }
 
   type clientPortalUsersListResponse {
     list: [ClientPortalUser],
     totalCount: Float,
+  }
+
+  type ClientPortalCompany {
+    _id: String!
+    erxesCompanyId: String
+
+    productCategoryIds: [String]
+    clientPortalId: String
+    createdAt: Date
+    company: Company
   }
 
   enum ClientPortalUserVerificationStatus {
@@ -107,6 +121,49 @@ type VerificationRequest {
     token: String
     refreshToken: String
   }
+
+   enum PostAuthorKind {
+        user
+        clientPortalUser
+    }
+
+  input PostDocumentInput {
+        clientPortalId: String
+        title: String
+        slug: String
+        content: String
+        excerpt: String
+        categoryIds: [String]
+        featured: Boolean
+        status: String
+        tagIds: [String]
+        authorId: String
+        scheduledDate: Date
+        autoArchiveDate: Date
+        reactions: [String]
+        reactionCounts: JSON
+        thumbnail: AttachmentInput
+        images: [AttachmentInput]
+        video: AttachmentInput
+        audio: AttachmentInput
+        documents: [AttachmentInput]
+        attachments: [AttachmentInput]
+        pdfAttachment: PdfAttachmentInput
+        videoUrl: String
+        customFieldsData: JSON
+    }
+
+    ${
+      cmsAvailable
+        ? `
+        type ClientportalUserPostList {
+          posts: [Post]
+          totalCount: Int
+          totalPages: Int
+          currentPage: Int
+        }`
+        : ''
+    }
 `;
 
 export const conformityQueryFields = `
@@ -131,12 +188,22 @@ const queryParams = `
   ${conformityQueryFields}
 `;
 
-export const queries = () => `
+export const queries = (cmsAvailable) => `
   clientPortalCurrentUser: ClientPortalUser
   clientPortalUserDetail(_id: String!): ClientPortalUser
   clientPortalUsers(${queryParams}): [ClientPortalUser]
   clientPortalUsersMain(${queryParams}): clientPortalUsersListResponse
   clientPortalUserCounts(type: String): Int
+
+  clientPortalCompanies(clientPortalId: String!): [ClientPortalCompany]
+
+    ${
+      cmsAvailable
+        ? `
+  clientPortalUserPosts(searchValue: String, page: Int, perPage: Int): ClientportalUserPostList
+    `
+        : ''
+    }  
 `;
 
 const userParams = `
@@ -145,9 +212,11 @@ const userParams = `
   email: String,
   username: String,
   password: String,
+  secondaryPassword: String,
 
   companyName: String
   companyRegistrationNumber: String
+  erxesCompanyId: String
   
   firstName: String,
   lastName: String,
@@ -160,32 +229,52 @@ const userParams = `
   avatar: String
 `;
 
-export const mutations = () => `
-  clientPortalUsersInvite(${userParams}): ClientPortalUser
+export const mutations = (cmsAvailable) => `
+  clientPortalUsersInvite(${userParams}, disableVerificationMail: Boolean): ClientPortalUser
   clientPortalUsersEdit(_id: String!, ${userParams}): ClientPortalUser
   clientPortalUsersRemove(clientPortalUserIds: [String!]): JSON
   clientPortalRegister(${userParams}): String
   clientPortalVerifyOTP(userId: String!, phoneOtp: String, emailOtp: String, password: String): JSON
   clientPortalUsersVerify(userIds: [String]!, type: String): JSON
-  clientPortalLogin(login: String!, password: String!, clientPortalId: String!, deviceToken: String): JSON
+  clientPortalLogin(login: String!, password: String!, clientPortalId: String!, deviceToken: String,twoFactor: TwoFactor): JSON
   clientPortalLoginWithPhone(phone: String!, clientPortalId: String!, deviceToken: String): JSON
+  clientPortal2FAGetCode(byPhone: Boolean,byEmail:Boolean): JSON
+  clientPortal2FADeleteKey(key:String!): JSON
+  clientPortalVerify2FA(phoneOtp: String, emailOtp: String,twoFactor:TwoFactor): JSON
+  clientPortalLoginWithMailOTP(email: String!, clientPortalId: String!, deviceToken: String): JSON
   clientPortalLoginWithSocialPay(clientPortalId: String!, token: String!) : JSON
   clientPortalRefreshToken: String
-  clientPortalGoogleAuthentication(clientPortalId: String, code: String): JSON
-  clientPortalFacebookAuthentication(accessToken: String, clientPortalId: String!): JSON
+  clientPortalGoogleAuthentication(clientPortalId: String!, code: String!): JSON
+  clientPortalFacebookAuthentication(accessToken: String!, clientPortalId: String!): JSON
   clientPortalLogout: String
   
   clientPortalUsersReplacePhone(clientPortalId: String!, phone: String!): String!
   clientPortalUsersVerifyPhone(code: String!): String!
+  clientPortalUsersMove(oldClientPortalId: String!, newClientPortalId: String!): JSON
 
   clientPortalUserAssignCompany(userId: String!, erxesCompanyId: String!, erxesCustomerId: String!):  JSON
 
   clientPortalConfirmInvitation(token: String, password: String, passwordConfirmation: String, username: String): ClientPortalUser
   clientPortalForgotPassword(clientPortalId: String!, email: String, phone: String): String!
-  clientPortalResetPasswordWithCode(phone: String!, code: String!, password: String!): String
+  clientPortalResetPasswordWithCode(phone: String!, code: String!, password: String!,isSecondary:Boolean): String
   clientPortalResetPassword(token: String!, newPassword: String!): JSON
   clientPortalUserChangePassword(currentPassword: String!, newPassword: String!): ClientPortalUser
   clientPortalUsersSendVerificationRequest(login: String!, password: String!, clientPortalId: String!,  attachments: [AttachmentInput]!, description: String): String
   clientPortalUsersChangeVerificationStatus(userId: String!, status: ClientPortalUserVerificationStatus!): String
   clientPortalUpdateUser(_id: String!, doc: ClientPortalUserUpdate!): JSON
+
+  clientPortalUserSetSecondaryPassword(newPassword: String!, oldPassword:String): String
+
+  ${
+    cmsAvailable
+      ? `
+  clientPortalUserAddPost(input: PostDocumentInput!): Post
+  clientPortalUserEditPost(_id: String!, input: PostDocumentInput!): Post
+  clientPortalUserRemovePost(_id: String!): JSON
+  clientPortalUserChangeStatus(_id: String!, status: String!): Post
+  clientPortalUserToggleFeatured(_id: String!): Post
+    `
+      : ''
+  }
+  
 `;

@@ -1,24 +1,26 @@
-import EmptyState from '@erxes/ui/src/components/EmptyState';
-import Spinner from '@erxes/ui/src/components/Spinner';
-import EmptySidebar from '@erxes/ui/src/layout/components/Sidebar';
-import { MainContent, ContentBox } from '@erxes/ui/src/layout/styles';
-import { IField } from '@erxes/ui/src/types';
-import React from 'react';
-import { IConversation } from '@erxes/ui-inbox/src/inbox/types';
-import Sidebar from '../../containers/conversationDetail/Sidebar';
+import { ContentBox, MainContent } from '@erxes/ui/src/layout/styles';
+import DmWorkArea, {
+  resetDmWithQueryCache,
+} from '../../containers/conversationDetail/DmWorkArea';
 import {
   getPluginConfig,
-  loadDynamicComponent
+  loadDynamicComponent,
 } from '@erxes/ui/src/utils/core';
-import DmWorkArea, {
-  resetDmWithQueryCache
-} from '../../containers/conversationDetail/DmWorkArea';
+
+import ConversationDetailLoader from './ConversationDetailLoader';
+import EmptySidebar from '@erxes/ui/src/layout/components/Sidebar';
+import EmptyState from '@erxes/ui/src/components/EmptyState';
+import { IConversation } from '@erxes/ui-inbox/src/inbox/types';
+import { IField } from '@erxes/ui/src/types';
+import React from 'react';
+import Sidebar from '../../containers/conversationDetail/Sidebar';
+import SidebarLoader from './sidebar/SidebarLoader';
 import WorkArea from './workarea/WorkArea';
 
 type Props = {
   currentConversation: IConversation;
   loading: boolean;
-  conversationFields: IField[];
+  conversationFields?: IField[];
   refetchDetail: () => void;
 };
 
@@ -26,20 +28,20 @@ export default class ConversationDetail extends React.Component<Props> {
   renderSidebar() {
     const { loading, currentConversation, conversationFields } = this.props;
 
+    if (loading) {
+      return (
+        <EmptySidebar full={true}>
+          <SidebarLoader />
+        </EmptySidebar>
+      );
+    }
+
     if (currentConversation) {
       return (
         <Sidebar
           conversation={currentConversation}
           conversationFields={conversationFields}
         />
-      );
-    }
-
-    if (loading) {
-      return (
-        <EmptySidebar full={true}>
-          <Spinner />
-        </EmptySidebar>
       );
     }
 
@@ -70,6 +72,14 @@ export default class ConversationDetail extends React.Component<Props> {
   renderContent() {
     const { loading, currentConversation } = this.props;
 
+    if (loading) {
+      return (
+        <ContentBox>
+          <ConversationDetailLoader />
+        </ContentBox>
+      );
+    }
+
     if (currentConversation) {
       const { integration } = currentConversation;
       const kind = integration.kind.split('-')[0];
@@ -77,17 +87,17 @@ export default class ConversationDetail extends React.Component<Props> {
       let content;
 
       if (
-        !['messenger', 'lead', 'booking', 'webhook', 'callpro'].includes(
-          currentConversation.integration.kind
+        !['messenger', 'lead', 'webhook', 'callpro'].includes(
+          currentConversation.integration.kind,
         )
       ) {
         const integrations = getPluginConfig({
           pluginName: kind,
-          configName: 'inboxIntegrations'
+          configName: 'inboxIntegrations',
         });
 
         if (integrations) {
-          const entry = integrations.find(i => i.kind === integration.kind);
+          const entry = integrations.find((i) => i.kind === integration.kind);
           const key = 'inboxConversationDetail';
 
           if (entry && entry.components && entry.components.includes(key)) {
@@ -95,10 +105,10 @@ export default class ConversationDetail extends React.Component<Props> {
               key,
               {
                 ...this.props,
-                conversation: currentConversation
+                conversation: currentConversation,
               },
               false,
-              kind
+              kind,
             );
           }
         }
@@ -119,7 +129,7 @@ export default class ConversationDetail extends React.Component<Props> {
 
       const dmConfig = getPluginConfig({
         pluginName: kind,
-        configName: 'inboxDirectMessage'
+        configName: 'inboxDirectMessage',
       });
 
       if (dmConfig) {
@@ -127,14 +137,6 @@ export default class ConversationDetail extends React.Component<Props> {
       }
 
       return <DmWorkArea {...this.props} />;
-    }
-
-    if (loading) {
-      return (
-        <ContentBox>
-          <Spinner />
-        </ContentBox>
-      );
     }
 
     return (

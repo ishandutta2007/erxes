@@ -1,96 +1,127 @@
-import { ISendMessageArgs, sendMessage } from '@erxes/api-utils/src/core';
-import { debugBase } from '@erxes/api-utils/src/debuggers';
-import { setTimeout } from 'timers';
-import { receiveTrigger } from './utils';
-import { serviceDiscovery } from './configs';
-import { playWait } from './actions';
-import { generateModels } from './connectionResolver';
+import { sendMessage } from "@erxes/api-utils/src/core";
+import type {
+  MessageArgsOmitService,
+  MessageArgs
+} from "@erxes/api-utils/src/core";
+import { playWait } from "./actions";
+import {
+  checkWaitingResponseAction,
+  doWaitingResponseAction
+} from "./actions/wait";
+import { generateModels } from "./connectionResolver";
+import { executePrevAction, receiveTrigger } from "./utils";
+import {
+  consumeQueue,
+  consumeRPCQueue
+} from "@erxes/api-utils/src/messageBroker";
+import { debugInfo } from "@erxes/api-utils/src/debuggers";
 
-let client;
-
-export const initBroker = async cl => {
-  client = cl;
-
-  const { consumeQueue } = cl;
-
-  consumeQueue('automations:trigger', async ({ subdomain, data }) => {
-    debugBase(`Receiving queue data: ${JSON.stringify(data)}`);
+export const setupMessageConsumers = async () => {
+  consumeQueue("automations:trigger", async ({ subdomain, data }) => {
+    debugInfo(`Receiving queue data: ${JSON.stringify(data)}`);
 
     const models = await generateModels(subdomain);
     const { type, actionType, targets } = data;
 
-    if (actionType && actionType === 'waiting') {
-      await playWait(models, subdomain);
+    if (actionType && actionType === "waiting") {
+      await playWait(models, subdomain, data);
+      return;
+    }
+    const waitingExecution = await await checkWaitingResponseAction(
+      models,
+      type,
+      actionType,
+      targets
+    );
+
+    if (waitingExecution) {
+      await doWaitingResponseAction(models, subdomain, data, waitingExecution);
       return;
     }
 
-    setTimeout(async () => {
-      await receiveTrigger({ models, subdomain, type, targets });
-    }, 10000);
+    await receiveTrigger({ models, subdomain, type, targets });
   });
 
-  consumeQueue('automations:find.count', async ({ subdomain, data }) => {
+  consumeRPCQueue("automations:trigger", async ({ subdomain, data }) => {
+    debugInfo(`Receiving queue data: ${JSON.stringify(data)}`);
+
+    const models = await generateModels(subdomain);
+    const { type, actionType, targets } = data;
+
+    const waitingExecution = await await checkWaitingResponseAction(
+      models,
+      type,
+      actionType,
+      targets
+    );
+
+    if (waitingExecution) {
+      await doWaitingResponseAction(models, subdomain, data, waitingExecution);
+      return {
+        status: "success",
+        data: "complete"
+      };
+    }
+
+    try {
+      await receiveTrigger({ models, subdomain, type, targets });
+      return {
+        status: "success",
+        data: "complete"
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        errorMessage: error?.message || "error"
+      };
+    }
+  });
+
+  consumeRPCQueue("automations:find.count", async ({ subdomain, data }) => {
     const models = await generateModels(subdomain);
 
     const { query = {} } = data || {};
 
     return {
-      status: 'success',
+      status: "success",
       data: await models.Automations.countDocuments(query)
     };
   });
+
+  consumeRPCQueue(
+    "automations:excutePrevActionExecution",
+    async ({ subdomain, data }) => {
+      const models = await generateModels(subdomain);
+      return {
+        status: "success",
+        data: await executePrevAction(models, subdomain, data)
+      };
+    }
+  );
 };
 
 export const sendCommonMessage = async (
-  args: ISendMessageArgs & { serviceName: string }
+  args: MessageArgs & { serviceName: string }
 ): Promise<any> => {
   return sendMessage({
-    serviceDiscovery,
-    client,
     ...args
   });
 };
 
-export const sendCoreMessage = async (args: ISendMessageArgs): Promise<any> => {
+export const sendCoreMessage = async (
+  args: MessageArgsOmitService
+): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'core',
+    serviceName: "core",
     ...args
   });
 };
 
 export const sendSegmentsMessage = async (
-  args: ISendMessageArgs
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'segments',
+    serviceName: "core",
     ...args
   });
 };
-
-export const sendEmailTemplateMessage = async (
-  args: ISendMessageArgs
-): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'emailtemplates',
-    ...args
-  });
-};
-
-export const sendLogsMessage = (args: ISendMessageArgs): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'logs',
-    ...args
-  });
-};
-
-export default function() {
-  return client;
-}

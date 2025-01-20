@@ -1,34 +1,28 @@
-import ClientPortalIdFilter from '../../containers/ClientPortalIdFilter';
-import { Counts } from '@erxes/ui/src/types';
-import DateFilters from '@erxes/ui-forms/src/forms/containers/DateFilters';
-import React from 'react';
-import TypeFilter from '../../containers/TypeFilter';
-import Wrapper from '@erxes/ui/src/layout/components/Wrapper';
-import { isEnabled } from '@erxes/ui/src/utils/core';
+import DateFilters from "@erxes/ui-forms/src/forms/containers/filters/DateFilters";
+import Wrapper from "@erxes/ui/src/layout/components/Wrapper";
+import { Counts } from "@erxes/ui/src/types";
+
+import React from "react";
+import ClientPortalIdFilter from "../../containers/ClientPortalIdFilter";
 
 type Props = {
   loadingMainQuery: boolean;
+  kind?: "client" | "vendor";
   counts: {
     byCP: Counts;
     byType: Counts;
   };
 };
 
-function Sidebar({ counts, loadingMainQuery }: Props) {
+function Sidebar({ counts, loadingMainQuery, kind }: Props) {
   return (
-    <Wrapper.Sidebar hasBorder>
-      {isEnabled('clientportal') && (
-        <>
-          <ClientPortalIdFilter counts={counts.byCP} />
-          <TypeFilter counts={counts.byType} />
-        </>
-      )}
-      {isEnabled('forms') && (
-        <DateFilters
-          type="clientportal:user"
-          loadingMainQuery={loadingMainQuery}
-        />
-      )}
+    <Wrapper.Sidebar hasBorder={true}>
+      <ClientPortalIdFilter counts={counts.byCP} kind={kind} />
+
+      <DateFilters
+        type="clientportal:user"
+        loadingMainQuery={loadingMainQuery}
+      />
     </Wrapper.Sidebar>
   );
 }

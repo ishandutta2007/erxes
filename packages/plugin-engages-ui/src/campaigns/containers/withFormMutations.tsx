@@ -1,156 +1,151 @@
-import { gql } from '@apollo/client';
 import * as compose from 'lodash.flowright';
-import { IRouterProps } from '@erxes/ui/src/types';
+
 import { Alert, withProps } from '@erxes/ui/src/utils';
-import React from 'react';
-import { graphql } from '@apollo/client/react/hoc';
-import { withRouter } from 'react-router-dom';
-import { mutations, queries } from '@erxes/ui-engage/src/graphql';
 import {
   EngageMessageDetailQueryResponse,
   IEngageMessage,
   WithFormAddMutationResponse,
   WithFormEditMutationResponse,
-  WithFormMutationVariables
+  WithFormMutationVariables,
 } from '@erxes/ui-engage/src/types';
-import { crudMutationsOptions } from '@erxes/ui-engage/src/utils';
+import React, { useState } from 'react';
+import { mutations, queries } from '@erxes/ui-engage/src/graphql';
+
 import { AllUsersQueryResponse } from '@erxes/ui/src/auth/types';
+import { crudMutationsOptions } from '@erxes/ui-engage/src/utils';
+import { gql } from '@apollo/client';
+import { graphql } from '@apollo/client/react/hoc';
+import { useNavigate } from 'react-router-dom';
 
 type Props = {
   messageId: string;
   kind: string;
+  businessPortalKind?: string;
 };
 
 type FinalProps = {
   engageMessageDetailQuery: EngageMessageDetailQueryResponse;
   usersQuery: AllUsersQueryResponse;
-} & IRouterProps &
-  Props &
+} & Props &
   WithFormAddMutationResponse &
   WithFormEditMutationResponse;
 
 function withSaveAndEdit<IComponentProps>(Component) {
-  class Container extends React.Component<FinalProps, { isLoading: boolean }> {
-    constructor(props: FinalProps) {
-      super(props);
+  const Container: React.FC<FinalProps> = ({
+    kind,
+    messageId,
+    usersQuery,
+    engageMessageDetailQuery,
+    addMutation,
+    editMutation,
+  }) => {
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const navigate = useNavigate();
 
-      this.state = {
-        isLoading: false
-      };
-    }
+    const message =
+      engageMessageDetailQuery.engageMessageDetail || ({} as IEngageMessage);
+    const users = usersQuery.allUsers || [];
+    const verifiedUsers = users.filter((user) => user.username || user.email) || [];
 
-    render() {
-      const {
-        history,
-        kind,
-        messageId,
-        usersQuery,
-        engageMessageDetailQuery,
-        addMutation,
-        editMutation
-      } = this.props;
-
-      const message =
-        engageMessageDetailQuery.engageMessageDetail || ({} as IEngageMessage);
-      const users = usersQuery.allUsers || [];
-      const verifiedUsers = users.filter(user => user.username) || [];
-
-      const doMutation = (mutation, variables, msg) => {
-        this.setState({ isLoading: true });
-
-        mutation({
-          variables
-        })
-          .then(() => {
-            Alert.success(msg);
-
-            history.push({
-              pathname: '/campaigns',
-              search: '?engageRefetchList=true'
-            });
-          })
-          .catch(error => {
-            Alert.error(error.message);
-
-            this.setState({ isLoading: false });
+    const doMutation = (mutation, variables, msg) => {
+      setIsLoading(true);
+      mutation({ variables })
+        .then(() => {
+          Alert.success(msg);
+          navigate({
+            pathname: '/campaigns',
+            search: '?engageRefetchList=true',
           });
-      };
+        })
+        .catch(error => {
+          Alert.error(error.message);
+          setIsLoading(false);
+        });
+    };
 
-      // save
-      const save = doc => {
-        doc.kind = message.kind ? message.kind : kind;
-
-        if (messageId) {
-          return doMutation(
-            editMutation,
-            { ...doc, _id: messageId },
-            `You successfully updated a campaign`
-          );
-        }
-
+    const save = doc => {
+      doc.kind = message.kind ? message.kind : kind;
+      if (messageId) {
         return doMutation(
-          addMutation,
-          doc,
-          `You successfully added a campaign`
+          editMutation,
+          { ...doc, _id: messageId },
+          `You successfully updated a broadcast`
         );
-      };
+      }
 
-      const messenger = message.messenger || {
-        brandId: '',
-        kind: '',
-        content: '',
-        sentAs: '',
-        rules: []
-      };
+      return doMutation(
+        addMutation,
+        doc,
+        `You successfully added a broadcast.`
+      );
+    };
 
-      const email = message.email || {
-        subject: '',
-        attachments: [],
-        content: '',
-        replyTo: '',
-        sender: '',
-        templateId: ''
-      };
+    const messenger = message.messenger || {
+      brandId: '',
+      kind: '',
+      content: '',
+      sentAs: '',
+      rules: [],
+    };
 
-      const scheduleDate = message.scheduleDate;
+    const email = message.email || {
+      subject: '',
+      attachments: [],
+      content: '',
+      replyTo: '',
+      sender: '',
+      templateId: '',
+    };
 
-      const updatedProps = {
-        ...this.props,
-        save,
-        users: verifiedUsers,
-        isActionLoading: this.state.isLoading,
-        message: {
-          ...message,
-          // excluding __type auto fields
-          messenger: {
-            brandId: messenger.brandId,
-            kind: messenger.kind,
-            content: messenger.content,
-            sentAs: messenger.sentAs,
-            rules: messenger.rules
-          },
-          email: {
-            subject: email.subject,
-            attachments: email.attachments,
-            content: email.content,
-            templateId: email.templateId,
-            replyTo: email.replyTo,
-            sender: email.sender
-          },
-          scheduleDate: scheduleDate
-            ? {
-                type: scheduleDate.type,
-                month: scheduleDate.month,
-                day: scheduleDate.day,
-                dateTime: scheduleDate.dateTime
-              }
-            : null
-        }
-      };
+    const notification = message.notification || {
+      title: '',
+      content: '',
+      isMobile: false,
+    };
 
-      return <Component {...updatedProps} />;
-    }
-  }
+    const scheduleDate = message.scheduleDate || null;
+
+    const updatedProps = {
+      save,
+      users: verifiedUsers,
+      isActionLoading: isLoading,
+      kind,
+      message: {
+        ...message,
+        // excluding __type auto fields
+        messenger: {
+          brandId: messenger.brandId,
+          kind: messenger.kind,
+          content: messenger.content,
+          sentAs: messenger.sentAs,
+          rules: messenger.rules,
+        },
+        email: {
+          subject: email.subject,
+          attachments: email.attachments,
+          content: email.content,
+          templateId: email.templateId,
+          replyTo: email.replyTo,
+          sender: email.sender,
+        },
+        notification: {
+          title: notification.title,
+          content: notification.content,
+          isMobile: notification.isMobile,
+        },
+        scheduleDate: scheduleDate
+          ? {
+              type: scheduleDate.type,
+              month: scheduleDate.month,
+              day: scheduleDate.day,
+              dateTime: scheduleDate.dateTime,
+            }
+          : null,
+      },
+    };
+
+    return <Component {...updatedProps} />;
+  };
 
   return withProps<IComponentProps>(
     compose(
@@ -160,21 +155,21 @@ function withSaveAndEdit<IComponentProps>(Component) {
           name: 'engageMessageDetailQuery',
           options: ({ messageId }: { messageId: string }) => ({
             variables: {
-              _id: messageId
-            }
-          })
+              _id: messageId,
+            },
+          }),
         }
       ),
       graphql<Props, AllUsersQueryResponse>(gql(queries.users), {
-        name: 'usersQuery'
+        name: 'usersQuery',
       }),
       graphql<Props, WithFormAddMutationResponse, WithFormMutationVariables>(
         gql(mutations.messagesAdd),
         {
           name: 'addMutation',
           options: {
-            refetchQueries: engageRefetchQueries({})
-          }
+            refetchQueries: engageRefetchQueries({}),
+          },
         }
       ),
       graphql<Props, WithFormEditMutationResponse, WithFormMutationVariables>(
@@ -182,22 +177,22 @@ function withSaveAndEdit<IComponentProps>(Component) {
         {
           name: 'editMutation',
           options: {
-            refetchQueries: engageRefetchQueries({ isEdit: true })
-          }
+            refetchQueries: engageRefetchQueries({ isEdit: true }),
+          },
         }
       )
-    )(withRouter<FinalProps>(Container))
+    )(Container)
   );
 }
 
 export const engageRefetchQueries = ({
-  isEdit
+  isEdit,
 }: {
   isEdit?: boolean;
 }): string[] => [
   ...crudMutationsOptions().refetchQueries,
   ...(isEdit ? ['activityLogs'] : []),
-  'engageMessageDetail'
+  'engageMessageDetail',
 ];
 
 export default withSaveAndEdit;

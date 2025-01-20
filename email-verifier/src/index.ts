@@ -1,4 +1,3 @@
-import * as bodyParser from 'body-parser';
 import * as dotenv from 'dotenv';
 import * as express from 'express';
 import { filterXSS } from 'xss';
@@ -6,7 +5,7 @@ import { bulk, single } from './api';
 import { validateBulkPhones, validateSinglePhone } from './apiPhoneVerifier';
 import { connect } from './connection';
 import './cronJobs/verifier';
-import { initRedis } from './redisClient';
+
 import { debugBase, debugCrons, debugRequest } from './utils';
 
 // load environment variables
@@ -14,8 +13,14 @@ dotenv.config();
 
 const app = express();
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+const urlencodedMiddleware = express.urlencoded({
+  extended: true,
+}) as express.RequestHandler;
+const jsonMiddleware = express.json() as express.RequestHandler;
+
+// Use the explicitly typed middleware function
+app.use(urlencodedMiddleware);
+app.use(jsonMiddleware);
 
 app.post('/verify-single', async (req, res, next) => {
   debugRequest(debugBase, req);
@@ -76,7 +81,6 @@ const { PORT } = process.env;
 
 app.listen(PORT, async () => {
   await connect();
-  initRedis();
   debugBase(`Email verifier server is running on port ${PORT}`);
 });
 

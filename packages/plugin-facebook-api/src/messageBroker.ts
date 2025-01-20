@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { sendMessage } from '@erxes/api-utils/src/core';
 
 import {
   facebookCreateIntegration,
@@ -11,27 +12,21 @@ import {
 import { handleFacebookMessage } from './handleFacebookMessage';
 import { userIds } from './middlewares/userMiddleware';
 
-import {
-  ISendMessageArgs,
-  sendMessage as sendCommonMessage
-} from '@erxes/api-utils/src/core';
+import { sendMessage as sendCommonMessage } from '@erxes/api-utils/src/core';
+import { MessageArgs, MessageArgsOmitService } from '@erxes/api-utils/src/core';
 
-import { serviceDiscovery } from './configs';
 import { generateModels } from './connectionResolver';
+import {
+  InterMessage,
+  RPResult,
+  consumeQueue,
+  consumeRPCQueue,
+  sendRPCMessage
+} from '@erxes/api-utils/src/messageBroker';
 
 dotenv.config();
 
-let client;
-
-export const sendRPCMessage = async (channel, message): Promise<any> => {
-  return client.sendRPCMessage(channel, message);
-};
-
-export const initBroker = async cl => {
-  client = cl;
-
-  const { consumeRPCQueue, consumeQueue } = client;
-
+export const setupMessageConsumers = async () => {
   consumeRPCQueue(
     'facebook:getAccounts',
     async ({ subdomain, data: { kind } }) => {
@@ -45,7 +40,32 @@ export const initBroker = async cl => {
       };
     }
   );
+  consumeRPCQueue(
+    'facebook:updateIntegration',
+    async ({ subdomain, data: { integrationId, doc } }) => {
+      const models = await generateModels(subdomain);
+      const details = JSON.parse(doc.data);
 
+      const integration = await models.Integrations.findOne({
+        erxesApiId: integrationId
+      });
+
+      if (!integration) {
+        return {
+          status: 'error',
+          errorMessage: 'Integration not found.'
+        };
+      }
+      await models.Integrations.updateOne(
+        { erxesApiId: integrationId },
+        { $set: details }
+      );
+
+      return {
+        status: 'success'
+      };
+    }
+  );
   // listen for rpc queue =========
   consumeRPCQueue(
     'facebook:api_to_integrations',
@@ -53,27 +73,26 @@ export const initBroker = async cl => {
       const models = await generateModels(subdomain);
 
       const { action, type } = data;
-
-      let response: any = null;
+      let response: RPResult = {
+        status: 'success'
+      };
 
       try {
         if (action === 'remove-account') {
-          response = { data: await removeAccount(models, data._id) };
+          response.data = await removeAccount(subdomain, models, data._id);
         }
 
         if (action === 'repair-integrations') {
-          response = { data: await repairIntegrations(models, data._id) };
+          response.data = await repairIntegrations(subdomain, models, data._id);
         }
 
         if (type === 'facebook') {
-          response = { data: await handleFacebookMessage(models, data) };
+          response.data = await handleFacebookMessage(models, data, subdomain);
         }
 
         if (action === 'getConfigs') {
-          response = { data: await models.Configs.find({}) };
+          response.data = await models.Configs.find({});
         }
-
-        response.status = 'success';
       } catch (e) {
         response = {
           status: 'error',
@@ -120,7 +139,7 @@ export const initBroker = async cl => {
       const models = await generateModels(subdomain);
 
       return {
-        data: await models.Posts.getPost({ erxesApiId }, true),
+        data: await models.PostConversations.findOne({ erxesApiId }),
         status: 'success'
       };
     }
@@ -142,12 +161,12 @@ export const initBroker = async cl => {
       const models = await generateModels(subdomain);
 
       if (kind === 'facebook') {
-        return facebookCreateIntegration(models, doc);
+        return facebookCreateIntegration(subdomain, models, doc);
       }
 
       return {
         status: 'error',
-        data: 'Wrong kind'
+        errorMessage: 'Wrong kind'
       };
     }
   );
@@ -158,7 +177,7 @@ export const initBroker = async cl => {
     async ({ subdomain, data: { integrationId } }) => {
       const models = await generateModels(subdomain);
 
-      await removeIntegration(models, integrationId);
+      await removeIntegration(subdomain, models, integrationId);
 
       return { status: 'success' };
     }
@@ -192,20 +211,50 @@ export const initBroker = async cl => {
       };
     }
   );
+
+  consumeRPCQueue(
+    'facebook:getModuleRelation',
+    async ({ data: { module, target } }) => {
+      // need to check pos-order or pos
+
+      let filter;
+
+      if (module.includes('contacts')) {
+        if (target.customerId) {
+          filter = { _id: target.customerId };
+        }
+      }
+
+      return {
+        status: 'success',
+        data: filter
+      };
+    }
+  );
 };
 
-export default function() {
-  return client;
-}
+export const sendCoreMessage = async (
+  args: MessageArgsOmitService
+): Promise<any> => {
+  return sendMessage({
+    serviceName: 'core',
+    ...args
+  });
+};
 
-export const sendInboxMessage = (args: ISendMessageArgs) => {
+export const sendInboxMessage = (args: MessageArgsOmitService) => {
   return sendCommonMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'inbox',
     ...args
   });
 };
 
-export const getFileUploadConfigs = async () =>
-  sendRPCMessage('core:getFileUploadConfigs', {});
+export const sendAutomationsMessage = (args: MessageArgsOmitService) => {
+  return sendCommonMessage({
+    serviceName: 'automations',
+    ...args
+  });
+};
+
+export const getFileUploadConfigs = async (subdomain) =>
+  sendRPCMessage('core:getFileUploadConfigs', { subdomain });

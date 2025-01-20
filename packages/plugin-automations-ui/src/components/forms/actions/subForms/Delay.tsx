@@ -1,5 +1,5 @@
-import React from 'react';
-import Select from 'react-select-plus';
+import React, { useEffect, useState } from 'react';
+import Select from 'react-select';
 import { IAction } from '@erxes/ui-automations/src/types';
 import Common from '@erxes/ui-automations/src/components/forms/actions/Common';
 import { BoardHeader, DrawerDetail } from '@erxes/ui-automations/src/styles';
@@ -15,57 +15,46 @@ type Props = {
   addAction: (action: IAction, actionId?: string, config?: any) => void;
 };
 
-type State = {
-  config: any;
-};
-
-class Delay extends React.Component<Props, State> {
-  constructor(props) {
-    super(props);
-
-    const { config } = this.props.activeAction;
-
-    this.state = { config: config || {} };
+const options = [
+  {
+    label: 'Minute',
+    value: 'minute'
+  },
+  {
+    label: 'Hour',
+    value: 'hour'
+  },
+  {
+    label: 'Day',
+    value: 'day'
   }
+];
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.activeAction !== this.props.activeAction) {
-      this.setState({ config: nextProps.activeAction.config });
-    }
-  }
+export default function Delay(props: Props) {
+  const { activeAction } = props;
+  const [config, setConfig] = useState(activeAction?.config || {});
 
-  onChangeField = (name: string, value: string) => {
-    const { config } = this.state;
-    config[name] = value;
+  useEffect(() => {
+    setConfig(activeAction.config);
+  }, [activeAction]);
 
-    this.setState({ config });
-  };
+  const onChange = (name: string, value: any) =>
+    setConfig({ ...config, [name]: value });
 
-  renderContent() {
-    const { config } = this.state;
+  const onChangeValue = (e) => onChange('value', e.target.value);
+  const onChangeSelect = (option) => onChange('type', option?.value);
 
-    const onChangeSelect = (field, e) => this.onChangeField(field, e.value);
-    const onChangeValue = e => this.onChangeField('value', e.target.value);
-
+  const renderContent = () => {
     return (
       <DrawerDetail>
         <FormGroup>
           <ControlLabel required={true}>{__('Type')}</ControlLabel>
 
           <Select
-            value={config.type || 'hour'}
-            options={[
-              {
-                label: 'Hour',
-                value: 'hour'
-              },
-              {
-                label: 'Day',
-                value: 'day'
-              }
-            ]}
-            onChange={onChangeSelect.bind(this, 'type')}
-            clearable={false}
+            value={options.find((o) => o.value === (config?.type || 'hour'))}
+            options={options}
+            onChange={onChangeSelect}
+            isClearable={false}
           />
         </FormGroup>
 
@@ -77,21 +66,18 @@ class Delay extends React.Component<Props, State> {
             <FormControl
               type="number"
               onChange={onChangeValue}
-              value={config.value}
+              defaultValue={0}
+              value={config?.value}
             />
           </FormGroup>
         </BoardHeader>
       </DrawerDetail>
     );
-  }
+  };
 
-  render() {
-    return (
-      <Common config={this.state.config} {...this.props}>
-        {this.renderContent()}
-      </Common>
-    );
-  }
+  return (
+    <Common config={config} {...props}>
+      {renderContent()}
+    </Common>
+  );
 }
-
-export default Delay;

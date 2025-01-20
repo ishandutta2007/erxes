@@ -1,52 +1,50 @@
-import { moduleRequireLogin } from '@erxes/api-utils/src/permissions';
+import { moduleRequireLogin } from "@erxes/api-utils/src/permissions";
 
 import {
   checkPremiumService,
   getCoreDomain,
   getEnv,
-  readFile,
-  sendRequest
-} from '../../utils';
+  readFile
+} from "../../utils";
 
-import { getService, getServices } from '../../../serviceDiscovery';
-import { sendCommonMessage } from '../../../messageBroker';
-import { DEFAULT_CONSTANT_VALUES } from '@erxes/api-utils/src/constants';
+import { getService, getServices } from "@erxes/api-utils/src/serviceDiscovery";
+import { sendCommonMessage } from "../../../messageBroker";
+import { DEFAULT_CONSTANT_VALUES } from "@erxes/api-utils/src/constants";
 
-import * as dotenv from 'dotenv';
-import { IContext } from '../../../connectionResolver';
+import * as dotenv from "dotenv";
+import { IContext } from "../../../connectionResolver";
+import fetch from "node-fetch";
 dotenv.config();
 
 const configQueries = {
   /**
    * Config object
    */
-  configs(_root, _args, { models }: IContext) {
+  async configs(_root, _args, { models }: IContext) {
     return models.Configs.find({});
   },
 
   async configsGetVersion(_root, { releaseNotes }) {
     const result = {
-      version: '-',
+      version: "-",
       isUsingRedis: Boolean(process.env.REDIS_HOST),
       isUsingRabbitMQ: Boolean(process.env.RABBITMQ_HOST),
-      isUsingElkSyncer: Boolean(process.env.ELK_SYNCER !== 'false'),
+      isUsingElkSyncer: Boolean(process.env.ELK_SYNCER !== "false"),
       isLatest: false,
       releaseInfo: {}
     };
 
-    const erxesDomain = getEnv({ name: 'DOMAIN' });
+    const erxesDomain = getEnv({ name: "DOMAIN" });
 
-    const erxesVersion = await sendRequest({
-      url: `${erxesDomain}/version.json`,
-      method: 'GET'
-    });
+    const erxesVersion = await fetch(`${erxesDomain}/version.json`).then(r =>
+      r.json()
+    );
 
-    result.version = erxesVersion.packageVersion || '-';
+    result.version = erxesVersion.packageVersion || "-";
 
-    const response = await sendRequest({
-      url: `${process.env.CORE_URL || 'https://erxes.io'}/git-release-info`,
-      method: 'GET'
-    });
+    const response = await fetch(
+      `${process.env.CORE_URL || "https://erxes.io"}/git-release-info`
+    ).then(r => r.json());
 
     result.isLatest = result.version === response.tag_name;
 
@@ -57,13 +55,14 @@ const configQueries = {
     return result;
   },
 
-  configsGetEnv(_root) {
+  async configsGetEnv(_root) {
     return {
-      USE_BRAND_RESTRICTIONS: process.env.USE_BRAND_RESTRICTIONS
+      USE_BRAND_RESTRICTIONS: process.env.USE_BRAND_RESTRICTIONS,
+      RELEASE: process.env.RELEASE
     };
   },
 
-  configsConstants(_root, _args, { models }: IContext) {
+  async configsConstants(_root, _args, { models }: IContext) {
     return {
       allValues: models.Configs.constants(),
       defaultValues: DEFAULT_CONSTANT_VALUES
@@ -76,18 +75,18 @@ const configQueries = {
 
   async configsCheckActivateInstallation(_root, args: { hostname: string }) {
     try {
-      return await sendRequest({
-        method: 'POST',
-        url: `${getCoreDomain()}/check-activate-installation`,
-        body: args
-      });
+      return await fetch(`${getCoreDomain()}/check-activate-installation`, {
+        method: "POST",
+        body: JSON.stringify(args),
+        headers: { "Content-Type": "application/json" }
+      }).then(r => r.json());
     } catch (e) {
       throw new Error(e.message);
     }
   },
 
-  configsGetEmailTemplate(_root, { name }: { name?: string }) {
-    return readFile(name || 'base');
+  async configsGetEmailTemplate(_root, { name }: { name?: string }) {
+    return readFile(name || "base");
   },
 
   async search(_root, { value }: { value: string }, { subdomain }: IContext) {
@@ -96,14 +95,14 @@ const configQueries = {
     let results: Array<{ module: string; items: any[] }> = [];
 
     for (const serviceName of services) {
-      const service = await getService(serviceName, true);
+      const service = await getService(serviceName);
       const meta = service.config ? service.config.meta : {};
 
       if (meta && meta.isSearchable) {
         const serviceResults = await sendCommonMessage({
           subdomain,
           serviceName,
-          action: 'search',
+          action: "search",
           data: {
             subdomain,
             value
@@ -134,7 +133,7 @@ const configQueries = {
     const names = await getServices();
 
     if (names.includes(name)) {
-      return { status: 'installed' };
+      return { status: "installed" };
     }
 
     const isExisting = await models.InstallationLogs.findOne({
@@ -142,23 +141,23 @@ const configQueries = {
     });
 
     if (!isExisting) {
-      return { status: 'notExisting' };
+      return { status: "notExisting" };
     }
 
     const isDone = await models.InstallationLogs.findOne({
       pluginName: name,
-      message: 'done'
+      message: "done"
     });
 
     if (isDone) {
-      return { status: 'installed' };
+      return { status: "installed" };
     }
 
     const lastLog = await models.InstallationLogs.findOne({
       pluginName: name
     }).sort({ date: -1 });
 
-    return { status: 'installing', lastLogMessage: lastLog?.message };
+    return { status: "installing", lastLogMessage: lastLog?.message };
   }
 };
 

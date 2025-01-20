@@ -1,5 +1,9 @@
-import { checkPermission, requireLogin } from '@erxes/api-utils/src/permissions';
+import {
+  checkPermission,
+  requireLogin
+} from '@erxes/api-utils/src/permissions';
 import { IContext } from '../../connectionResolver';
+import { paginate } from '@erxes/api-utils/src';
 
 interface IListParams {
   page: number;
@@ -31,20 +35,20 @@ const responseTemplateQueries = {
   /**
    * Response templates list
    */
-  responseTemplates(
+  async responseTemplates(
     _root,
     args: IListParams,
     { commonQuerySelector, models }: IContext
   ) {
     const filter = generateFilter(commonQuerySelector, args);
 
-    return models.ResponseTemplates.find(filter);
+    return paginate(models.ResponseTemplates.find(filter), args);
   },
 
   /**
    * Get all response templates count. We will use it in pager
    */
-  responseTemplatesTotalCount(
+  async responseTemplatesTotalCount(
     _root,
     args: IListParams,
     { commonQuerySelector, models }: IContext

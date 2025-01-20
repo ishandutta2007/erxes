@@ -1,23 +1,18 @@
-import Select from 'react-select-plus';
-import EmptyState from '@erxes/ui/src/components/EmptyState';
-import FormControl from '@erxes/ui/src/components/form/Control';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { FlexItem, FlexPad } from '@erxes/ui/src/components/step/styles';
-import colors from '@erxes/ui/src/styles/colors';
-import { ISelectedOption } from '@erxes/ui/src/types';
-import { __ } from '@erxes/ui/src/utils/core';
-import React from 'react';
-import styled from 'styled-components';
-import styledTS from 'styled-components-ts';
-import {
-  IEngageScheduleDate,
-  IEngageSms,
-  IIntegrationWithPhone
-} from '@erxes/ui-engage/src/types';
-import Scheduler from './Scheduler';
-import SmsPreview from './SmsPreview';
-import { IConfig } from '@erxes/ui-settings/src/general/types';
+import Select, { OnChangeValue, components } from "react-select";
+import EmptyState from "@erxes/ui/src/components/EmptyState";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import FormGroup from "@erxes/ui/src/components/form/Group";
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import { FlexItem, FlexPad } from "@erxes/ui/src/components/step/styles";
+import colors from "@erxes/ui/src/styles/colors";
+import { ISelectedOption } from "@erxes/ui/src/types";
+import { __ } from "@erxes/ui/src/utils/core";
+import React from "react";
+import styled from "styled-components";
+import styledTS from "styled-components-ts";
+import { IEngageSms, IIntegrationWithPhone } from "@erxes/ui-engage/src/types";
+import SmsPreview from "./SmsPreview";
+import { IConfig } from "@erxes/ui-settings/src/general/types";
 
 const SMSInfo = styled.div`
   display: flex;
@@ -26,7 +21,7 @@ const SMSInfo = styled.div`
 `;
 
 const Char = styledTS<{ count: number }>(styled.div)`
-  color: ${props =>
+  color: ${(props) =>
     props.count > 10
       ? props.count < 30 && colors.colorCoreOrange
       : colors.colorCoreRed};
@@ -35,11 +30,10 @@ const Char = styledTS<{ count: number }>(styled.div)`
 
 type Props = {
   onChange: (
-    name: 'shortMessage' | 'scheduleDate' | 'fromUserId',
-    value?: IEngageScheduleDate | IEngageSms | string
+    name: "shortMessage" | "fromUserId",
+    value?: IEngageSms | string
   ) => void;
   messageKind: string;
-  scheduleDate: IEngageScheduleDate;
   shortMessage?: IEngageSms;
   fromUserId: string;
   smsConfig: IConfig;
@@ -47,7 +41,6 @@ type Props = {
 };
 
 type State = {
-  scheduleDate: IEngageScheduleDate;
   characterCount: number;
   titleCount: number;
   message: string;
@@ -67,12 +60,11 @@ class MessengerForm extends React.Component<Props, State> {
     super(props);
 
     this.state = {
-      scheduleDate: props.scheduleDate,
-      characterCount: this.calcCharacterCount(160, this.getContent('content')),
-      titleCount: this.calcCharacterCount(15, this.getContent('from')),
-      message: this.getContent('content'),
-      title: this.getContent('from'),
-      fromIntegrationId: this.getContent('fromIntegrationId')
+      characterCount: this.calcCharacterCount(160, this.getContent("content")),
+      titleCount: this.calcCharacterCount(15, this.getContent("from")),
+      message: this.getContent("content"),
+      title: this.getContent("from"),
+      fromIntegrationId: this.getContent("fromIntegrationId"),
     };
   }
 
@@ -81,14 +73,14 @@ class MessengerForm extends React.Component<Props, State> {
 
     shortMessage[key] = value;
 
-    this.props.onChange('shortMessage', shortMessage);
+    this.props.onChange("shortMessage", shortMessage);
   };
 
   getContent(key: string) {
     const { shortMessage } = this.props;
 
     if (!shortMessage) {
-      return '';
+      return "";
     }
 
     return shortMessage[key];
@@ -102,38 +94,23 @@ class MessengerForm extends React.Component<Props, State> {
     return maxChar - character.length;
   }
 
-  renderScheduler() {
-    const { messageKind, onChange } = this.props;
-
-    if (messageKind === 'manual') {
-      return null;
-    }
-
-    return (
-      <Scheduler
-        scheduleDate={this.state.scheduleDate || ({} as IEngageScheduleDate)}
-        onChange={onChange}
-      />
-    );
-  }
-
   fromSelectOptions = () => {
     const { integrations } = this.props;
     const options: IOption[] = [];
 
-    integrations.map(i =>
+    integrations.map((i) =>
       options.push({
         value: i._id,
         label: i.name,
         phoneNumber: i.phoneNumber,
-        disabled: !i.isActive
+        disabled: !i.isActive,
       })
     );
 
     return options;
   };
 
-  fromOptionRenderer = option => (
+  fromOptionRenderer = (option) => (
     <div>
       <strong>{option.label}</strong> (<i>{option.phoneNumber}</i>)
     </div>
@@ -141,42 +118,45 @@ class MessengerForm extends React.Component<Props, State> {
 
   render() {
     const { shortMessage, smsConfig } = this.props;
-    const {
-      message,
-      title,
-      titleCount,
-      characterCount,
-      fromIntegrationId
-    } = this.state;
+    const { message, title, titleCount, characterCount, fromIntegrationId } =
+      this.state;
 
-    const onChangeTitle = e =>
-      this.onChangeSms('from', (e.target as HTMLInputElement).value);
+    const onChangeTitle = (e) =>
+      this.onChangeSms("from", (e.target as HTMLInputElement).value);
 
-    const onChangeContent = e =>
-      this.onChangeSms('content', (e.target as HTMLInputElement).value);
+    const onChangeContent = (e) =>
+      this.onChangeSms("content", (e.target as HTMLInputElement).value);
 
-    const onChangeFrom = (value: ISelectedOption) => {
-      const integrationId = value ? value.value : '';
+    const onChangeFrom = (value: OnChangeValue<ISelectedOption, false>) => {
+      const integrationId = value ? value.value : "";
 
       this.setState({ fromIntegrationId: integrationId });
-      this.onChangeSms('fromIntegrationId', integrationId);
+      this.onChangeSms("fromIntegrationId", integrationId);
     };
 
-    const onChangeFromContent = e => {
+    const onChangeFromContent = (e) => {
       const from = (e.target as HTMLInputElement).value;
 
       this.setState({
         title: from,
-        titleCount: this.calcCharacterCount(15, from)
+        titleCount: this.calcCharacterCount(15, from),
       });
     };
 
-    const onChangeSmsContent = e => {
+    const onChangeSmsContent = (e) => {
       const content = (e.target as HTMLInputElement).value;
       this.setState({
         message: content,
-        characterCount: this.calcCharacterCount(160, content)
+        characterCount: this.calcCharacterCount(160, content),
       });
+    };
+
+    const Option = (props) => {
+      return (
+        <components.Option {...props}>
+          {this.fromOptionRenderer(props.data)}
+        </components.Option>
+      );
     };
 
     if (!smsConfig) {
@@ -194,16 +174,19 @@ class MessengerForm extends React.Component<Props, State> {
           <FormGroup>
             <ControlLabel>From:</ControlLabel>
             <Select
-              placeholder={__('Choose phone number')}
-              value={fromIntegrationId}
+              placeholder={__("Choose phone number")}
+              value={this.fromSelectOptions().find(
+                (option) => option.value === fromIntegrationId
+              )}
+              isClearable={true}
               onChange={onChangeFrom}
               options={this.fromSelectOptions()}
-              optionRenderer={this.fromOptionRenderer}
+              components={{ Option }}
             />
           </FormGroup>
           <FormGroup>
             <SMSInfo>
-              <ControlLabel>{__('SMS marketing from the title')}:</ControlLabel>
+              <ControlLabel>{__("SMS marketing from the title")}:</ControlLabel>
               <Char count={titleCount}>{titleCount}</Char>
             </SMSInfo>
             <FormControl
@@ -215,11 +198,11 @@ class MessengerForm extends React.Component<Props, State> {
           </FormGroup>
           <FormGroup>
             <SMSInfo>
-              <ControlLabel>{__('SMS marketing content')}:</ControlLabel>
+              <ControlLabel>{__("SMS marketing content")}:</ControlLabel>
               <Char count={characterCount}>{characterCount}</Char>
             </SMSInfo>
             <FormControl
-              componentClass="textarea"
+              componentclass="textarea"
               defaultValue={shortMessage && shortMessage.content}
               onBlur={onChangeContent}
               onChange={onChangeSmsContent}
@@ -227,7 +210,6 @@ class MessengerForm extends React.Component<Props, State> {
               maxLength={160}
             />
           </FormGroup>
-          {this.renderScheduler()}
         </FlexPad>
 
         <FlexItem overflow="auto" count="2">

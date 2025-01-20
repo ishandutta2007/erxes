@@ -1,14 +1,13 @@
 import React from 'react';
 import Spinner from 'modules/common/components/Spinner';
 import Store from '../components/Store';
-
-type Props = {};
+import { Plugin } from '../types';
 
 type State = {
-  plugins: any;
+  plugins: Plugin[];
 };
 
-class StoreContainer extends React.Component<Props, State> {
+class StoreContainer extends React.Component<{}, State> {
   constructor(props) {
     super(props);
 
@@ -20,8 +19,8 @@ class StoreContainer extends React.Component<Props, State> {
   async componentDidMount() {
     const url =
       process.env.NODE_ENV === 'production'
-        ? 'https://erxes.io/plugins'
-        : 'http://127.0.0.1:3500/plugins';
+        ? 'https://erxes.io/api/plugins'
+        : 'http://127.0.0.1:3500/api/plugins';
 
     fetch(url)
       .then(async response => {

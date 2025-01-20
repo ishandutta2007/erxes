@@ -3,11 +3,24 @@ import { Document, Schema } from 'mongoose';
 import { field } from './utils';
 
 export interface IOTPConfig {
+  emailSubject?: any;
   content: string;
   codeLength: number;
-  smsTransporterType: '' | 'messagePro' | 'telnyx';
+  smsTransporterType: string;
   loginWithOTP: boolean;
   expireAfter: number;
+}
+export interface TwoFactorConfig {
+  emailSubject?: any;
+  content: string;
+  codeLength: number;
+  smsTransporterType: string;
+  enableTwoFactor: boolean;
+  expireAfter: number;
+}
+export interface ISocialpayConfig {
+  publicKey: string;
+  certId: string;
 }
 
 export interface IMailConfig {
@@ -36,6 +49,7 @@ export interface IPasswordVerificationConfig {
 export interface IClientPortal {
   _id?: string;
   name?: string;
+  kind: 'client' | 'vendor';
   description?: string;
   logo?: string;
   icon?: string;
@@ -51,9 +65,12 @@ export interface IClientPortal {
   tokenPassMethod?: 'cookie' | 'header';
 
   otpConfig?: IOTPConfig;
+  twoFactorConfig?: TwoFactorConfig;
+
   mailConfig?: IMailConfig;
   manualVerificationConfig?: IManualVerificationConfig;
   passwordVerificationConfig?: IPasswordVerificationConfig;
+  socialpayConfig?: ISocialpayConfig;
 
   googleCredentials?: string;
   googleClientId?: string;
@@ -89,6 +106,23 @@ export interface IClientPortal {
   dealToggle?: boolean;
   purchaseToggle?: boolean;
   taskToggle?: boolean;
+
+  testUserEmail?: string;
+  testUserPhone?: string;
+  testUserPassword?: string;
+  testUserOTP?: number;
+
+  vendorParentProductCategoryId?: string;
+  language?: string;
+  slug?: string;
+  template?: string;
+  templateId?: string;
+  keywords?: string,
+  copyright?: string
+
+  externalLinks?: {
+    [key: string]: string;
+  }
 }
 
 interface IStyles {
@@ -129,10 +163,10 @@ const stylesSchema = new Schema(
     primaryBtnColor: field({ type: String, optional: true }),
     secondaryBtnColor: field({ type: String, optional: true }),
     baseFont: field({ type: String, optional: true }),
-    headingFont: field({ type: String, optional: true })
+    headingFont: field({ type: String, optional: true }),
   },
   {
-    _id: false
+    _id: false,
   }
 );
 
@@ -144,9 +178,24 @@ const otpConfigSchema = new Schema(
     expireAfter: field({ type: Number, default: 1, min: 1, max: 10 }),
     smsTransporterType: field({
       type: String,
-      enum: ['', 'messagePro', 'telnyx'],
-      optional: true
-    })
+      optional: true,
+    }),
+    emailSubject: field({ type: String, optional: true }),
+  },
+  { _id: false }
+);
+
+const twoFactorSchema = new Schema(
+  {
+    content: field({ type: String, optional: true }),
+    codeLength: field({ type: Number, default: 4, min: 4 }),
+    enableTwoFactor: field({ type: Boolean, default: false }),
+    expireAfter: field({ type: Number, default: 1, min: 1, max: 10 }),
+    smsTransporterType: field({
+      type: String,
+      optional: true,
+    }),
+    emailSubject: field({ type: String, optional: true }),
   },
   { _id: false }
 );
@@ -155,7 +204,18 @@ const mailConfigSchema = new Schema(
   {
     subject: field({ type: String, optional: true }),
     invitationContent: field({ type: String, optional: true }),
-    registrationContent: field({ type: String, optional: true })
+    registrationContent: field({ type: String, optional: true }),
+  },
+  { _id: false }
+);
+
+const navigationMenuSchema = new Schema(
+  {
+    label: field({ type: String }),
+    url: field({ type: String }),
+    icon: field({ type: String, optional: true }),
+    children: field({ type: [Object], optional: true }),
+    order: field({ type: Number, optional: true }),
   },
   { _id: false }
 );
@@ -164,6 +224,11 @@ export const clientPortalSchema = new Schema({
   _id: field({ pkey: true }),
   name: field({ type: String }),
   description: field({ type: String, optional: true }),
+  kind: field({
+    type: String,
+    enum: ['client', 'vendor'],
+    default: 'client',
+  }),
   url: field({ type: String }),
   logo: field({ type: String, optional: true }),
   icon: field({ type: String, optional: true }),
@@ -175,14 +240,24 @@ export const clientPortalSchema = new Schema({
   styles: field({ type: stylesSchema, optional: true }),
   mobileResponsive: field({ type: Boolean, optional: true }),
   otpConfig: field({ type: otpConfigSchema, optional: true }),
+  twoFactorConfig: field({ type: twoFactorSchema, optional: true }),
+
   mailConfig: field({ type: mailConfigSchema, optional: true }),
   manualVerificationConfig: field({
     type: {
       userIds: field({ type: [String], required: true }),
-      verifyCustomer: field({ type: Boolean, optional: true, default: false }),
-      verifyCompany: field({ type: Boolean, optional: true, default: false })
+      verifyCustomer: field({
+        type: Boolean,
+        optional: true,
+        default: false,
+      }),
+      verifyCompany: field({
+        type: Boolean,
+        optional: true,
+        default: false,
+      }),
     },
-    optional: true
+    optional: true,
   }),
   googleCredentials: field({ type: Object, optional: true }),
   googleClientId: field({ type: String, optional: true }),
@@ -221,20 +296,29 @@ export const clientPortalSchema = new Schema({
   dealToggle: field({ type: Boolean }),
   purchaseToggle: field({ type: Boolean }),
 
+  testUserEmail: field({ type: String, optional: true }),
+  testUserPhone: field({ type: String, optional: true }),
+  testUserPassword: field({ type: String, optional: true }),
+  testUserOTP: field({ type: Number, optional: true }),
+
   createdAt: field({
     type: Date,
     default: new Date(),
-    label: 'Created at'
+    label: 'Created at',
   }),
 
   passwordVerificationConfig: field({
     type: {
-      verifyByOTP: field({ type: Boolean, optional: true, default: false }),
+      verifyByOTP: field({
+        type: Boolean,
+        optional: true,
+        default: false,
+      }),
       emailSubject: field({ type: String, optional: true }),
       emailContent: field({ type: String, optional: true }),
-      smsContent: field({ type: String, optional: true })
+      smsContent: field({ type: String, optional: true }),
     },
-    optional: true
+    optional: true,
   }),
 
   tokenExpiration: field({
@@ -243,7 +327,7 @@ export const clientPortalSchema = new Schema({
     default: 1,
     label: 'Token expiration',
     min: 1,
-    max: 7
+    max: 7,
   }),
 
   refreshTokenExpiration: field({
@@ -252,7 +336,7 @@ export const clientPortalSchema = new Schema({
     default: 7,
     min: 1,
     max: 30,
-    label: 'Refresh token expiration'
+    label: 'Refresh token expiration',
   }),
 
   tokenPassMethod: field({
@@ -260,6 +344,26 @@ export const clientPortalSchema = new Schema({
     optional: true,
     default: 'cookie',
     label: 'Token pass method',
-    enum: ['cookie', 'header']
-  })
+    enum: ['cookie', 'header'],
+  }),
+
+  vendorParentProductCategoryId: field({
+    type: String,
+    optional: true,
+  }),
+
+  socialpayConfig: field({
+    type: {
+      publicKey: field({ type: String, optional: true }),
+      certId: field({ type: String, optional: true }),
+    },
+    optional: true,
+  }),
+  language: field({ type: String, optional: true }),
+  slug: field({ type: String, optional: true }),
+  template: field({ type: String, optional: true }),
+  templateId: field({ type: String, optional: true }),
+  keywords: field({ type: String, optional: true }),
+  copyright: field({ type: String, optional: true }),
+  externalLinks: field({ type: Object, optional: true }),
 });

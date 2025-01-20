@@ -3,8 +3,38 @@ import T from 'i18n-react';
 import { FieldValue } from './form/types';
 import { ENV, IBrowserInfo, IRule } from './types';
 
-export const getEnv = (): ENV => {
-  return (window as any).erxesEnv;
+export const getSubdomain = (): string => {
+  const hostnameParts = window.location.hostname.split('.');
+
+  if (hostnameParts.length > 2) {
+    return hostnameParts[0];
+  }
+
+  // return an empty string (for open-source environments with no subdomain)
+  return '';
+};
+
+// get env config from process.env or window.env
+export const getEnv = () => {
+  const wenv = (window as any).erxesEnv || {};
+
+  const subdomain = getSubdomain();
+
+  const getItem = (name: string) => {
+    const value = wenv[name] || process.env[name] || '';
+    // Only replace '<subdomain>' if it exists in the value
+    if (value.includes('<subdomain>')) {
+      return value.replace('<subdomain>', subdomain);
+    }
+
+    return value;
+  };
+
+
+  return {
+    API_URL: getItem('API_URL'),
+    API_SUBSCRIPTIONS_URL: getItem('API_SUBSCRIPTIONS_URL'),
+  };
 };
 
 declare const window: any;
@@ -15,7 +45,7 @@ export const postMessage = (source: string, message: string, postData = {}) => {
       fromErxes: true,
       source,
       message,
-      ...postData
+      ...postData,
     },
     '*'
   );
@@ -39,7 +69,7 @@ export type LogicParams = {
 export const requestBrowserInfo = ({
   source,
   postData = {},
-  callback
+  callback,
 }: RequestBrowserInfoParams) => {
   postMessage(source, 'requestingBrowserInfo', postData);
 
@@ -70,10 +100,10 @@ export const setLocale = (code?: string, callBack?: () => void) => {
       setDayjsLocale(code || 'en');
 
       if (callBack) {
-        callBack()
+        callBack();
       }
     })
-    .catch((e) => console.log(e)); // tslint:disable-line
+    .catch((e) => console.error(e)); // tslint:disable-line
 };
 
 export const __ = (msg: string) => {
@@ -134,17 +164,22 @@ export const isValidURL = (url: string) => {
  * @param {String} - value
  * @return {String} - URL
  */
-export const readFile = (value: string): string => {
+export const readFile = (value: string, width?: number): string => {
   const { API_URL } = getEnv();
 
   if (!value || isValidURL(value) || value.includes('http')) {
     return value;
   }
 
-  return `${API_URL}/read-file?key=${value}`;
+  let url = `${API_URL}/read-file?key=${value}`;
+  if (width) {
+    url += `&width=${width}`;
+  }
+
+  return url;
 };
 
-export const checkRule = async (rule: IRule, browserInfo: IBrowserInfo) => {
+export const checkRule = (rule: IRule, browserInfo: IBrowserInfo) => {
   const { language, url, city, country } = browserInfo || ({} as IBrowserInfo);
   const { value, kind, condition } = rule;
   const ruleValue: any = value;
@@ -230,14 +265,14 @@ export const checkRule = async (rule: IRule, browserInfo: IBrowserInfo) => {
   return true;
 };
 
-export const checkRules = async (
+export const checkRules = (
   rules: IRule[],
   browserInfo: IBrowserInfo
-): Promise<boolean> => {
+): boolean => {
   let passedAllRules = true;
 
   for (const rule of rules) {
-    const result = await checkRule(rule, browserInfo);
+    const result = checkRule(rule, browserInfo);
 
     if (result === false) {
       passedAllRules = false;
@@ -266,7 +301,8 @@ export const newLineToBr = (content: string) => {
 
 export const urlify = (text: string) => {
   // validate url except html a tag
-  const urlRegex = /(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w-]+)+[\w\-_~:/?#[\]@!&',;=.]+(?![^<>]*>|[^"]*?<\/a)/g;
+  const urlRegex =
+    /(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w-]+)+[\w\-_~:/?#[\]@!&',;=.]+(?![^<>]*>|[^"]*?<\/a)/g;
 
   if (!text) {
     return text;
@@ -283,9 +319,10 @@ export const urlify = (text: string) => {
 
 export const checkLogicFulfilled = (logics: LogicParams[]) => {
   const values: { [key: string]: boolean } = {};
-  
+
   for (const logic of logics) {
-    const { fieldId, operator, logicValue, fieldValue, validation, type } = logic;
+    const { fieldId, operator, logicValue, fieldValue, validation, type } =
+      logic;
     const key = `${fieldId}_${logicValue}`;
     values[key] = false;
 
@@ -381,7 +418,6 @@ export const checkLogicFulfilled = (logics: LogicParams[]) => {
           values[key] = false;
         }
       }
-      
     }
 
     if (validation && validation.includes('date')) {
@@ -438,25 +474,27 @@ export const checkLogicFulfilled = (logics: LogicParams[]) => {
     result.push(values[key]);
   }
 
-  if (result.filter(val => !val).length === 0) {
+  if (result.filter((val) => !val).length === 0) {
     return true;
-  } 
+  }
 
   return false;
-}
+};
 
 export const loadMapApi = (apiKey: string, locale?: string) => {
   if (!apiKey) {
-    return "";
+    return '';
   }
 
-  const mapsURL = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places&language=${locale || 'en'}&v=quarterly`;
+  const mapsURL = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places&language=${
+    locale || 'en'
+  }&v=quarterly`;
   const scripts: any = document.getElementsByTagName('script');
   // Go through existing script tags, and return google maps api tag when found.
   for (const script of scripts) {
-      if (script.src.indexOf(mapsURL) === 0) {
-          return script;
-      }
+    if (script.src.indexOf(mapsURL) === 0) {
+      return script;
+    }
   }
 
   const googleMapScript = document.createElement('script');

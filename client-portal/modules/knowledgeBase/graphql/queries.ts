@@ -99,6 +99,12 @@ export const articleDetailQuery = `
           avatar
         }
       }
+      publishedUser {
+        details {
+          fullName
+          avatar
+        }
+      }
       categoryId
       createdDate
       modifiedBy
@@ -108,14 +114,15 @@ export const articleDetailQuery = `
 `;
 
 export const articlesQuery = `
-  query knowledgeBaseArticles($categoryIds: [String], $searchValue: String, $topicId: String,) {
-    clientPortalKnowledgeBaseArticles(categoryIds: $categoryIds, searchValue: $searchValue, topicId: $topicId) {
+  query knowledgeBaseArticles($categoryIds: [String], $searchValue: String, $topicId: String, $isPrivate: Boolean) {
+    clientPortalKnowledgeBaseArticles(categoryIds: $categoryIds, searchValue: $searchValue, topicId: $topicId, isPrivate: $isPrivate) {
       _id
       title
       viewCount
       summary
       content
       status
+      isPrivate
       forms {
         brandId
         formId
@@ -133,6 +140,13 @@ export const articlesQuery = `
           avatar
         }
       }
+      publishedUser {
+        details {
+          fullName
+          avatar
+        }
+      }
+      publishedAt
     }
   }
 `;

@@ -8,21 +8,16 @@ import {
   toPromise,
   GraphQLRequest,
   FetchResult,
-  ApolloLink
+  ApolloLink,
 } from '@apollo/client/core';
 import { onError } from '@apollo/client/link/error';
 import { setContext } from '@apollo/client/link/context';
 import {
   FieldsByTypeName,
   parseResolveInfo,
-  ResolveTree
+  ResolveTree,
 } from 'graphql-parse-resolve-info';
 import fetch from 'node-fetch';
-import {
-  AuthenticationError,
-  ApolloError,
-  ForbiddenError
-} from 'apollo-server-errors';
 
 function fieldPathsAsStrings(obj: { [key: string]: any }) {
   const paths = (obj = {}, head = ''): string[] => {
@@ -33,7 +28,7 @@ function fieldPathsAsStrings(obj: { [key: string]: any }) {
           ? acc.concat(key, paths(value, fullPath))
           : acc.concat(fullPath);
       },
-      []
+      [],
     );
   };
   return paths(obj);
@@ -57,7 +52,7 @@ function isFieldObject(obj: any) {
 }
 
 function fieldPathsAsMapFromResolveInfo(
-  resolveInfo: FieldsByTypeName | ResolveTree
+  resolveInfo: FieldsByTypeName | ResolveTree,
 ) {
   // Construct entries-like array of field paths their corresponding name, alias, and args
   const paths = (obj = {}, head = ''): [string, any][] => {
@@ -74,14 +69,14 @@ function fieldPathsAsMapFromResolveInfo(
           const { alias, args, name } = value;
           return acc.concat(
             [[fullPath, { alias, args, name }]],
-            paths(value, fullPath)
+            paths(value, fullPath),
           );
         } else if (isObject(value)) {
           return acc.concat(paths(value, fullPath));
         }
         return acc.concat([[fullPath, null]]);
       },
-      []
+      [],
     );
   };
   const resolveInfoFields = paths(resolveInfo);
@@ -98,13 +93,13 @@ function fieldPathsAsMapFromResolveInfo(
         });
         let keptOptions = {
           ...(name !== alias && { alias }),
-          ...(Object.keys(args).length && { args })
+          ...(Object.keys(args).length && { args }),
         };
         return [
           pathParts.join('.'),
-          Object.keys(keptOptions).length ? keptOptions : null
+          Object.keys(keptOptions).length ? keptOptions : null,
         ];
-      })
+      }),
   );
 }
 
@@ -145,7 +140,7 @@ function buildSelection(selection, pathString, pathParts, fieldPathMap, index) {
 
 function buildNonPayloadSelections(
   payload,
-  info
+  info,
 ): { selections: string; resolveInfo: ResolveTree | FieldsByTypeName } {
   const resolveInfo = parseResolveInfo(info);
   if (!resolveInfo) {
@@ -153,21 +148,21 @@ function buildNonPayloadSelections(
   }
 
   const payloadFieldPaths = fieldPathsAsStrings(
-    payload[resolveInfo?.name as string]
+    payload[resolveInfo?.name as string],
   );
   const operationFields = resolveInfo
     ? fieldPathsAsMapFromResolveInfo(resolveInfo)
     : {};
   const operationFieldPaths = Object.keys(operationFields);
   const selections = operationFieldPaths
-    .filter(path => !payloadFieldPaths.includes(path))
+    .filter((path) => !payloadFieldPaths.includes(path))
     .reduce((acc, curr, i, arr) => {
       const pathParts = curr.split('.');
       let selections = '';
       pathParts.forEach((part, j) => {
         // Is this a top-level field that will be accounted for when nested
         // children are added to the selection?
-        const hasSubFields = !!arr.slice(i + 1).find(item => {
+        const hasSubFields = !!arr.slice(i + 1).find((item) => {
           const itemParts = item.split('.');
           itemParts.pop();
           const rejoinedItem = itemParts.join('.');
@@ -185,7 +180,7 @@ function buildNonPayloadSelections(
           const char = -(j - 2) - j;
           selections = `${selections.slice(
             0,
-            char
+            char,
           )}{ ${sel} } ${selections.slice(char)}`;
         }
       });
@@ -197,8 +192,8 @@ function buildNonPayloadSelections(
 
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
-    graphQLErrors.map(graphqlError =>
-      console.error(`[GraphQL error]: ${graphqlError.message}`)
+    graphQLErrors.map((graphqlError) =>
+      console.error(`[GraphQL error]: ${graphqlError.message}`),
     );
   }
   if (networkError) {
@@ -224,7 +219,7 @@ export default class SubscriptionResolver {
       return previousContext;
     });
 
-    const httpLink = createHttpLink({ fetch, uri: gatewayURL });
+    const httpLink = createHttpLink({ fetch: fetch as any, uri: gatewayURL });
 
     this.apolloLink = from([errorLink, contextLink, httpLink]);
   }
@@ -233,7 +228,7 @@ export default class SubscriptionResolver {
     payload,
     queryVariables,
     info,
-    buildQueryUsingSelections
+    buildQueryUsingSelections,
   }: {
     payload: any;
     queryVariables: object;
@@ -242,7 +237,7 @@ export default class SubscriptionResolver {
   }): Promise<any> {
     const { selections, resolveInfo } = buildNonPayloadSelections(
       payload,
-      info
+      info,
     );
 
     const payloadData =
@@ -261,41 +256,29 @@ export default class SubscriptionResolver {
     try {
       const response = await this.query({
         query: documentNode,
-        variables: queryVariables
+        variables: queryVariables,
       });
 
       if (response.data) {
         return merge(payloadData, Object.values(response.data)[0]);
       }
     } catch (error) {
-      console.error(error);
+      console.error(
+        '----------------- subscription resolver request error ---------------------------',
+      );
+      console.error('query', query);
+      console.error('payload', payload);
+      console.error('queryVariables', queryVariables);
+      console.error('resolveInfo?.name', resolveInfo?.name);
+      console.error('error', error);
+      console.error(
+        '---------------------------------------------------------------------------------',
+      );
     }
   }
 
   private async query(graphqlRequest: GraphQLRequest): Promise<FetchResult> {
-    try {
-      const response = await toPromise(
-        execute(this.apolloLink, graphqlRequest)
-      );
-      return response;
-    } catch (error) {
-      const status = error.statusCode ? error.statusCode : null;
-      const message = error.bodyText ? error.bodyText : null;
-      let apolloError: ApolloError;
-      switch (status) {
-        case 401:
-          apolloError = new AuthenticationError(message);
-          break;
-        case 403:
-          apolloError = new ForbiddenError(message);
-          break;
-        case 502:
-          apolloError = new ApolloError('Bad Gateway', status);
-          break;
-        default:
-          apolloError = new ApolloError(message, status);
-      }
-      return apolloError;
-    }
+    const response = await toPromise(execute(this.apolloLink, graphqlRequest));
+    return response;
   }
 }

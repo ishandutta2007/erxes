@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Button,
   ControlLabel,
@@ -6,29 +6,29 @@ import {
   FormControl,
   FormGroup,
   DateControl,
-  Uploader
-} from '@erxes/ui/src/components';
-import EditorCK from '@erxes/ui/src/components/EditorCK';
+  Uploader,
+} from "@erxes/ui/src/components";
+import { RichTextEditor } from "@erxes/ui/src/components/richTextEditor/TEditor";
 import {
   MainStyleFormColumn as FormColumn,
   MainStyleFormWrapper as FormWrapper,
   MainStyleModalFooter as ModalFooter,
   MainStyleScrollWrapper as ScrollWrapper,
-  MainStyleDateContainer as DateContainer
-} from '@erxes/ui/src/styles/eindex';
+  MainStyleDateContainer as DateContainer,
+} from "@erxes/ui/src/styles/eindex";
 import {
   IAttachment,
   IButtonMutateProps,
-  IFormProps
-} from '@erxes/ui/src/types';
-import { IVoucherCampaign } from '../types';
-import Select from 'react-select-plus';
-import { extractAttachment, __ } from '@erxes/ui/src/utils';
-import { ISpinCampaign } from '../../spinCampaign/types';
-import { ILotteryCampaign } from '../../lotteryCampaign/types';
-import { VOUCHER_TYPES } from '../../../constants';
-import SelectProducts from '@erxes/ui-products/src/containers/SelectProducts';
-import SelectProductCategory from '@erxes/ui-products/src/containers/SelectProductCategory';
+  IFormProps,
+} from "@erxes/ui/src/types";
+import { IVoucherCampaign } from "../types";
+import Select from "react-select";
+import { extractAttachment, __ } from "@erxes/ui/src/utils";
+import { ISpinCampaign } from "../../spinCampaign/types";
+import { ILotteryCampaign } from "../../lotteryCampaign/types";
+import { VOUCHER_TYPES } from "../../../constants";
+import SelectProducts from "@erxes/ui-products/src/containers/SelectProducts";
+import SelectProductCategory from "@erxes/ui-products/src/containers/SelectProductCategory";
 
 type Props = {
   voucherCampaign?: IVoucherCampaign;
@@ -48,8 +48,8 @@ class Form extends React.Component<Props, State> {
 
     this.state = {
       voucherCampaign: this.props.voucherCampaign || {
-        voucherType: VOUCHER_TYPES.discount.value
-      }
+        voucherType: VOUCHER_TYPES.discount.value,
+      },
     };
   }
 
@@ -70,7 +70,7 @@ class Form extends React.Component<Props, State> {
       spinCount = 0,
       lotteryCount = 0,
       bonusCount = 0,
-      buyScore = 0
+      buyScore = 0,
     } = voucherCampaign;
 
     return {
@@ -80,16 +80,16 @@ class Form extends React.Component<Props, State> {
       spinCount: Number(spinCount),
       lotteryCount: Number(lotteryCount),
       bonusCount: Number(bonusCount),
-      buyScore: Number(buyScore)
+      buyScore: Number(buyScore),
     };
   };
 
-  onChangeDescription = e => {
+  onChangeDescription = (content: string) => {
     this.setState({
       voucherCampaign: {
         ...this.state.voucherCampaign,
-        description: e.editor.getData()
-      }
+        description: content,
+      },
     });
   };
 
@@ -97,15 +97,15 @@ class Form extends React.Component<Props, State> {
     this.setState({
       voucherCampaign: {
         ...this.state.voucherCampaign,
-        attachment: files.length ? files[0] : undefined
-      }
+        attachment: files.length ? files[0] : undefined,
+      },
     });
   };
 
   onChangeCombo = (name: string, selected) => {
     const value = selected.value;
     this.setState({
-      voucherCampaign: { ...this.state.voucherCampaign, [name]: value }
+      voucherCampaign: { ...this.state.voucherCampaign, [name]: value },
     });
   };
 
@@ -113,52 +113,52 @@ class Form extends React.Component<Props, State> {
     let value = values;
 
     if (Array.isArray(values)) {
-      value = values.map(el => el.value);
+      value = values.map((el) => el.value);
     }
 
     this.setState({
-      voucherCampaign: { ...this.state.voucherCampaign, [name]: value }
+      voucherCampaign: { ...this.state.voucherCampaign, [name]: value },
     });
   };
 
   onDateInputChange = (type: string, date) => {
     this.setState({
-      voucherCampaign: { ...this.state.voucherCampaign, [type]: date }
+      voucherCampaign: { ...this.state.voucherCampaign, [type]: date },
     });
   };
 
-  onInputChange = e => {
+  onInputChange = (e) => {
     e.preventDefault();
     const value = e.target.value;
     const name = e.target.name;
 
     this.setState({
-      voucherCampaign: { ...this.state.voucherCampaign, [name]: value }
+      voucherCampaign: { ...this.state.voucherCampaign, [name]: value },
     });
   };
 
-  renderVoucherType = formProps => {
+  renderVoucherType = (formProps) => {
     const { lotteryCampaigns, spinCampaigns } = this.props;
     const { voucherCampaign } = this.state;
-    const voucherType = voucherCampaign.voucherType || 'discount';
+    const voucherType = voucherCampaign.voucherType || "discount";
 
-    if (voucherType === 'bonus') {
+    if (voucherType === "bonus") {
       return (
         <FormWrapper>
           <FormColumn>
             <FormGroup>
               <ControlLabel required={true}>Bonus Product</ControlLabel>
               <SelectProducts
-                label={__('Filter by products')}
+                label={__("Filter by products")}
                 name="productId"
                 multi={false}
                 initialValue={voucherCampaign.bonusProductId}
-                onSelect={productId =>
+                onSelect={(productId) =>
                   this.setState({
                     voucherCampaign: {
                       ...this.state.voucherCampaign,
-                      bonusProductId: String(productId)
-                    }
+                      bonusProductId: String(productId),
+                    },
                   })
                 }
               />
@@ -166,7 +166,7 @@ class Form extends React.Component<Props, State> {
           </FormColumn>
           <FormColumn>
             <FormGroup>
-              <ControlLabel required={true}>bonus Count</ControlLabel>
+              <ControlLabel required={true}>Bonus Count</ControlLabel>
               <FormControl
                 {...formProps}
                 name="bonusCount"
@@ -181,28 +181,33 @@ class Form extends React.Component<Props, State> {
       );
     }
 
-    if (voucherType === 'lottery') {
+    if (voucherType === "lottery") {
+      const options = lotteryCampaigns.map((lottery) => ({
+        label: lottery.title,
+        value: lottery._id,
+      }));
+
       return (
         <FormWrapper>
           <FormColumn>
             <FormGroup>
               <ControlLabel required={true}>Lottery</ControlLabel>
               <Select
-                placeholder={__('Filter by lottery')}
-                value={voucherCampaign.lotteryCampaignId}
-                options={lotteryCampaigns.map(lottery => ({
-                  label: lottery.title,
-                  value: lottery._id
-                }))}
+                placeholder={__("Filter by lottery")}
+                value={options.find(
+                  (o) => o.value === voucherCampaign.lotteryCampaignId
+                )}
+                options={options}
                 name="lotteryCampaignId"
-                onChange={this.onChangeCombo.bind(this, 'lotteryCampaignId')}
-                loadingPlaceholder={__('Loading...')}
+                isClearable={true}
+                onChange={this.onChangeCombo.bind(this, "lotteryCampaignId")}
+                // loadingPlaceholder={__('Loading...')}
               />
             </FormGroup>
           </FormColumn>
           <FormColumn>
             <FormGroup>
-              <ControlLabel required={true}>lottery Count</ControlLabel>
+              <ControlLabel required={true}>Lottery Count</ControlLabel>
               <FormControl
                 {...formProps}
                 name="lotteryCount"
@@ -218,28 +223,32 @@ class Form extends React.Component<Props, State> {
       );
     }
 
-    if (voucherType === 'spin') {
+    if (voucherType === "spin") {
+      const options = spinCampaigns.map((spin) => ({
+        label: spin.title,
+        value: spin._id,
+      }));
       return (
         <FormWrapper>
           <FormColumn>
             <FormGroup>
               <ControlLabel required={true}>Spin</ControlLabel>
               <Select
-                placeholder={__('Filter by spin')}
-                value={voucherCampaign.spinCampaignId}
-                options={spinCampaigns.map(spin => ({
-                  label: spin.title,
-                  value: spin._id
-                }))}
+                placeholder={__("Filter by spin")}
+                value={options.find(
+                  (o) => o.value === voucherCampaign.spinCampaignId
+                )}
+                options={options}
                 name="spinCampaignId"
-                onChange={this.onChangeCombo.bind(this, 'spinCampaignId')}
-                loadingPlaceholder={__('Loading...')}
+                isClearable={true}
+                onChange={this.onChangeCombo.bind(this, "spinCampaignId")}
+                // loadingPlaceholder={__("Loading...")}
               />
             </FormGroup>
           </FormColumn>
           <FormColumn>
             <FormGroup>
-              <ControlLabel required={true}>spin Count</ControlLabel>
+              <ControlLabel required={true}>Spin Count</ControlLabel>
               <FormControl
                 {...formProps}
                 name="spinCount"
@@ -255,7 +264,7 @@ class Form extends React.Component<Props, State> {
       );
     }
 
-    if (voucherType === 'coupon') {
+    if (voucherType === "coupon") {
       return (
         <FormWrapper>
           <FormColumn>
@@ -279,15 +288,15 @@ class Form extends React.Component<Props, State> {
           <FormGroup>
             <ControlLabel required={true}>Product Category</ControlLabel>
             <SelectProductCategory
-              label="Choose product category"
+              label={__("Choose product category")}
               name="productCategoryIds"
               initialValue={voucherCampaign.productCategoryIds}
-              onSelect={categoryIds =>
+              onSelect={(categoryIds) =>
                 this.setState({
                   voucherCampaign: {
                     ...this.state.voucherCampaign,
-                    productCategoryIds: categoryIds as string[]
-                  }
+                    productCategoryIds: categoryIds as string[],
+                  },
                 })
               }
               multi={true}
@@ -298,16 +307,16 @@ class Form extends React.Component<Props, State> {
           <FormGroup>
             <ControlLabel required={true}>Or Product</ControlLabel>
             <SelectProducts
-              label={__('Filter by products')}
+              label={__("Filter by products")}
               name="productIds"
               multi={true}
               initialValue={voucherCampaign.productIds}
-              onSelect={productIds =>
+              onSelect={(productIds) =>
                 this.setState({
                   voucherCampaign: {
                     ...this.state.voucherCampaign,
-                    productIds: productIds as string[]
-                  }
+                    productIds: productIds as string[],
+                  },
                 })
               }
             />
@@ -315,7 +324,7 @@ class Form extends React.Component<Props, State> {
         </FormColumn>
         <FormColumn>
           <FormGroup>
-            <ControlLabel required={true}>discount percent</ControlLabel>
+            <ControlLabel required={true}>Discount percent</ControlLabel>
             <FormControl
               {...formProps}
               name="discountPercent"
@@ -348,7 +357,7 @@ class Form extends React.Component<Props, State> {
           <FormWrapper>
             <FormColumn>
               <FormGroup>
-                <ControlLabel required={true}>title</ControlLabel>
+                <ControlLabel required={true}>Title</ControlLabel>
                 <FormControl
                   {...formProps}
                   name="title"
@@ -363,10 +372,14 @@ class Form extends React.Component<Props, State> {
               <FormGroup>
                 <ControlLabel required={true}>Type</ControlLabel>
                 <Select
-                  value={voucherCampaign.voucherType || 'discount'}
+                  value={Object.values(VOUCHER_TYPES).find(
+                    (o) =>
+                      o.value === (voucherCampaign.voucherType || "discount")
+                  )}
                   options={Object.values(VOUCHER_TYPES)}
                   name="voucherType"
-                  onChange={this.onChangeCombo.bind(this, 'voucherType')}
+                  isClearable={true}
+                  onChange={this.onChangeCombo.bind(this, "voucherType")}
                 />
               </FormGroup>
             </FormColumn>
@@ -381,9 +394,9 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="startDate"
-                    placeholder={__('Start date')}
+                    placeholder={__("Start date")}
                     value={voucherCampaign.startDate}
-                    onChange={this.onDateInputChange.bind(this, 'startDate')}
+                    onChange={this.onDateInputChange.bind(this, "startDate")}
                   />
                 </DateContainer>
               </FormGroup>
@@ -397,9 +410,9 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="endDate"
-                    placeholder={__('End date')}
+                    placeholder={__("End date")}
                     value={voucherCampaign.endDate}
-                    onChange={this.onDateInputChange.bind(this, 'endDate')}
+                    onChange={this.onDateInputChange.bind(this, "endDate")}
                   />
                 </DateContainer>
               </FormGroup>
@@ -413,11 +426,11 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="finishDateOfUse"
-                    placeholder={__('Finish Date of Use')}
+                    placeholder={__("Finish Date of Use")}
                     value={voucherCampaign.finishDateOfUse}
                     onChange={this.onDateInputChange.bind(
                       this,
-                      'finishDateOfUse'
+                      "finishDateOfUse"
                     )}
                   />
                 </DateContainer>
@@ -442,27 +455,21 @@ class Form extends React.Component<Props, State> {
 
           <FormGroup>
             <ControlLabel>Description</ControlLabel>
-            <EditorCK
-              content={voucherCampaign.description || ''}
+            <RichTextEditor
+              content={voucherCampaign.description || ""}
               onChange={this.onChangeDescription}
               height={150}
               isSubmitted={formProps.isSaved}
               name={`voucherCampaign_description_${voucherCampaign.description}`}
               toolbar={[
-                {
-                  name: 'basicstyles',
-                  items: [
-                    'Bold',
-                    'Italic',
-                    'NumberedList',
-                    'BulletedList',
-                    'Link',
-                    'Unlink',
-                    '-',
-                    'Image',
-                    'EmojiPanel'
-                  ]
-                }
+                "bold",
+                "italic",
+                "orderedList",
+                "bulletList",
+                "link",
+                "unlink",
+                "|",
+                "image",
               ]}
             />
           </FormGroup>
@@ -489,11 +496,11 @@ class Form extends React.Component<Props, State> {
           </Button>
 
           {renderButton({
-            name: 'voucher Campaign',
+            name: "voucher Campaign",
             values: this.generateDoc(values),
             isSubmitted,
             callback: closeModal,
-            object: voucherCampaign
+            object: voucherCampaign,
           })}
         </ModalFooter>
       </>

@@ -1,86 +1,38 @@
-import * as Sentry from '@sentry/node';
-import * as dotenv from 'dotenv';
+import * as dotenv from "dotenv";
 dotenv.config();
 
-import * as express from 'express';
-import * as http from 'http';
-import * as cookieParser from 'cookie-parser';
-import userMiddleware from './middlewares/userMiddleware';
-import pubsub from './subscription/pubsub';
+import "./instrument";
+import * as http from "http";
+import * as cookieParser from "cookie-parser";
+import userMiddleware from "./middlewares/userMiddleware";
+import pubsub from "./subscription/pubsub";
 import {
-  redis,
   setAfterMutations,
   setBeforeResolvers,
   setAfterQueries
-} from './redis';
-import { initBroker } from './messageBroker';
-import * as cors from 'cors';
-import { retryGetProxyTargets, ErxesProxyTarget } from './proxy/targets';
+} from "./redis";
+import * as cors from "cors";
+import { retryGetProxyTargets, ErxesProxyTarget } from "./proxy/targets";
+import { applyProxiesCoreless, applyProxyToCore } from "./proxy/middleware";
+import { startRouter, stopRouter } from "./apollo-router";
 import {
-  applyProxiesCoreless,
-  applyProxyToCore
-} from './proxy/create-middleware';
-import apolloRouter from './apollo-router';
-import { ChildProcess } from 'child_process';
-import { startSubscriptionServer } from './subscription';
-import { Disposable } from 'graphql-ws';
-import { publishRefreshEnabledServices } from '@erxes/api-utils/src/serviceDiscovery';
+  startSubscriptionServer,
+  stopSubscriptionServer
+} from "./subscription";
+import { applyInspectorEndpoints } from "@erxes/api-utils/src/inspect";
+import app from "@erxes/api-utils/src/app";
+import { sanitizeHeaders } from "@erxes/api-utils/src/headers";
+import { applyGraphqlLimiters } from "./middlewares/graphql-limiter";
+import * as Sentry from "@sentry/node";
 
-const {
-  NODE_ENV,
-  DOMAIN,
-  WIDGETS_DOMAIN,
-  CLIENT_PORTAL_DOMAINS,
-  ALLOWED_ORIGINS,
-  PORT,
-  RABBITMQ_HOST,
-  MESSAGE_BROKER_PREFIX,
-  SENTRY_DSN
-} = process.env;
-
-let apolloRouterProcess: ChildProcess | undefined = undefined;
-let subscriptionServer: Disposable | undefined = undefined;
-
-const stopRouter = () => {
-  if (!apolloRouterProcess) {
-    return;
-  }
-  try { apolloRouterProcess.kill('SIGKILL'); } catch (e) {}
-};
+const { DOMAIN, WIDGETS_DOMAIN, CLIENT_PORTAL_DOMAINS, ALLOWED_ORIGINS, PORT } =
+  process.env;
 
 (async () => {
-  const app = express();
-
-  // for health check
-  app.get('/health', async (_req, res) => {
-    res.end('ok');
+  app.use((req, _res, next) => {
+    sanitizeHeaders(req.headers);
+    next();
   });
-
-  await publishRefreshEnabledServices();
-
-  if (SENTRY_DSN) {
-    Sentry.init({
-      dsn: SENTRY_DSN,
-      integrations: [
-        // enable HTTP calls tracing
-        new Sentry.Integrations.Http({ tracing: true }),
-        // Automatically instrument Node.js libraries and frameworks
-        ...Sentry.autoDiscoverNodePerformanceMonitoringIntegrations()
-      ],
-
-      // Set tracesSampleRate to 1.0 to capture 100%
-      // of transactions for performance monitoring.
-      // We recommend adjusting this value in production
-      tracesSampleRate: 1.0,
-      profilesSampleRate: 1.0 // Profiling sample rate is relative to tracesSampleRate
-    });
-  }
-
-  // RequestHandler creates a separate execution context, so that all
-  // transactions/spans/breadcrumbs are isolated across requests
-  app.use(Sentry.Handlers.requestHandler());
-  // TracingHandler creates a trace for every incoming request
-  app.use(Sentry.Handlers.tracingHandler());
 
   app.use(cookieParser());
 
@@ -89,11 +41,11 @@ const stopRouter = () => {
   const corsOptions = {
     credentials: true,
     origin: [
-      DOMAIN ? DOMAIN : 'http://localhost:3000',
-      WIDGETS_DOMAIN ? WIDGETS_DOMAIN : 'http://localhost:3200',
-      ...(CLIENT_PORTAL_DOMAINS || '').split(','),
-      'https://studio.apollographql.com',
-      ...(ALLOWED_ORIGINS || '').split(',').map(c => c && RegExp(c))
+      DOMAIN ? DOMAIN : "http://localhost:3000",
+      WIDGETS_DOMAIN ? WIDGETS_DOMAIN : "http://localhost:3200",
+      ...(CLIENT_PORTAL_DOMAINS || "").split(","),
+      "https://studio.apollographql.com",
+      ...(ALLOWED_ORIGINS || "").split(",").map(c => c && RegExp(c))
     ]
   };
 
@@ -101,66 +53,44 @@ const stopRouter = () => {
 
   const targets: ErxesProxyTarget[] = await retryGetProxyTargets();
 
-  apolloRouterProcess = await apolloRouter(targets);
+  await startRouter(targets);
 
-  await applyProxiesCoreless(app, targets);
-
-  // The error handler must be before any other error middleware and after all controllers
-  app.use(Sentry.Handlers.errorHandler());
+  Sentry.setupExpressErrorHandler(app);
+  applyGraphqlLimiters(app);
+  applyProxiesCoreless(app, targets);
 
   const httpServer = http.createServer(app);
 
-  httpServer.on('close', () => {
+  httpServer.on("close", () => {
     try {
       pubsub.close();
     } catch (e) {
-      console.log('PubSub client disconnected');
+      console.log("PubSub client disconnected");
     }
   });
 
-  subscriptionServer = await startSubscriptionServer(httpServer);
+  await startSubscriptionServer(httpServer);
 
-  // Why are we parsing the body twice? When we don't use the body
-  app.use(
-    express.json({
-      limit: '15mb'
-    })
-  );
-
-  app.use(express.urlencoded({ limit: '15mb', extended: true }));
+  applyInspectorEndpoints("gateway");
 
   const port = PORT || 4000;
 
   await new Promise<void>(resolve => httpServer.listen({ port }, resolve));
 
-  await initBroker({ RABBITMQ_HOST, MESSAGE_BROKER_PREFIX, redis, app });
-
   await setBeforeResolvers();
   await setAfterMutations();
   await setAfterQueries();
 
-  // this has to be applied last, just like 404 route handlers are applied last
-  applyProxyToCore(app, targets);
+  await applyProxyToCore(app, targets);
 
-  console.log(`Erxes gateway ready at http://localhost:${port}/graphql`);
+  console.log(`Erxes gateway ready at http://localhost:${port}/`);
 })();
 
-(['SIGINT', 'SIGTERM'] as NodeJS.Signals[]).forEach(sig => {
+(["SIGINT", "SIGTERM"] as NodeJS.Signals[]).forEach(sig => {
   process.on(sig, async () => {
     console.log(`Exiting on signal ${sig}`);
-    if (NODE_ENV === 'development') {
-      try {
-        publishRefreshEnabledServices();
-      } catch (e) {
-
-      }
-    }
-    if (subscriptionServer) {
-      try {
-        subscriptionServer.dispose();
-      } catch (e) {}
-    }
-    stopRouter();
+    await stopSubscriptionServer();
+    await stopRouter(sig);
     process.exit(0);
   });
 });

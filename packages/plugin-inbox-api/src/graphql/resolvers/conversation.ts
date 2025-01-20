@@ -1,8 +1,8 @@
-import { debug } from '../../configs';
 import { IConversationDocument } from '../../models/definitions/conversations';
 import { MESSAGE_TYPES } from '../../models/definitions/constants';
-import { sendIntegrationsMessage } from '../../messageBroker';
+import { sendCallsMessage, sendIntegrationsMessage } from '../../messageBroker';
 import { IContext } from '../../connectionResolver';
+import { debugError } from '@erxes/api-utils/src/debuggers';
 
 export default {
   /**
@@ -51,21 +51,26 @@ export default {
   },
 
   participatedUsers(conv: IConversationDocument) {
-    return (conv.participatedUserIds || []).map(_id => ({
+    return (conv.participatedUserIds || []).map((_id) => ({
       __typename: 'User',
       _id
     }));
   },
 
+  readUsers(conv: IConversationDocument) {
+    return (conv.readUserIds || []).map((_id) => ({
+      __typename: 'User',
+      _id
+    }));
+  },
   participatorCount(conv: IConversationDocument) {
     return (conv.participatedUserIds && conv.participatedUserIds.length) || 0;
   },
 
   async messages(conv: IConversationDocument, _, { dataLoaders }: IContext) {
-    const messages = await dataLoaders.conversationMessagesByConversationId.load(
-      conv._id
-    );
-    return messages.filter(message => message);
+    const messages =
+      await dataLoaders.conversationMessagesByConversationId.load(conv._id);
+    return messages.filter((message) => message);
   },
 
   async callProAudio(
@@ -96,7 +101,7 @@ export default {
 
         return response ? response.audioSrc : '';
       } catch (e) {
-        debug.error(e);
+        debugError(e);
         return null;
       }
     }
@@ -105,7 +110,7 @@ export default {
   },
 
   async tags(conv: IConversationDocument) {
-    return (conv.tagIds || []).map(_id => ({ __typename: 'Tag', _id }));
+    return (conv.tagIds || []).map((_id) => ({ __typename: 'Tag', _id }));
   },
 
   async videoCallData(
@@ -134,8 +139,42 @@ export default {
 
       return response;
     } catch (e) {
-      debug.error(e);
+      debugError(e);
       return null;
     }
+  },
+  async callHistory(
+    conversation: IConversationDocument,
+    _args,
+    { models, subdomain }: IContext
+  ) {
+    const integration =
+      (await models.Integrations.findOne({
+        _id: conversation.integrationId
+      })) || ({} as any);
+
+    if (integration && integration.kind !== 'calls') {
+      return null;
+    }
+
+    // if (user.isOwner || user._id === conv.assignedUserId) {
+    try {
+      const response = await sendCallsMessage({
+        subdomain,
+        action: 'getCallHistory',
+        data: {
+          erxesApiConversationId: conversation._id
+        },
+        isRPC: true
+      });
+
+      return response ? response : '';
+    } catch (e) {
+      debugError(e);
+      return null;
+    }
+    // }
+
+    return null;
   }
 };

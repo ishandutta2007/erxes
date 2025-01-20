@@ -1,8 +1,8 @@
-import { IBreadCrumbItem } from '../../types';
-import { __ } from '../../utils/core';
-import React from 'react';
-import styled from 'styled-components';
-import MenuItem from './MenuItem';
+import { IBreadCrumbItem } from "../../types";
+import MenuItem from "./MenuItem";
+import React from "react";
+import { __ } from "../../utils/core";
+import styled from "styled-components";
 
 const Items = styled.ul`
   display: inline-block;
@@ -19,45 +19,48 @@ const Items = styled.ul`
 
 function Submenu({
   items,
-  additionalMenuItem
+  additionalMenuItem,
 }: {
   items?: IBreadCrumbItem[];
   additionalMenuItem?: React.ReactNode;
 }) {
-  
   const getLink = (url) => {
-    const storageValue = window.localStorage.getItem('pagination:perPage');
+    const storageValue = window.localStorage.getItem("pagination:perPage");
 
     let parsedStorageValue;
 
     try {
-      parsedStorageValue = JSON.parse(storageValue || '');
+      parsedStorageValue = JSON.parse(storageValue || "");
     } catch {
       parsedStorageValue = {};
     }
 
-    if (url.includes('?')) {
-      const pathname = url.split('?')[0];
+    if (url.includes("?")) {
+      const pathname = url.split("?")[0];
 
-      if(!url.includes('perPage') && parsedStorageValue[pathname]){
-          return `${url}&perPage=${parsedStorageValue[pathname]}`;
-      } 
+      if (!url.includes("perPage") && parsedStorageValue[pathname]) {
+        return `${url}&perPage=${parsedStorageValue[pathname]}`;
+      }
 
       return url;
-    }  
+    }
 
     if (parsedStorageValue[url]) {
       return `${url}?perPage=${parsedStorageValue[url]}`;
     }
 
     return url;
-   }
+  };
 
   if (items) {
     return (
       <Items>
-        {items.map(b => (
-          <MenuItem to={getLink(b.link) || ''} key={b.title}>
+        {items.map((b, i) => (
+          <MenuItem
+            to={getLink(b.link) || ""}
+            key={i}
+            isLast={items.length === i + 1}
+          >
             {__(b.title)}
           </MenuItem>
         ))}

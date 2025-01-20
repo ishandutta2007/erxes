@@ -1,21 +1,19 @@
 import {
   receiveIntegrationsNotification,
-  receiveRpcMessage
+  receiveRpcMessage,
 } from './receiveMessage';
-import { serviceDiscovery } from './configs';
+
 import { generateModels, IModels } from './connectionResolver';
-import {
-  ISendMessageArgs,
-  paginate,
-  sendMessage
-} from '@erxes/api-utils/src/core';
+import { paginate, sendMessage } from '@erxes/api-utils/src/core';
+import { MessageArgs, MessageArgsOmitService } from '@erxes/api-utils/src/core';
 import { receiveVisitorDetail } from './widgetUtils';
-import { sendToWebhook as sendWebhook } from '@erxes/api-utils/src';
 import { getIntegrationsKinds } from './utils';
 import { sendNotifications } from './graphql/resolvers/conversationMutations';
 import { pConversationClientMessageInserted } from './graphql/resolvers/widgetMutations';
-
-export let client;
+import {
+  consumeQueue,
+  consumeRPCQueue,
+} from '@erxes/api-utils/src/messageBroker';
 
 const createConversationAndMessage = async (
   models: IModels,
@@ -25,7 +23,8 @@ const createConversationAndMessage = async (
   visitorId,
   integrationId,
   content,
-  engageData
+  engageData,
+  formWidgetData
 ) => {
   // create conversation
   const conversation = await models.Conversations.createConversation({
@@ -34,25 +33,22 @@ const createConversationAndMessage = async (
     customerId,
     visitorId,
     integrationId,
-    content
+    content,
   });
 
   // create message
   return models.ConversationMessages.createMessage({
     engageData,
+    formWidgetData,
     conversationId: conversation._id,
     userId,
     customerId,
     visitorId,
-    content
+    content,
   });
 };
 
-export const initBroker = cl => {
-  client = cl;
-
-  const { consumeQueue, consumeRPCQueue } = client;
-
+export const setupMessageConsumers = () => {
   consumeRPCQueue(
     'inbox:createConversationAndMessage',
     async ({ subdomain, data }) => {
@@ -63,7 +59,8 @@ export const initBroker = cl => {
         visitorId,
         integrationId,
         content,
-        engageData
+        engageData,
+        formWidgetData,
       } = data;
       const models = await generateModels(subdomain);
 
@@ -75,7 +72,8 @@ export const initBroker = cl => {
         visitorId,
         integrationId,
         content,
-        engageData
+        engageData,
+        formWidgetData
       );
 
       return { data: response, status: 'success' };
@@ -86,7 +84,14 @@ export const initBroker = cl => {
     'inbox:createOnlyMessage',
     async ({
       subdomain,
-      data: { conversationId, content, userId, customerId }
+      data: {
+        conversationId,
+        content,
+        userId,
+        customerId,
+        internal,
+        contentType,
+      },
     }) => {
       const models = await generateModels(subdomain);
 
@@ -94,11 +99,12 @@ export const initBroker = cl => {
         status: 'success',
         data: await models.ConversationMessages.createMessage({
           conversationId,
-          internal: true,
+          internal,
           userId,
           customerId,
-          content
-        })
+          content,
+          contentType,
+        }),
       };
     }
   );
@@ -111,6 +117,22 @@ export const initBroker = cl => {
     'inbox:integrationsNotification',
     async ({ subdomain, data }) => {
       await receiveIntegrationsNotification(subdomain, data);
+    }
+  );
+
+  consumeQueue(
+    'inbox:integrations.remove',
+    async ({ subdomain, data: { _id } }) => {
+      const models = await generateModels(subdomain);
+
+      const conversationIds = await models.Conversations.find({
+        integrationId: _id,
+      }).distinct('_id');
+      await models.ConversationMessages.deleteMany({
+        conversationId: { $in: conversationIds },
+      });
+      await models.Conversations.deleteMany({ integrationId: _id });
+      return models.Integrations.removeIntegration(_id);
     }
   );
 
@@ -129,11 +151,25 @@ export const initBroker = cl => {
   );
 
   consumeRPCQueue(
+    'inbox:integrations.copyLeadIntegration',
+    async ({ subdomain, data: { _id, userId } }) => {
+      const models = await generateModels(subdomain);
+
+      const integration = await models.Integrations.duplicateLeadIntegration(
+        _id,
+        userId
+      );
+
+      return { data: integration, status: 'success' };
+    }
+  );
+
+  consumeRPCQueue(
     'inbox:integrations.count',
     async ({ subdomain, data: { selector } }) => {
       const models = await generateModels(subdomain);
 
-      const count = await models.Integrations.count(selector);
+      const count = await models.Integrations.countDocuments(selector);
 
       return { data: count, status: 'success' };
     }
@@ -155,7 +191,9 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await models.Conversations.findOne({ _id: conversationId }).lean()
+        data: await models.Conversations.findOne({
+          _id: conversationId,
+        }).lean(),
       };
     }
   );
@@ -167,7 +205,7 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await models.ConversationMessages.findOne(data).lean()
+        data: await models.ConversationMessages.findOne(data).lean(),
       };
     }
   );
@@ -176,10 +214,21 @@ export const initBroker = cl => {
     'inbox:conversationMessages.find',
     async ({ subdomain, data }) => {
       const models = await generateModels(subdomain);
+      const { skip, limit } = data;
+      if (skip || limit) {
+        delete data.skip;
+        delete data.limit;
 
+        return {
+          status: 'success',
+          data: await models.ConversationMessages.find(data)
+            .skip(skip || 0)
+            .limit(limit || 20),
+        };
+      }
       return {
         status: 'success',
-        data: await models.ConversationMessages.find(data).lean()
+        data: await models.ConversationMessages.find(data).lean(),
       };
     }
   );
@@ -189,7 +238,7 @@ export const initBroker = cl => {
 
     return {
       status: 'success',
-      data: await models.Integrations.findOne(data).lean()
+      data: await models.Integrations.findOne(data).lean(),
     };
   });
 
@@ -199,12 +248,12 @@ export const initBroker = cl => {
       const models = await generateModels(subdomain);
 
       const updated = await models.ConversationMessages.updateOne(filter, {
-        $set: updateDoc
+        $set: updateDoc,
       });
 
       return {
         data: updated,
-        status: 'success'
+        status: 'success',
       };
     }
   );
@@ -235,7 +284,7 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await models.Conversations.find(query).lean()
+        data: await models.Conversations.find(query).lean(),
       };
     }
   );
@@ -247,7 +296,29 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await models.Conversations.findOne(query)
+        data: await models.Conversations.findOne(query),
+      };
+    }
+  );
+
+  consumeRPCQueue(
+    'inbox:conversations.changeStatus',
+    async ({ subdomain, data: { id, status } }) => {
+      const models = await generateModels(subdomain);
+
+      if (id && status) {
+        return {
+          status: 'success',
+          data: await models.Conversations.updateOne(
+            { _id: id },
+            { status: status }
+          ),
+        };
+      }
+      return {
+        status: 'error',
+        errorMessage:
+          'id and status are required. id is ${id} and status is ${status}',
       };
     }
   );
@@ -259,7 +330,7 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await models.Conversations.find(query).countDocuments()
+        data: await models.Conversations.find(query).countDocuments(),
       };
     }
   );
@@ -271,7 +342,7 @@ export const initBroker = cl => {
 
       return {
         status: 'success',
-        data: await paginate(models.Conversations.find(query), listParams)
+        data: await paginate(models.Conversations.find(query), listParams),
       };
     }
   );
@@ -286,7 +357,7 @@ export const initBroker = cl => {
 
     return {
       status: 'success',
-      data: await models.Channels.updateUserChannels(channelIds, userId)
+      data: await models.Channels.updateUserChannels(channelIds, userId),
     };
   });
 
@@ -295,14 +366,14 @@ export const initBroker = cl => {
 
     return {
       status: 'success',
-      data: await models.Channels.find(data)
+      data: await models.Channels.find(data),
     };
   });
 
   consumeRPCQueue('inbox:getIntegrationKinds', async () => {
     return {
       status: 'success',
-      data: await getIntegrationsKinds()
+      data: await getIntegrationsKinds(),
     };
   });
 
@@ -317,14 +388,14 @@ export const initBroker = cl => {
 
         if (queryField) {
           filter = {
-            _id: queryField
+            _id: queryField,
           };
         }
       }
 
       return {
         status: 'success',
-        data: filter
+        data: filter,
       };
     }
   );
@@ -341,153 +412,136 @@ export const initBroker = cl => {
       await pConversationClientMessageInserted(models, subdomain, data);
     }
   );
+
+  consumeRPCQueue(
+    'inbox:widgetsGetUnreadMessagesCount',
+    async ({ subdomain, data }) => {
+      const models = await generateModels(subdomain);
+
+      return {
+        status: 'success',
+        data: await models.ConversationMessages.widgetsGetUnreadMessagesCount(
+          data.conversationId
+        ),
+      };
+    }
+  );
 };
 
 export const sendCommonMessage = async (
-  args: ISendMessageArgs & { serviceName: string }
+  args: MessageArgs & { serviceName: string }
 ): Promise<any> => {
   return sendMessage({
-    serviceDiscovery,
-    client,
-    ...args
+    ...args,
   });
 };
 
-export const sendContactsMessage = async (
-  args: ISendMessageArgs
-): Promise<any> => {
+export const sendCoreMessage = (args: MessageArgsOmitService): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'contacts',
-    ...args
-  });
-};
-
-export const sendFormsMessage = (args: ISendMessageArgs): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'forms',
-    ...args
-  });
-};
-
-export const sendCoreMessage = (args: ISendMessageArgs): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'core',
-    ...args
+    ...args,
   });
 };
 
-export const sendEngagesMessage = (args: ISendMessageArgs): Promise<any> => {
+export const sendEngagesMessage = (
+  args: MessageArgsOmitService
+): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'engages',
-    ...args
+    ...args,
   });
 };
 
-export const sendCardsMessage = async (
-  args: ISendMessageArgs
+export const sendSalesMessage = async (
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'cards',
-    ...args
+    serviceName: 'sales',
+    ...args,
   });
 };
 
-export const sendProductsMessage = async (
-  args: ISendMessageArgs
+export const sendTicketsMessage = async (
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'products',
-    ...args
+    serviceName: 'tickets',
+    ...args,
   });
 };
 
-export const sendTagsMessage = (args: ISendMessageArgs): Promise<any> => {
+export const sendTasksMessage = async (
+  args: MessageArgsOmitService
+): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'tags',
-    ...args
+    serviceName: 'tasks',
+    ...args,
+  });
+};
+
+export const sendPurchasesMessage = async (
+  args: MessageArgsOmitService
+): Promise<any> => {
+  return sendMessage({
+    serviceName: 'purchases',
+    ...args,
   });
 };
 
 export const sendIntegrationsMessage = (
-  args: ISendMessageArgs
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'integrations',
-    ...args
-  });
-};
-
-export const sendSegmentsMessage = (args: ISendMessageArgs): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'segments',
-    ...args
+    ...args,
   });
 };
 
 export const sendNotificationsMessage = (
-  args: ISendMessageArgs
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'notifications',
-    ...args
+    ...args,
   });
 };
 
 export const sendKnowledgeBaseMessage = (
-  args: ISendMessageArgs
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'knowledgebase',
-    ...args
-  });
-};
-
-export const sendLogsMessage = async (args: ISendMessageArgs): Promise<any> => {
-  return sendMessage({
-    client,
-    serviceDiscovery,
-    serviceName: 'logs',
-    ...args
+    ...args,
   });
 };
 
 export const sendAutomationsMessage = async (
-  args: ISendMessageArgs
+  args: MessageArgsOmitService
 ): Promise<any> => {
   return sendMessage({
-    client,
-    serviceDiscovery,
     serviceName: 'automations',
-    ...args
+    ...args,
   });
 };
 
-export const sendToWebhook = ({ subdomain, data }) => {
-  return sendWebhook(client, { subdomain, data });
-};
+export const fetchSegment = (
+  subdomain: string,
+  segmentId: string,
+  options?,
+  segmentData?: any
+) =>
+  sendCoreMessage({
+    subdomain,
+    action: 'fetchSegment',
+    data: { segmentId, options, segmentData },
+    isRPC: true,
+  });
 
-export default function() {
-  return client;
-}
+export const sendCallsMessage = (
+  args: MessageArgsOmitService
+): Promise<any> => {
+  return sendMessage({
+    serviceName: 'calls',
+    ...args,
+  });
+};

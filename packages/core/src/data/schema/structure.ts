@@ -1,6 +1,6 @@
 import {
   attachmentType,
-  attachmentInput
+  attachmentInput,
 } from '@erxes/api-utils/src/commonTypeDefs';
 const commonContactInfoTypes = `
 
@@ -41,6 +41,7 @@ export const types = `
         users: [User]
         userCount: Int
         userIds: [String]
+        workhours:JSON
     }
 
     type Unit @key(fields: "_id") @cacheControl(maxAge: 3) {
@@ -53,6 +54,7 @@ export const types = `
         description: String
         department: Department
         users: [User]
+        userCount: Int
         userIds: [String]
     }
 
@@ -69,10 +71,27 @@ export const types = `
         userCount: Int
         parent: Branch
         children: [Branch]
+        status:String
 
         address: String
         radius: Int
+        hasChildren:Boolean
+        workhours:JSON
         ${commonContactInfoTypes}
+    }
+
+    type Position @key(fields: "_id") @cacheControl(maxAge: 3){
+        _id: String!
+        title: String
+        code: String
+        order: String
+        parentId: String
+        parent: Position
+        status: String
+        children: [Position]
+        users: [User]
+        userIds: [String]
+        userCount: Int
     }
 
     type Coordinate {
@@ -90,18 +109,24 @@ export const types = `
         totalCount: Int
         totalUsersCount:Int
     }
-
+    
     type DepartmentListQueryResponse {
         list:[Department]
         totalCount: Int
         totalUsersCount:Int
     }
-        type UnitListQueryResponse {
+    
+    type UnitListQueryResponse {
         list:[Unit]
         totalCount: Int
         totalUsersCount:Int
     }
-
+    
+    type PositionListQueryResponse {
+        list:[Position]
+        totalCount: Int
+        totalUsersCount:Int
+    }
 `;
 
 const commonParams = `
@@ -111,6 +136,8 @@ const commonParams = `
     page: Int
     searchValue: String,
     status: String,
+    onlyFirstLevel: Boolean,
+    parentId: String
 `;
 
 export const queries = `
@@ -127,6 +154,10 @@ export const queries = `
     branches(${commonParams},withoutUserFilter:Boolean): [Branch]
     branchesMain(${commonParams},withoutUserFilter:Boolean): BranchListQueryResponse
     branchDetail(_id: String!): Branch
+    
+    positions(${commonParams},withoutUserFilter:Boolean): [Position]
+    positionsMain(${commonParams}): PositionListQueryResponse
+    positionDetail(_id: String): Position
 
     structureDetail: Structure
 `;
@@ -156,6 +187,7 @@ const commonDepartmentParams = `
     code: String
     parentId: String
     userIds: [String]
+    workhours: JSON
 `;
 
 const commonUnitParams = `
@@ -175,17 +207,25 @@ const commonBranchParams = `
     parentId: String
     userIds: [String]
     radius: Int
-
+    workhours: JSON
     ${commonContactInfoParams}
+`;
+
+const commonPositionParams = `
+    title: String
+    code: String
+    parentId: String
+    userIds: [String]
+    status: String
 `;
 
 export const mutations = `
     structuresAdd(${commonStructureParams}): Structure
-    structuresEdit(_id: String!, ${commonStructureParams}): Structure
+    structuresEdit(_id: String!,${commonStructureParams}): Structure
     structuresRemove(_id: String!): JSON
 
     departmentsAdd(${commonDepartmentParams}): Department
-    departmentsEdit(_id: String!, ${commonDepartmentParams}): Department
+    departmentsEdit(_id: String!,${commonDepartmentParams}): Department
     departmentsRemove(ids: [String!]): JSON
 
     unitsAdd(${commonUnitParams}): Unit
@@ -195,4 +235,8 @@ export const mutations = `
     branchesAdd(${commonBranchParams}): Branch
     branchesEdit(_id: String!, ${commonBranchParams}): Branch
     branchesRemove(ids:[String!]): JSON
+
+    positionsAdd(${commonPositionParams}):Position
+    positionsEdit(_id: String!, ${commonPositionParams}):Position
+    positionsRemove(ids:[String!]): JSON
 `;

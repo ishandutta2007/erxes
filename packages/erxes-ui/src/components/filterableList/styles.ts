@@ -1,12 +1,14 @@
+import { colors, dimensions } from '../../styles';
+
 import styled from 'styled-components';
 import styledTS from 'styled-components-ts';
-import { colors, dimensions } from '../../styles';
 
 const PopoverHeader = styled.div`
   display: block !important;
 
   input {
     margin-bottom: 0;
+    width: 100% !important;
     padding: ${dimensions.unitSpacing}px ${dimensions.coreSpacing}px;
   }
 `;
@@ -23,6 +25,16 @@ const FlexRow = styled.div`
   > li {
     flex: 1;
     display: flex !important;
+
+    &.active {
+      color: rgb(55, 55, 55);
+      background: rgb(240, 240, 240);
+      outline: 0px;
+    }
+
+    &:focus {
+      outline: none;
+    }
   }
 `;
 
@@ -38,8 +50,8 @@ const IconWrapper = styled.div`
   }
 `;
 
-const PopoverList = styledTS<{ selectable?: boolean; isIndented?: boolean }>(
-  styled.ul
+const PopoverList = styledTS<{ $selectable?: boolean; $isIndented?: boolean }>(
+  styled.ul,
 )`
   max-height: 275px;
   margin: 0;
@@ -48,21 +60,21 @@ const PopoverList = styledTS<{ selectable?: boolean; isIndented?: boolean }>(
   overflow: auto;
   padding-bottom: 10px;
   padding-top: 10px;
-  text-indent:${props =>
-    props.isIndented && `-${dimensions.unitSpacing + 5}px`};
-  margin-left: ${props => props.isIndented && `${dimensions.unitSpacing}px`};
+  text-indent:${(props) =>
+    props.$isIndented && `-${dimensions.unitSpacing + 5}px`};
+  margin-left: ${(props) => props.$isIndented && `${dimensions.unitSpacing}px`};
 
   li {
     position: relative;
     display: block;
     overflow: hidden;
-    padding: ${dimensions.unitSpacing / 2}px ${props =>
-  props.isIndented
-    ? `${dimensions.unitSpacing * 3 + 7}px`
-    : `${dimensions.unitSpacing * 2}px`}; 
+    padding: ${dimensions.unitSpacing / 2}px ${(props) =>
+      props.$isIndented
+        ? `${dimensions.unitSpacing * 3 + 7}px`
+        : `${dimensions.unitSpacing * 2}px`}; 
     white-space: normal;
     font-size: 13px;
-    padding-right: ${props => props.selectable && '30px'};
+    padding-right: ${(props) => props.$selectable && '30px'};
 
     i {
       &.icon-tag-alt{
@@ -85,8 +97,8 @@ const PopoverList = styledTS<{ selectable?: boolean; isIndented?: boolean }>(
       position: absolute;
       color: ${colors.colorCoreDarkGray};
       top: ${dimensions.headerSpacing}%;
-      right: ${props =>
-        props.isIndented
+      right: ${(props) =>
+        props.$isIndented
           ? `${dimensions.unitSpacing * 0.5}px`
           : `${dimensions.unitSpacing * 1.5}px`};
       margin-top: -${dimensions.unitSpacing - 1}px;
@@ -105,7 +117,8 @@ const PopoverList = styledTS<{ selectable?: boolean; isIndented?: boolean }>(
 const PopoverBody = styled.div`
   ${PopoverList} {
     max-height: 275px;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   ul {
@@ -113,7 +126,7 @@ const PopoverBody = styled.div`
     max-height: unset;
   }
 
-  min-width: 260px;
+  min-width: 300px;
 `;
 
 const PopoverFooter = styled.div`
@@ -150,26 +163,20 @@ const ChildList = styled.div`
 
 const iconWidth = 30;
 
-const ToggleIcon = styledTS<{ isIndented?: boolean; type?: string }>(
-  styled.div
-)`
+const ToggleIcon = styledTS<{ type?: string }>(styled.div)`
   position: absolute;
-  ${props =>
+  ${(props) =>
     props.type === 'list' &&
     `
   top: 8px;
-  left:${
-    props.isIndented
-      ? `${dimensions.unitSpacing * 0.5}px`
-      : `${dimensions.unitSpacing * 1.5}px`
-  };
+  left:${dimensions.unitSpacing * 0.5}px;
   line-height: ${iconWidth}px;
   text-align: center;
   width: ${iconWidth / 2}px;`}
   height: ${iconWidth}px;
   cursor: pointer;
   z-index: 1;
-  ${props =>
+  ${(props) =>
     props.type === 'params' &&
     `
   display: flex;
@@ -204,7 +211,7 @@ export {
   IconWrapper,
   ChildList,
   ToggleIcon,
-  ItemText
+  ItemText,
 };
 
 export default {
@@ -218,5 +225,5 @@ export default {
   IconWrapper,
   ChildList,
   ToggleIcon,
-  ItemText
+  ItemText,
 };

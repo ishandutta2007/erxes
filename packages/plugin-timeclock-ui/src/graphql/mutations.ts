@@ -7,6 +7,9 @@ $shiftRequest: Boolean,
 $requestType: String,
 $requestTimeType: String
 $requestHoursPerDay: Float
+$requestToType: String
+$absenceUserIds: [String]
+$branchIds: [String]
 `;
 
 const absenceTypeValues = `
@@ -17,6 +20,22 @@ shiftRequest: $shiftRequest,
 requestType: $requestType,
 requestTimeType: $requestTimeType,
 requestHoursPerDay: $requestHoursPerDay
+requestToType: $requestToType
+absenceUserIds: $absenceUserIds
+branchIds: $branchIds
+`;
+
+const scheduleConfigParams = `
+
+$scheduleName: String
+$lunchBreakInMins: Int
+$configShiftStart: String
+$configShiftEnd: String
+$scheduleConfig: [ShiftInput]
+$overtimeExists: Boolean
+$startFlexible: Boolean
+$endFlexible: Boolean
+$locations: [JSON]
 `;
 
 const userFields = `
@@ -140,8 +159,8 @@ const checkDuplicateScheduleShifts = `
   }`;
 
 const solveAbsenceRequest = `
-  mutation solveAbsenceRequest($_id: String, $status: String){
-    solveAbsenceRequest(_id: $_id, status: $status){
+  mutation solveAbsenceRequest($_id: String, $status: String, $note: String){
+    solveAbsenceRequest(_id: $_id, status: $status, note:$note){
       _id
     }
   }  
@@ -210,19 +229,45 @@ const scheduleShiftRemove = `
     scheduleShiftRemove(_id: $_id)
   }`;
 
-const scheduleConfigAdd = `mutation scheduleConfigAdd($scheduleName: String, $lunchBreakInMins: Int, $configShiftStart: String, $configShiftEnd: String, $scheduleConfig: [ShiftInput]){
-  scheduleConfigAdd(scheduleName: $scheduleName, lunchBreakInMins : $lunchBreakInMins, configShiftStart:$configShiftStart, configShiftEnd: $configShiftEnd, scheduleConfig : $scheduleConfig){
+const scheduleConfigAdd = `mutation scheduleConfigAdd(${scheduleConfigParams}){
+  scheduleConfigAdd(scheduleName: $scheduleName, lunchBreakInMins : $lunchBreakInMins, configShiftStart:$configShiftStart, configShiftEnd: $configShiftEnd, scheduleConfig : $scheduleConfig, overtimeExists: $overtimeExists, startFlexible: $startFlexible, endFlexible: $endFlexible, locations: $locations){
     _id
   }
 }`;
-const scheduleConfigEdit = `mutation scheduleConfigEdit($_id: String, $scheduleName: String,$lunchBreakInMins: Int, $configShiftStart: String, $configShiftEnd: String, $scheduleConfig: [ShiftInput]){
-  scheduleConfigEdit(_id: $_id, scheduleName: $scheduleName, lunchBreakInMins : $lunchBreakInMins, configShiftStart:$configShiftStart, configShiftEnd: $configShiftEnd, scheduleConfig : $scheduleConfig){
+const scheduleConfigEdit = `mutation scheduleConfigEdit($_id: String, $scheduleName: String,$lunchBreakInMins: Int, $configShiftStart: String, $configShiftEnd: String, $scheduleConfig: [ShiftInput], $overtimeExists: Boolean, $startFlexible: Boolean, $endFlexible: Boolean, $locations: [JSON]){
+  scheduleConfigEdit(_id: $_id, scheduleName: $scheduleName, lunchBreakInMins : $lunchBreakInMins, configShiftStart:$configShiftStart, configShiftEnd: $configShiftEnd, scheduleConfig : $scheduleConfig, overtimeExists: $overtimeExists, startFlexible: $startFlexible, endFlexible: $endFlexible, locations: $locations){
     _id
   }
 }`;
 
 const scheduleConfigRemove = `mutation scheduleConfigRemove($_id: String){
   scheduleConfigRemove(_id: $_id)
+}`;
+
+const deviceConfigAdd = `mutation deviceConfigAdd($deviceName: String, $serialNo: String, $extractRequired: Boolean){
+  deviceConfigAdd(deviceName: $deviceName, serialNo: $serialNo, extractRequired: $extractRequired ){
+    _id
+  }
+}`;
+
+const deviceConfigEdit = `mutation deviceConfigEdit($_id: String, $deviceName: String, $serialNo: String, $extractRequired: Boolean){
+  deviceConfigEdit(_id: $_id, deviceName: $deviceName, serialNo: $serialNo, extractRequired: $extractRequired ){
+    _id
+  }
+}`;
+
+const deviceConfigRemove = `mutation deviceConfigRemove($_id: String){
+  deviceConfigRemove(_id: $_id)
+}`;
+
+const extractAllDataFromMsSQL = `
+mutation extractAllDataFromMsSQL($startDate: String, $endDate: String, $extractAll: Boolean, $branchIds: [String], $departmentIds: [String],$userIds: [String]){
+  extractAllDataFromMsSQL(startDate: $startDate, endDate: $endDate, extractAll: $extractAll, branchIds: $branchIds, departmentIds:$departmentIds, userIds: $userIds)
+}`;
+
+const extractTimeLogsFromMsSql = `
+mutation extractTimeLogsFromMsSQL($startDate: String, $endDate: String, $extractAll: Boolean, $branchIds: [String], $departmentIds: [String],$userIds: [String]){
+  extractTimeLogsFromMsSQL(startDate: $startDate, endDate: $endDate, extractAll: $extractAll, branchIds: $branchIds, departmentIds:$departmentIds, userIds: $userIds)
 }`;
 
 const createTimeClockFromLog = `
@@ -238,9 +283,10 @@ mutation submitCheckInOutRequest($checkType: String, $userId: String, $checkTime
     _id
   }
 }`;
-const scheduleConfigOrderEdit = `
-mutation scheduleConfigOrderEdit($userId: String, $orderedList :[ConfigOrderInput]){
-  scheduleConfigOrderEdit(userId: $userId, orderedList: $orderedList)
+
+const editSchedule = `
+mutation editSchedule($_id: String!, $shifts:[ShiftInput]){
+  editSchedule(_id: $_id, shifts: $shifts)
 }`;
 
 export default {
@@ -277,9 +323,15 @@ export default {
   scheduleConfigEdit,
   scheduleConfigRemove,
 
+  deviceConfigAdd,
+  deviceConfigEdit,
+  deviceConfigRemove,
+
   submitCheckInOutRequest,
 
+  extractAllDataFromMsSQL,
+  extractTimeLogsFromMsSql,
   createTimeClockFromLog,
 
-  scheduleConfigOrderEdit
+  editSchedule,
 };

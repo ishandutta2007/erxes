@@ -1,15 +1,19 @@
 module.exports = {
+  srcDir: __dirname,
   name: "notifications",
-  port: 3014,
+  port: 3114,
+  scope: "notifications",
   exposes: {
     "./routes": "./src/routes.tsx",
     "./settings": "./src/containers/Widget.tsx",
+    "./automation": "./src/automations/index.tsx",
   },
   routes: {
-    url: "http://localhost:3014/remoteEntry.js",
+    url: "http://localhost:3114/remoteEntry.js",
     scope: "notifications",
     module: "./routes",
   },
+  automation: "./automation",
   menus: [
     {
       text: "notifications",
@@ -20,11 +24,11 @@ module.exports = {
       component: "./settings",
     },
     {
-      text: "Notification settings",
+      text: "Notification Config",
       to: "/settings/notifications",
       image: "/images/icons/erxes-11.svg",
       location: "settings",
-      scope: "notifications"
+      scope: "notifications",
     },
   ],
 };

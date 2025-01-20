@@ -7,8 +7,8 @@ function retry(fn, retriesLeft = 30, interval = 2000) {
   return new Promise((resolve, reject) => {
     fn()
       .then(resolve)
-      .catch(error => {
-        console.log(error);
+      .catch((error) => {
+        console.error(error);
 
         setTimeout(() => {
           if (retriesLeft === 1) {
@@ -26,14 +26,14 @@ function retry(fn, retriesLeft = 30, interval = 2000) {
 
 export default function asyncComponent(
   importComponent: any,
-  loaderStyle?: IAnimatedLoader
+  loaderStyle?: IAnimatedLoader,
 ): any {
   class AsyncComponent extends React.Component<any, { component: any }> {
     constructor(props) {
       super(props);
 
       this.state = {
-        component: null
+        component: null,
       };
     }
 

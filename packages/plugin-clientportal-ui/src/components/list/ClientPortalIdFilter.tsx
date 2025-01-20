@@ -1,39 +1,58 @@
-import Box from '@erxes/ui/src/components/Box';
-import DataWithLoader from '@erxes/ui/src/components/DataWithLoader';
-import Icon from '@erxes/ui/src/components/Icon';
 import {
   FieldStyle,
   SidebarCounter,
-  SidebarList
-} from '@erxes/ui/src/layout/styles';
-import { IRouterProps } from '@erxes/ui/src/types';
-import { __, router } from '@erxes/ui/src/utils';
-import React from 'react';
-import { withRouter } from 'react-router-dom';
+  SidebarList,
+} from "@erxes/ui/src/layout/styles";
+import { __, router } from "@erxes/ui/src/utils";
 
-import { ClientPortalConfig } from '../../types';
+import Box from "@erxes/ui/src/components/Box";
+import { ClientPortalConfig } from "../../types";
+import DataWithLoader from "@erxes/ui/src/components/DataWithLoader";
+import Icon from "@erxes/ui/src/components/Icon";
+import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-interface IProps extends IRouterProps {
+interface IProps {
   counts: { [key: string]: number };
   loading: boolean;
   emptyText?: string;
   clientPortalGetConfigs: ClientPortalConfig[];
+  kind?: string;
 }
 
 function ClientPortalUser({
-  history,
   counts,
   loading,
   emptyText,
-  clientPortalGetConfigs
+  clientPortalGetConfigs,
+  kind = "client",
 }: IProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (
+      clientPortalGetConfigs.length > 0 &&
+      !router.getParam(location, "cpId")
+    ) {
+      router.setParams(navigate, location, {
+        cpId: clientPortalGetConfigs[0]._id,
+      });
+    }
+  }, [clientPortalGetConfigs]);
+
   const onRemove = () => {
-    router.removeParams(history, 'cpId');
+    router.removeParams(navigate, location, "cpId");
+  };
+
+  const onClickRow = (id) => {
+    router.removeParams(navigate, location, "page");
+    router.setParams(navigate, location, { cpId: id });
   };
 
   const extraButtons = (
     <>
-      {router.getParam(history, 'cpId') && (
+      {router.getParam(location, "cpId") && (
         <a href="#" tabIndex={0} onClick={onRemove}>
           <Icon icon="times-circle" />
         </a>
@@ -43,11 +62,8 @@ function ClientPortalUser({
 
   const data = (
     <SidebarList>
-      {clientPortalGetConfigs.map(cp => {
-        const onClick = () => {
-          router.setParams(history, { cpId: cp._id });
-          router.removeParams(history, 'page');
-        };
+      {clientPortalGetConfigs.map((cp) => {
+  
 
         return (
           <li key={cp._id}>
@@ -55,14 +71,14 @@ function ClientPortalUser({
               href="#filter"
               tabIndex={0}
               className={
-                router.getParam(history, 'clientPortalId') === cp._id
-                  ? 'active'
-                  : ''
+                router.getParam(location, "clientPortalId") === cp._id
+                  ? "active"
+                  : ""
               }
-              onClick={onClick}
+              onClick={()=> onClickRow(cp._id)}
             >
               <FieldStyle>{cp.name}</FieldStyle>
-              <SidebarCounter>{counts[cp._id || '']}</SidebarCounter>
+              <SidebarCounter>{counts[cp._id || ""]}</SidebarCounter>
             </a>
           </li>
         );
@@ -72,7 +88,7 @@ function ClientPortalUser({
 
   return (
     <Box
-      title={__('Filter by Client Portal')}
+      title={__(`Filter by ${kind} portal`)}
       collapsible={clientPortalGetConfigs.length > 5}
       extraButtons={extraButtons}
       name="showFilterByClientPortalId"
@@ -81,7 +97,7 @@ function ClientPortalUser({
         data={data}
         loading={loading}
         count={clientPortalGetConfigs.length}
-        emptyText={emptyText || 'Empty'}
+        emptyText={emptyText || "Empty"}
         emptyIcon="leaf"
         size="small"
         objective={true}
@@ -90,4 +106,4 @@ function ClientPortalUser({
   );
 }
 
-export default withRouter<IProps>(ClientPortalUser);
+export default ClientPortalUser;

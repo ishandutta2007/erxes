@@ -1,20 +1,21 @@
-import Wrapper from '@erxes/ui/src/layout/components/Wrapper';
-import { router, __ } from '@erxes/ui/src/utils';
-import React, { useState } from 'react';
-import Table from '@erxes/ui/src/components/table';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import Select from 'react-select-plus';
-import Button from '@erxes/ui/src/components/Button';
-import ReportRow from './ReportRow';
-import { IReport } from '../../types';
 import { FilterItem, FlexRow, FlexRowEven, ToggleButton } from '../../styles';
-import Pagination from '@erxes/ui/src/components/pagination/Pagination';
+import React, { useState } from 'react';
+import { __, loadDynamicComponent, router } from '@erxes/ui/src/utils';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+import Button from '@erxes/ui/src/components/Button';
+import ControlLabel from '@erxes/ui/src/components/form/Label';
+import FormGroup from '@erxes/ui/src/components/form/Group';
+import { IReport } from '../../types';
 import Icon from '@erxes/ui/src/components/Icon';
+import Pagination from '@erxes/ui/src/components/pagination/Pagination';
+import ReportRow from './ReportRow';
+import Select from 'react-select';
+import Table from '@erxes/ui/src/components/table';
+import Wrapper from '@erxes/ui/src/layout/components/Wrapper';
 
 type Props = {
   queryParams: any;
-  history: any;
   reports: IReport[];
   totalCount: number;
 
@@ -23,20 +24,24 @@ type Props = {
   getPagination: (pagination: any) => void;
 
   exportReport: () => void;
+
+  isCurrentUserAdmin: boolean;
 };
 
 function ReportList(props: Props) {
   const {
-    history,
     reports,
     queryParams,
     totalCount,
     getActionBar,
     getPagination,
     exportReport,
-    showSideBar
+    showSideBar,
+    isCurrentUserAdmin
   } = props;
   const [reportType, setType] = useState(queryParams.reportType);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [showDepartment, setShowDepartment] = useState(
     queryParams.showDepartment ? JSON.parse(queryParams.showDepartment) : false
@@ -59,13 +64,13 @@ function ReportList(props: Props) {
   const toggleShowDepartment = () => {
     const toggle = !showDepartment;
     setShowDepartment(toggle);
-    router.setParams(history, { showDepartment: toggle });
+    router.setParams(navigate, location, { showDepartment: toggle });
   };
 
   const toggleShowBranch = () => {
     const toggle = !showBranch;
     setShowBranch(toggle);
-    router.setParams(history, { showBranch: toggle });
+    router.setParams(navigate, location, { showBranch: toggle });
   };
 
   const renderTableHead = () => {
@@ -128,21 +133,18 @@ function ReportList(props: Props) {
             <tr>
               <th
                 colSpan={5}
-                style={{ textAlign: 'center', border: '1px solid #EEE' }}
-              >
+                style={{ textAlign: 'center', border: '1px solid #EEE' }}>
                 {__('General Information')}
               </th>
               <th colSpan={1}>{__('Time')}</th>
               <th
                 colSpan={4}
-                style={{ textAlign: 'center', border: '1px solid #EEE' }}
-              >
+                style={{ textAlign: 'center', border: '1px solid #EEE' }}>
                 {__('Schedule')}
               </th>
               <th
                 colSpan={9}
-                style={{ textAlign: 'center', border: '1px solid #EEE' }}
-              >
+                style={{ textAlign: 'center', border: '1px solid #EEE' }}>
                 {__('Performance')}
               </th>
             </tr>
@@ -173,6 +175,18 @@ function ReportList(props: Props) {
   };
 
   const content = () => {
+    // custom report for bichil-globus
+    const bichilTable = loadDynamicComponent('bichilReportTable', {
+      reportType,
+      queryParams,
+      isCurrentUserAdmin,
+      getPagination
+    });
+
+    if (bichilTable) {
+      return bichilTable;
+    }
+
     return (
       <Table>
         <thead>{renderTableHead()}</thead>
@@ -193,34 +207,37 @@ function ReportList(props: Props) {
 
   const renderSelectionBar = () => {
     const onTypeSelect = type => {
-      router.setParams(history, { reportType: type.value });
+      router.setParams(navigate, location, { reportType: type.value, page: 1 });
+      // router.removeParams(navigate, location, 'page');
       setType(type.value);
     };
+
+    const selectOptions = ['Урьдчилсан', 'Сүүлд', 'Pivot'].map(ipt => ({
+      value: ipt,
+      label: __(ipt)
+    }));
 
     return (
       <FlexRow>
         <FlexRowEven>
           <ToggleButton
-            id="btn-inbox-channel-visible"
-            isActive={isSideBarOpen}
-            onClick={onToggleSidebar}
-          >
-            <Icon icon="subject" />
+            id='btn-inbox-channel-visible'
+            $isActive={isSideBarOpen}
+            onClick={onToggleSidebar}>
+            <Icon icon='subject' />
           </ToggleButton>
           {reportType === 'Сүүлд' && (
             <>
               <ToggleButton
                 style={{ width: 'auto' }}
-                isActive={showDepartment}
-                onClick={toggleShowDepartment}
-              >
+                $isActive={showDepartment}
+                onClick={toggleShowDepartment}>
                 <ControlLabel>{__('Department')}</ControlLabel>
               </ToggleButton>
               <ToggleButton
                 style={{ width: 'auto' }}
-                isActive={showBranch}
-                onClick={toggleShowBranch}
-              >
+                $isActive={showBranch}
+                onClick={toggleShowBranch}>
                 <ControlLabel>{__('Branch')}</ControlLabel>
               </ToggleButton>
             </>
@@ -230,14 +247,12 @@ function ReportList(props: Props) {
           <FormGroup>
             <ControlLabel>Select type</ControlLabel>
             <Select
-              value={reportType}
+              value={selectOptions.find(o => o.value === reportType)}
               onChange={onTypeSelect}
-              placeholder="Select type"
-              multi={false}
-              options={['Урьдчилсан', 'Сүүлд', 'Pivot'].map(ipt => ({
-                value: ipt,
-                label: __(ipt)
-              }))}
+              placeholder={__('Select type')}
+              isMulti={false}
+              isClearable={true}
+              options={selectOptions}
             />
           </FormGroup>
         </FilterItem>
@@ -245,6 +260,13 @@ function ReportList(props: Props) {
     );
   };
   const renderExportBtn = () => {
+    const bichilExportReportBtn = loadDynamicComponent(
+      'bichilExportReportBtn',
+      { ...queryParams, reportType, isCurrentUserAdmin }
+    );
+    if (bichilExportReportBtn) {
+      return bichilExportReportBtn;
+    }
     return (
       <div>
         <Button onClick={exportReport}>Export</Button>

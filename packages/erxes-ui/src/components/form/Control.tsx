@@ -5,14 +5,14 @@ import {
   Progress,
   Radio,
   Select,
-  SelectWrapper
-} from './styles';
+  SelectWrapper,
+} from "./styles";
 
-import { Column } from '@erxes/ui/src/styles/main';
-import ProgressBar from '../ProgressBar';
-import React from 'react';
-import Textarea from './Textarea';
-import NumberInput from './NumberInput';
+import { Column } from "@erxes/ui/src/styles/main";
+import NumberInput from "./NumberInput";
+import ProgressBar from "../ProgressBar";
+import React from "react";
+import Textarea from "./Textarea";
 
 type Props = {
   children?: React.ReactNode;
@@ -35,11 +35,12 @@ type Props = {
   autoFocus?: boolean;
   autoComplete?: string;
   onFocus?: (e: React.FormEvent<HTMLElement>) => void;
-  componentClass?: string;
+  componentclass?: string;
   min?: number;
   max?: number;
   rows?: number;
   inline?: boolean;
+  boxView?: boolean;
   className?: string;
   errors?: any;
   registerChild?: (child: any) => void;
@@ -50,6 +51,8 @@ type Props = {
   align?: string;
   useNumberFormat?: boolean;
   fixed?: number; // useNumberFormat is true then used
+  hideBottomBorder?: boolean;
+  onDoubleClick?: (e: React.FormEvent<HTMLElement>) => void;
 };
 
 const renderElement = (Element, attributes, type, child) => {
@@ -57,7 +60,7 @@ const renderElement = (Element, attributes, type, child) => {
     <FormLabel key={attributes.key ? attributes.key : null}>
       <Element {...attributes} type={type} />
       <span>
-        {child && '\u00a0\u00a0'}
+        {child && "\u00a0\u00a0"}
         {child}
       </span>
     </FormLabel>
@@ -66,10 +69,10 @@ const renderElement = (Element, attributes, type, child) => {
 
 class FormControl extends React.Component<Props> {
   static defaultProps = {
-    componentClass: 'input',
+    componentclass: "input",
     required: false,
     defaultChecked: false,
-    disabled: false
+    disabled: false,
   };
 
   componentDidMount() {
@@ -82,12 +85,12 @@ class FormControl extends React.Component<Props> {
 
   render() {
     const props = this.props;
-    const childNode = props.children;
-    const elementType = props.componentClass;
-    const errorMessage = props.errors && props.errors[props.name || ''];
+    const childnode = props.children;
+    const elementType = props.componentclass;
+    const errorMessage = props.errors && props.errors[props.name || ""];
 
     // cancel custom browser default form validation error
-    const onChange = e => {
+    const onChange = (e) => {
       if (props.onChange) {
         props.onChange(e);
       }
@@ -101,13 +104,10 @@ class FormControl extends React.Component<Props> {
       onBlur: props.onBlur,
       value: props.value,
       defaultValue: props.defaultValue,
-      [props.defaultChecked
-        ? 'defaultChecked'
-        : 'checked']: props.defaultChecked
-        ? props.defaultChecked
-        : props.checked,
+      [props.defaultChecked ? "defaultChecked" : "checked"]:
+        props.defaultChecked ? props.defaultChecked : props.checked,
       placeholder: props.placeholder,
-      hasError: errorMessage ? true : false,
+      $hasError: errorMessage ? true : false,
       type: props.type,
       name: props.name,
       round: props.round,
@@ -116,29 +116,34 @@ class FormControl extends React.Component<Props> {
       onFocus: props.onFocus,
       autoFocus: props.autoFocus,
       autoComplete: props.autoComplete,
+      $boxView: props.boxView,
       min: props.min,
       max: props.max,
       id: props.id,
       maxHeight: props.maxHeight,
       maxLength: props.maxLength,
       color: props.color,
-      align: props.align
+      align: props.align,
+      onDoubleClick: props.onDoubleClick,
     };
 
-    if (elementType === 'select') {
+    if (elementType === "select") {
       if (props.options) {
         return (
           <Column>
-            <SelectWrapper hasError={errorMessage}>
+            <SelectWrapper
+              $hasError={errorMessage ? true : false}
+              $boxView={props.boxView}
+            >
               <Select {...attributes}>
                 {props.options.map((option, index) => {
                   return (
                     <option
                       key={index}
-                      value={option.value || ''}
+                      value={option.value || ""}
                       disabled={option.disabled}
                     >
-                      {option.label || ''}
+                      {option.label || ""}
                     </option>
                   );
                 })}
@@ -151,30 +156,30 @@ class FormControl extends React.Component<Props> {
 
       return (
         <Column>
-          <SelectWrapper hasError={errorMessage}>
-            <Select {...attributes}>{childNode}</Select>
+          <SelectWrapper $hasError={errorMessage} $boxView={props.boxView}>
+            <Select {...attributes}>{childnode}</Select>
           </SelectWrapper>
           {errorMessage}
         </Column>
       );
     }
 
-    if (elementType === 'radio') {
+    if (elementType === "radio") {
       if (props.options) {
         return props.options.map((option, index) => {
           return renderElement(
             Radio,
             { key: index, ...attributes, ...option },
             elementType,
-            option.childNode
+            option.childnode
           );
         });
       }
 
-      return renderElement(Radio, attributes, elementType, childNode);
+      return renderElement(Radio, attributes, elementType, childnode);
     }
 
-    if (elementType === 'poll') {
+    if (elementType === "poll") {
       const options = props.options;
       if (options) {
         const count = options.length;
@@ -184,7 +189,7 @@ class FormControl extends React.Component<Props> {
           return (
             <Progress key={attributes.key ? attributes.key : null}>
               <div>
-                {renderElement(Radio, attributes, elementType, childNode)}
+                {renderElement(Radio, attributes, elementType, childnode)}
                 <b>{option}: </b>
                 <span>({percentage.toFixed(2)}%)</span>
               </div>
@@ -197,11 +202,11 @@ class FormControl extends React.Component<Props> {
       return null;
     }
 
-    if (elementType === 'checkbox') {
-      return renderElement(Checkbox, attributes, elementType, childNode);
+    if (elementType === "checkbox") {
+      return renderElement(Checkbox, attributes, elementType, childnode);
     }
 
-    if (elementType === 'textarea') {
+    if (elementType === "textarea") {
       return (
         <Column>
           <Textarea {...props} hasError={errorMessage} />
@@ -210,7 +215,7 @@ class FormControl extends React.Component<Props> {
       );
     }
 
-    if (props.type === 'number' && props.useNumberFormat) {
+    if (props.type === "number" && props.useNumberFormat) {
       return (
         <Column>
           <NumberInput {...attributes} fixed={props.fixed} />

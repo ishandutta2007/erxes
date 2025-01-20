@@ -1,19 +1,23 @@
-import { getSubdomain } from '@erxes/api-utils/src/core';
+import { getSubdomain } from "@erxes/api-utils/src/core";
 
-import { debugError, debugFacebook } from './debuggers';
-import { getConfig } from './commonUtils';
-import loginMiddleware from './middlewares/loginMiddleware';
-import receiveComment from './receiveComment';
-import receiveMessage from './receiveMessage';
-import receivePost from './receivePost';
-import { FACEBOOK_POST_TYPES, INTEGRATION_KINDS } from './constants';
-import { getAdapter, getPageAccessTokenFromMap } from './utils';
-import { generateModels } from './connectionResolver';
+import { debugError, debugFacebook } from "./debuggers";
+import { getConfig } from "./commonUtils";
+import loginMiddleware from "./middlewares/loginMiddleware";
+import receiveComment from "./receiveComment";
+import receiveMessage from "./receiveMessage";
+import receivePost from "./receivePost";
+import { FACEBOOK_POST_TYPES, INTEGRATION_KINDS } from "./constants";
+import {
+  checkIsAdsOpenThread,
+  getAdapter,
+  getPageAccessTokenFromMap
+} from "./utils";
+import { generateModels } from "./connectionResolver";
 
 const init = async app => {
-  app.get('/fblogin', loginMiddleware);
+  app.get("/fblogin", loginMiddleware);
 
-  app.get('/facebook/get-post', async (req, res) => {
+  app.get("/facebook/get-post", async (req, res) => {
     debugFacebook(
       `Request to get post data with: ${JSON.stringify(req.query)}`
     );
@@ -23,12 +27,12 @@ const init = async app => {
 
     const { erxesApiId } = req.query;
 
-    const post = await models.Posts.getPost({ erxesApiId }, true);
+    const post = await models.PostConversations.findOne({ erxesApiId });
 
     return res.json({ ...post });
   });
 
-  app.get('/facebook/get-status', async (req, res) => {
+  app.get("/facebook/get-status", async (req, res) => {
     const subdomain = getSubdomain(req);
     const models = await generateModels(subdomain);
 
@@ -39,12 +43,12 @@ const init = async app => {
     });
 
     let result = {
-      status: 'healthy'
+      status: "healthy"
     } as any;
 
     if (integration) {
       result = {
-        status: integration.healthStatus || 'healthy',
+        status: integration.healthStatus || "healthy",
         error: integration.error
       };
     }
@@ -55,36 +59,35 @@ const init = async app => {
   const accessTokensByPageId = {};
 
   // Facebook endpoint verifier
-  app.get('/facebook/receive', async (req, res) => {
+  app.get("/facebook/receive", async (req, res) => {
     const subdomain = getSubdomain(req);
     const models = await generateModels(subdomain);
 
     const FACEBOOK_VERIFY_TOKEN = await getConfig(
       models,
-      'FACEBOOK_VERIFY_TOKEN'
+      "FACEBOOK_VERIFY_TOKEN"
     );
 
     // when the endpoint is registered as a webhook, it must echo back
     // the 'hub.challenge' value it receives in the query arguments
-    if (req.query['hub.mode'] === 'subscribe') {
-      if (req.query['hub.verify_token'] === FACEBOOK_VERIFY_TOKEN) {
-        res.send(req.query['hub.challenge']);
+    if (req.query["hub.mode"] === "subscribe") {
+      if (req.query["hub.verify_token"] === FACEBOOK_VERIFY_TOKEN) {
+        res.send(req.query["hub.challenge"]);
       } else {
-        res.send('OK');
+        res.send("OK");
       }
     }
   });
 
-  app.post('/facebook/receive', async (req, res, next) => {
+  app.post("/facebook/receive", async (req, res, next) => {
     const subdomain = getSubdomain(req);
     const models = await generateModels(subdomain);
 
     const data = req.body;
 
-    if (data.object !== 'page') {
+    if (data.object !== "page" && !checkIsAdsOpenThread(data?.entry)) {
       return;
     }
-
     const adapter = await getAdapter(models);
 
     for (const entry of data.entry) {
@@ -136,14 +139,14 @@ const init = async app => {
             debugFacebook(
               `Error occurred while processing activity: ${e.message}`
             );
-            return res.end('success');
+            return res.end("success");
           });
       }
 
       // receive post and comment
       if (entry.changes) {
         for (const event of entry.changes) {
-          if (event.value.item === 'comment') {
+          if (event.value.item === "comment") {
             debugFacebook(
               `Received comment data ${JSON.stringify(event.value)}`
             );
@@ -152,10 +155,10 @@ const init = async app => {
               debugFacebook(
                 `Successfully saved  ${JSON.stringify(event.value)}`
               );
-              return res.end('success');
+              return res.end("success");
             } catch (e) {
               debugError(`Error processing comment: ${e.message}`);
-              return res.end('success');
+              return res.end("success");
             }
           }
 
@@ -168,13 +171,13 @@ const init = async app => {
               debugFacebook(
                 `Successfully saved post ${JSON.stringify(event.value)}`
               );
-              return res.end('success');
+              return res.end("success");
             } catch (e) {
               debugError(`Error processing post: ${e.message}`);
-              return res.end('success');
+              return res.end("success");
             }
           } else {
-            return res.end('success');
+            return res.end("success");
           }
         }
       }

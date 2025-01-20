@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Button,
   ControlLabel,
@@ -6,25 +6,25 @@ import {
   FormControl,
   FormGroup,
   DateControl,
-  Uploader
-} from '@erxes/ui/src/components';
-import EditorCK from '@erxes/ui/src/components/EditorCK';
+  Uploader,
+} from "@erxes/ui/src/components";
+import { RichTextEditor } from "@erxes/ui/src/components/richTextEditor/TEditor";
 import {
   MainStyleFormColumn as FormColumn,
   MainStyleFormWrapper as FormWrapper,
   MainStyleModalFooter as ModalFooter,
   MainStyleScrollWrapper as ScrollWrapper,
-  MainStyleDateContainer as DateContainer
-} from '@erxes/ui/src/styles/eindex';
+  MainStyleDateContainer as DateContainer,
+} from "@erxes/ui/src/styles/eindex";
 import {
   IAttachment,
   IButtonMutateProps,
-  IFormProps
-} from '@erxes/ui/src/types';
-import { IDonateCampaign, IDonateCampaignAward } from '../types';
-import Select from 'react-select-plus';
-import { extractAttachment, __ } from '@erxes/ui/src/utils';
-import { IVoucherCampaign } from '../../voucherCampaign/types';
+  IFormProps,
+} from "@erxes/ui/src/types";
+import { IDonateCampaign, IDonateCampaignAward } from "../types";
+import Select from "react-select";
+import { extractAttachment, __ } from "@erxes/ui/src/utils";
+import { IVoucherCampaign } from "../../voucherCampaign/types";
 
 type Props = {
   donateCampaign?: IDonateCampaign;
@@ -42,7 +42,7 @@ class Form extends React.Component<Props, State> {
     super(props);
 
     this.state = {
-      donateCampaign: this.props.donateCampaign || {}
+      donateCampaign: this.props.donateCampaign || {},
     };
   }
 
@@ -77,16 +77,16 @@ class Form extends React.Component<Props, State> {
     return {
       ...finalValues,
       ...updatedDonateCampaign,
-      awards: sortedAwards // Assign the sorted array to the awards property
+      awards: sortedAwards, // Assign the sorted array to the awards property
     };
   };
 
-  onChangeDescription = e => {
+  onChangeDescription = (content: string) => {
     this.setState({
       donateCampaign: {
         ...this.state.donateCampaign,
-        description: e.editor.getData()
-      }
+        description: content,
+      },
     });
   };
 
@@ -94,8 +94,8 @@ class Form extends React.Component<Props, State> {
     this.setState({
       donateCampaign: {
         ...this.state.donateCampaign,
-        attachment: files.length ? files[0] : undefined
-      }
+        attachment: files.length ? files[0] : undefined,
+      },
     });
   };
 
@@ -103,27 +103,27 @@ class Form extends React.Component<Props, State> {
     let value = values;
 
     if (Array.isArray(values)) {
-      value = values.map(el => el.value);
+      value = values.map((el) => el.value);
     }
 
     this.setState({
-      donateCampaign: { ...this.state.donateCampaign, [name]: value }
+      donateCampaign: { ...this.state.donateCampaign, [name]: value },
     });
   };
 
   onDateInputChange = (type: string, date) => {
     this.setState({
-      donateCampaign: { ...this.state.donateCampaign, [type]: date }
+      donateCampaign: { ...this.state.donateCampaign, [type]: date },
     });
   };
 
-  onInputChange = e => {
+  onInputChange = (e) => {
     e.preventDefault();
     const value = e.target.value;
     const name = e.target.name;
 
     this.setState({
-      donateCampaign: { ...this.state.donateCampaign, [name]: value }
+      donateCampaign: { ...this.state.donateCampaign, [name]: value },
     });
   };
 
@@ -133,42 +133,47 @@ class Form extends React.Component<Props, State> {
     awards.push({
       _id: Math.random().toString(),
       minScore: 0,
-      voucherCampaignId: ''
+      voucherCampaignId: "",
     });
     donateCampaign.awards = awards;
     this.setState({ donateCampaign });
   };
 
-  onRemoveAward = awardId => {
+  onRemoveAward = (awardId) => {
     const { donateCampaign } = this.state;
     const { awards = [] } = donateCampaign;
-    donateCampaign.awards = awards.filter(a => a._id !== awardId);
+    donateCampaign.awards = awards.filter((a) => a._id !== awardId);
     this.setState({ donateCampaign });
   };
 
   renderAward = (award: IDonateCampaignAward, formProps) => {
     const changeAward = (key, value) => {
       const { donateCampaign } = this.state;
-      const awards = (donateCampaign.awards || []).map(a =>
+      const awards = (donateCampaign.awards || []).map((a) =>
         a._id === award._id ? { ...a, [key]: value } : a
       );
       this.setState({
         donateCampaign: {
           ...donateCampaign,
-          awards
-        }
+          awards,
+        },
       });
     };
-    const onChangeMinScore = e => {
+    const onChangeMinScore = (e) => {
       e.preventDefault();
       const value = e.target.value;
-      changeAward('minScore', value);
+      changeAward("minScore", value);
     };
 
-    const onChangeVoucherCampaign = selected => {
+    const onChangeVoucherCampaign = (selected) => {
       const value = (selected || {}).value;
-      changeAward('voucherCampaignId', value);
+      changeAward("voucherCampaignId", value);
     };
+
+    const voucherOptions = this.props.voucherCampaigns.map((voucher) => ({
+      label: `${voucher.title}`,
+      value: voucher._id,
+    }));
 
     return (
       <FormWrapper key={award._id}>
@@ -186,15 +191,15 @@ class Form extends React.Component<Props, State> {
 
         <FormColumn>
           <Select
-            placeholder={__('Choose voucher')}
-            value={award.voucherCampaignId}
-            options={this.props.voucherCampaigns.map(voucher => ({
-              label: `${voucher.title}`,
-              value: voucher._id
-            }))}
+            placeholder={__("Choose voucher")}
+            value={voucherOptions.find(
+              (o) => o.value === award.voucherCampaignId
+            )}
+            options={voucherOptions}
             name="voucherCampaignId"
+            isClearable={true}
             onChange={onChangeVoucherCampaign}
-            loadingPlaceholder={__('Loading...')}
+            // loadingPlaceholder={__('Loading...')}
           />
         </FormColumn>
         <Button
@@ -209,8 +214,8 @@ class Form extends React.Component<Props, State> {
     );
   };
 
-  renderAwards = formProps => {
-    return (this.state.donateCampaign.awards || []).map(award =>
+  renderAwards = (formProps) => {
+    return (this.state.donateCampaign.awards || []).map((award) =>
       this.renderAward(award, formProps)
     );
   };
@@ -256,9 +261,9 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="startDate"
-                    placeholder={__('Start date')}
+                    placeholder={__("Start date")}
                     value={donateCampaign.startDate}
-                    onChange={this.onDateInputChange.bind(this, 'startDate')}
+                    onChange={this.onDateInputChange.bind(this, "startDate")}
                   />
                 </DateContainer>
               </FormGroup>
@@ -272,9 +277,9 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="endDate"
-                    placeholder={__('End date')}
+                    placeholder={__("End date")}
                     value={donateCampaign.endDate}
-                    onChange={this.onDateInputChange.bind(this, 'endDate')}
+                    onChange={this.onDateInputChange.bind(this, "endDate")}
                   />
                 </DateContainer>
               </FormGroup>
@@ -288,11 +293,11 @@ class Form extends React.Component<Props, State> {
                     {...formProps}
                     required={true}
                     name="finishDateOfUse"
-                    placeholder={__('Finish date of use')}
+                    placeholder={__("Finish date of use")}
                     value={donateCampaign.finishDateOfUse}
                     onChange={this.onDateInputChange.bind(
                       this,
-                      'finishDateOfUse'
+                      "finishDateOfUse"
                     )}
                   />
                 </DateContainer>
@@ -319,7 +324,7 @@ class Form extends React.Component<Props, State> {
               <ControlLabel required={true}>Voucher</ControlLabel>
             </FormColumn>
             <Button btnStyle="simple" icon="add" onClick={this.onAddAward}>
-              {__('Add level')}
+              {__("Add level")}
             </Button>
           </FormWrapper>
           {this.renderAwards(formProps)}
@@ -327,27 +332,21 @@ class Form extends React.Component<Props, State> {
           <br />
           <FormGroup>
             <ControlLabel>Description</ControlLabel>
-            <EditorCK
-              content={donateCampaign.description || ''}
+            <RichTextEditor
+              content={donateCampaign.description || ""}
               onChange={this.onChangeDescription}
               height={150}
               isSubmitted={formProps.isSaved}
               name={`donateCampaign_description_${donateCampaign.description}`}
               toolbar={[
-                {
-                  name: 'basicstyles',
-                  items: [
-                    'Bold',
-                    'Italic',
-                    'NumberedList',
-                    'BulletedList',
-                    'Link',
-                    'Unlink',
-                    '-',
-                    'Image',
-                    'EmojiPanel'
-                  ]
-                }
+                "bold",
+                "italic",
+                "orderedList",
+                "bulletList",
+                "link",
+                "unlink",
+                "|",
+                "image",
               ]}
             />
           </FormGroup>
@@ -374,11 +373,11 @@ class Form extends React.Component<Props, State> {
           </Button>
 
           {renderButton({
-            name: 'donate Campaign',
+            name: "donate Campaign",
             values: this.generateDoc(values),
             isSubmitted,
             callback: closeModal,
-            object: donateCampaign
+            object: donateCampaign,
           })}
         </ModalFooter>
       </>

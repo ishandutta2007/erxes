@@ -1,4 +1,4 @@
-import { isEnabled } from '@erxes/ui/src/utils/core';
+import { isEnabled } from "@erxes/ui/src/utils/core";
 
 const userFields = `
   _id
@@ -29,6 +29,9 @@ export const automationFields = `
     icon
     label
     description
+    position
+    isCustom
+    workflowId
     count
   }
   actions {
@@ -40,6 +43,8 @@ export const automationFields = `
     icon
     label
     description
+    position
+    workflowId
   }
   createdAt
   updatedAt
@@ -99,6 +104,7 @@ export const automations = `
 export const automationsMain = `
   query automationsMain(${listParamsDef}) {
     automationsMain(${listParamsValue}) {
+      totalCount
       list {
         _id
         name
@@ -120,11 +126,10 @@ export const automationsMain = `
           ${userFields}
         }
 
-        ${isEnabled('tags') ? `tags {${tagFields}}` : ''}
-        
+        tags {
+         ${tagFields}
+        }
       }
-
-      totalCount
     }
   }
 `;
@@ -169,6 +174,7 @@ const historiesParamValue = `
 
 const automationHistories = `
   query automationHistories(${historiesParamDef}) {
+    automationHistoriesTotalCount(${historiesParamValue}) 
     automationHistories(${historiesParamValue}) {
       _id
       createdAt

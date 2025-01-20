@@ -68,11 +68,15 @@ export const hours = [
 export const INTEGRATION_KINDS = {
   MESSENGER: 'messenger',
   FACEBOOK_MESSENGER: 'facebook-messenger',
+  INSTAGRAM_MESSENGER: 'instagram-messenger',
   FACEBOOK_POST: 'facebook-post',
+  INSTAGRAM_POST: 'instagram-post',
   FORMS: 'lead',
   CALLPRO: 'callpro',
   WEBHOOK: 'webhook',
-  BOOKING: 'booking',
+  WHATSAPP_MESSENGER: 'whatsapp',
+
+
   ALL: [
     { text: 'Messenger', value: 'messenger' },
     { text: 'Forms', value: 'lead' },
@@ -80,10 +84,14 @@ export const INTEGRATION_KINDS = {
       text: 'Facebook Messenger',
       value: 'facebook-messenger'
     },
-    { text: 'Facebook Post', value: 'facebook-post' },
+    {
+      text: 'Instagram Messenger',
+      value: 'instagram-messenger'
+    },
     { text: 'Webhook', value: 'webhook' },
     { text: 'Callpro', value: 'callpro' },
-    { text: 'Booking', value: 'booking' }
+    { text: 'whatsapp', value: 'whatsapp'},
+
   ]
 };
 
@@ -106,21 +114,18 @@ export const FORM_SUCCESS_ACTIONS = {
 };
 
 export const MAIL_TOOLBARS_CONFIG = [
-  { name: 'styles', items: ['Font', 'FontSize'] },
-  {
-    name: 'other',
-    items: [
-      'TextColor',
-      'BGColor',
-      'Bold',
-      'Italic',
-      'Underline',
-      'NumberedList',
-      'BulletedList',
-      'Link'
-    ]
-  },
-  { name: 'clear', items: ['RemoveFormat'] }
+  'fontSize',
+  '|',
+  'color',
+  'highlight',
+  'bold',
+  'italic',
+  'underline',
+  'orderedList',
+  'bulletList',
+  '|',
+  'link',
+  'unlink'
 ];
 
 export const INTEGRATIONS = [
@@ -160,5 +165,4 @@ export const INTEGRATIONS = [
   }
 ];
 
-export const WEBHOOK_DOC_URL =
-  'https://www.erxes.org/developer/webhook#samples';
+export const WEBHOOK_DOC_URL = 'https://docs.erxes.io/webhooks';

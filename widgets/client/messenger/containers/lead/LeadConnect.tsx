@@ -1,14 +1,19 @@
-import gql from "graphql-tag";
 import * as React from "react";
-import client from "../../../apollo-client";
-import { formConnectMutation } from "../../../form/graphql";
-import { __, requestBrowserInfo } from "../../../utils";
-import { connection } from "../../connection";
+
+import { __, checkRules, requestBrowserInfo } from "../../../utils";
+
+import Card from "../../components/Card.tsx";
+import IntegrationItem from "../../components/IntegrationItem";
 import LeadContent from "./LeadContent";
+import client from "../../../apollo-client";
+import { connection } from "../../connection";
+import { formConnectMutation } from "../../../form/graphql";
+import gql from "graphql-tag";
 
 interface IState {
   loading: boolean;
   hasError: boolean;
+  browserInfo?: any;
 }
 
 type Props = {
@@ -26,9 +31,10 @@ class LeadConnect extends React.PureComponent<Props, IState> {
   saveBrowserInfo() {
     requestBrowserInfo({
       source: "fromMessenger",
-      callback: browserInfo => {
+      callback: (browserInfo) => {
         connection.browserInfo = browserInfo;
-      }
+        this.setState({ browserInfo });
+      },
     });
   }
 
@@ -40,13 +46,13 @@ class LeadConnect extends React.PureComponent<Props, IState> {
         mutation: gql(formConnectMutation),
         variables: {
           brandCode,
-          formCode
-        }
+          formCode,
+        },
       })
       .then(({ data = { widgetsLeadConnect: {} } }) => {
         if (!data) {
           this.setState({ hasError: true });
-          return
+          return;
         }
 
         const response = data.widgetsLeadConnect;
@@ -79,7 +85,31 @@ class LeadConnect extends React.PureComponent<Props, IState> {
       return <div className="loader" />;
     }
 
-    return <LeadContent formCode={this.props.formCode} />;
+    if (!this.state.browserInfo) {
+      return null;
+    }
+
+    const leadData = connection.leadData[this.props.formCode];
+
+    const { form } = leadData;
+
+    // check rules ======
+    const isPassedAllRules = checkRules(
+      form?.leadData.rules || [],
+      this.state.browserInfo
+    );
+
+    if (!isPassedAllRules) {
+      return null;
+    }
+
+    return (
+      <Card p="0">
+        <IntegrationItem>
+          <LeadContent form={form} formCode={this.props.formCode} />
+        </IntegrationItem>
+      </Card>
+    );
   }
 }
 

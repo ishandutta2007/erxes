@@ -1,23 +1,24 @@
-import { Row } from '@erxes/ui-inbox/src/settings/integrations/styles';
-import Button from '@erxes/ui/src/components/Button';
-import CollapseContent from '@erxes/ui/src/components/CollapseContent';
-import FormControl from '@erxes/ui/src/components/form/Control';
-import Form from '@erxes/ui/src/components/form/Form';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import Toggle from '@erxes/ui/src/components/Toggle';
-import { ModalFooter } from '@erxes/ui/src/styles/main';
 import {
   IButtonMutateProps,
   IFieldLogic,
   IFormProps
-} from '@erxes/ui/src/types';
-import { __ } from '@erxes/ui/src/utils';
-import { RenderDynamicComponent } from '@erxes/ui/src/utils/core';
-import React from 'react';
+} from "@erxes/ui/src/types";
 
-import PropertyLogics from '../containers/PropertyLogics';
-import { IFieldGroup } from '../types';
+import Button from "@erxes/ui/src/components/Button";
+import CollapseContent from "@erxes/ui/src/components/CollapseContent";
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import Form from "@erxes/ui/src/components/form/Form";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import FormGroup from "@erxes/ui/src/components/form/Group";
+import { IFieldGroup } from "../types";
+import { ModalFooter } from "@erxes/ui/src/styles/main";
+import PropertyLogics from "../containers/PropertyLogics";
+import React from "react";
+import { RenderDynamicComponent } from "@erxes/ui/src/utils/core";
+import { Row } from "../styles";
+import Toggle from "@erxes/ui/src/components/Toggle";
+import { __ } from "@erxes/ui/src/utils";
+import ProductPropertGroupForm from "@erxes/ui-products/src/containers/form/PropertyGroupForm";
 
 type Props = {
   group?: IFieldGroup;
@@ -96,7 +97,7 @@ class PropertyGroupForm extends React.Component<Props, State> {
   };
 
   multipleHandler = e => {
-    if (e.target.id === 'multiple') {
+    if (e.target.id === "multiple") {
       const isMultiple = e.target.checked;
 
       return this.setState({ isMultiple });
@@ -104,7 +105,7 @@ class PropertyGroupForm extends React.Component<Props, State> {
   };
 
   alwaysOpenHandler = e => {
-    if (e.target.id === 'alwaysOpen') {
+    if (e.target.id === "alwaysOpen") {
       const alwaysOpen = e.target.checked;
 
       return this.setState({ alwaysOpen });
@@ -112,7 +113,7 @@ class PropertyGroupForm extends React.Component<Props, State> {
   };
 
   visibleHandler = e => {
-    if (e.target.id === 'visible') {
+    if (e.target.id === "visible") {
       const isVisible = e.target.checked;
 
       return this.setState({ isVisible });
@@ -190,6 +191,15 @@ class PropertyGroupForm extends React.Component<Props, State> {
     const { type } = this.props;
     const { config } = this.state;
 
+    if (type === "core:product") {
+      return (
+        <ProductPropertGroupForm
+          config={config}
+          onChangeItems={this.onChangeItems}
+        />
+      );
+    }
+
     const plugins: any[] = (window as any).plugins || [];
 
     for (const plugin of plugins) {
@@ -251,7 +261,7 @@ class PropertyGroupForm extends React.Component<Props, State> {
             <FormControl
               {...formProps}
               name="parentId"
-              componentClass="select"
+              componentclass="select"
               defaultValue={object.parentId || null}
             >
               <option value="" />
@@ -271,15 +281,15 @@ class PropertyGroupForm extends React.Component<Props, State> {
         {this.renderFieldVisible()}
         {this.renderExtraContent()}
 
-        {['visitor', 'lead', 'customer'].includes(object.contentType) ? (
+        {["visitor", "lead", "customer"].includes(object.contentType) ? (
           this.renderFieldVisibleInDetail()
         ) : (
           <></>
         )}
 
         <FormGroup>
-          <ControlLabel>{__('Always open')} </ControlLabel>
-          <p>{__('Whether this group is always open in a sidebar')}</p>
+          <ControlLabel>{__("Always open")} </ControlLabel>
+          <p>{__("Whether this group is always open in a sidebar")}</p>
           <div>
             <Toggle
               id="alwaysOpen"
@@ -308,11 +318,11 @@ class PropertyGroupForm extends React.Component<Props, State> {
           </div>
         </FormGroup>
 
-        <CollapseContent title={__('Logic')} compact={true}>
+        <CollapseContent title={__("Logic")} compact={true}>
           <PropertyLogics
             contentType={this.props.type}
             logics={this.state.logics || []}
-            action={this.state.logicAction || 'show'}
+            action={this.state.logicAction || "show"}
             onLogicsChange={this.onChangeLogics}
             onActionChange={this.onChangeLogicAction}
           />
@@ -324,7 +334,7 @@ class PropertyGroupForm extends React.Component<Props, State> {
           </Button>
 
           {renderButton({
-            name: 'property group',
+            name: "property group",
             values: this.generateDoc(values),
             isSubmitted,
             callback: closeModal,

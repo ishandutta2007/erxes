@@ -1,21 +1,31 @@
 import { IContext } from '../../connectionResolver';
 import { moduleRequireLogin } from '@erxes/api-utils/src/permissions';
 import { checkPermission } from '@erxes/api-utils/src';
+import redis from '@erxes/api-utils/src/redis';
+
 import {
   IAbsence,
   ISchedule,
   IShift,
   ITimeClock,
-  IAbsenceType
+  IAbsenceType,
+  IDeviceConfigDocument,
+  IDeviceConfig,
 } from '../../models/definitions/timeclock';
 import {
   createScheduleShiftsByUserIds,
   findBranches,
   findUser,
-  returnUnionOfUserIds
+  returnUnionOfUserIds,
+  timeclockLocation,
 } from './utils';
-import * as dayjs from 'dayjs';
-import { fixDate } from '@erxes/api-utils/src';
+import dayjs = require('dayjs');
+import {
+  connectAndQueryFromMsSql,
+  connectAndQueryTimeLogsFromMsSql,
+} from '../../utils';
+import { sendMobileNotification } from '../utils';
+import { sendCoreMessage } from '../../messageBroker';
 
 interface ITimeClockEdit extends ITimeClock {
   _id: string;
@@ -51,40 +61,22 @@ const timeclockMutations = {
     { userId, longitude, latitude, deviceType },
     { models, user, subdomain }: IContext
   ) {
-    // convert long, lat into radians
-    const longRad = (Math.PI * longitude) / 180;
-    const latRad = (latitude * Math.PI) / 180;
-
     let insideCoordinate = false;
     let getBranchName;
+    let getScheduleConfig;
 
     const getUserId = userId || user._id;
-
-    const EARTH_RADIUS = 6378.14;
 
     const userInfo = await findUser(subdomain, getUserId);
     const branches = await findBranches(subdomain, userInfo.branchIds);
 
     for (const branch of branches) {
-      // convert into radians
-      const branchLong = (branch.coordinate.longitude * Math.PI) / 180;
-      const branchLat = (branch.coordinate.latitude * Math.PI) / 180;
-
-      const longDiff = longRad - branchLong;
-      const latDiff = latRad - branchLat;
-
-      // distance in km
-      const dist =
-        EARTH_RADIUS *
-        2 *
-        Math.asin(
-          Math.sqrt(
-            Math.pow(Math.sin(latDiff / 2), 2) +
-              Math.cos(latRad) *
-                Math.cos(branchLat) *
-                Math.pow(Math.sin(longDiff / 2), 2)
-          )
-        );
+      const dist = await timeclockLocation(
+        longitude,
+        latitude,
+        branch.coordinate.longitude,
+        branch.coordinate.latitude
+      );
 
       // if user's coordinate is within the radius
       if (dist * 1000 <= branch.radius) {
@@ -95,6 +87,33 @@ const timeclockMutations = {
 
     let timeclock;
 
+    if (!insideCoordinate) {
+      const getSchedule = await models.Schedules.findOne({ userId: getUserId });
+
+      if (getSchedule) {
+        getScheduleConfig = await models.ScheduleConfigs.findOne({
+          _id: getSchedule.scheduleConfigId,
+        });
+      }
+
+      if (getScheduleConfig) {
+        for (const location of getScheduleConfig.locations) {
+          const dist = await timeclockLocation(
+            longitude,
+            latitude,
+            location.longitude,
+            location.latitude
+          );
+
+          // if user's coordinate is within the radius
+          if (dist * 1000 <= 1000) {
+            insideCoordinate = true;
+            getBranchName = location.name;
+          }
+        }
+      }
+    }
+
     if (insideCoordinate) {
       timeclock = await models.Timeclocks.createTimeClock({
         shiftStart: new Date(),
@@ -103,7 +122,7 @@ const timeclockMutations = {
         branchName: getBranchName,
         deviceType,
         inDevice: getBranchName,
-        inDeviceType: deviceType
+        inDeviceType: deviceType,
       });
     } else {
       throw new Error('User not in the coordinate');
@@ -119,7 +138,6 @@ const timeclockMutations = {
   ) {
     const timeclock = await models.Timeclocks.findOne({
       _id,
-      shiftActive: true
     });
     if (!timeclock) {
       throw new Error('time clock not found');
@@ -127,13 +145,8 @@ const timeclockMutations = {
 
     const getUserId = userId || user._id;
 
-    // convert long, lat into radians
-    const longRad = (Math.PI * longitude) / 180;
-    const latRad = (latitude * Math.PI) / 180;
-
     let insideCoordinate = false;
-
-    const EARTH_RADIUS = 6378.14;
+    let getScheduleConfig;
 
     const userInfo = await findUser(subdomain, getUserId);
     const branches = await findBranches(subdomain, userInfo.branchIds);
@@ -141,29 +154,44 @@ const timeclockMutations = {
     let outDevice;
 
     for (const branch of branches) {
-      // convert into radians
-      const branchLong = (branch.coordinate.longitude * Math.PI) / 180;
-      const branchLat = (branch.coordinate.latitude * Math.PI) / 180;
+      const dist = await timeclockLocation(
+        longitude,
+        latitude,
+        branch.coordinate.longitude,
+        branch.coordinate.latitude
+      );
 
-      const longDiff = longRad - branchLong;
-      const latDiff = latRad - branchLat;
-
-      // distance in km
-      const dist =
-        EARTH_RADIUS *
-        2 *
-        Math.asin(
-          Math.sqrt(
-            Math.pow(Math.sin(latDiff / 2), 2) +
-              Math.cos(latRad) *
-                Math.cos(branchLat) *
-                Math.pow(Math.sin(longDiff / 2), 2)
-          )
-        );
       // if user's coordinate is within the radius
       if (dist * 1000 <= branch.radius) {
         insideCoordinate = true;
         outDevice = branch.title;
+      }
+    }
+
+    if (!insideCoordinate) {
+      const getSchedule = await models.Schedules.findOne({ userId: getUserId });
+
+      if (getSchedule) {
+        getScheduleConfig = await models.ScheduleConfigs.findOne({
+          _id: getSchedule.scheduleConfigId,
+        });
+      }
+
+      if (getScheduleConfig) {
+        for (const location of getScheduleConfig.locations) {
+          const dist = await timeclockLocation(
+            longitude,
+            latitude,
+            location.longitude,
+            location.latitude
+          );
+
+          // if user's coordinate is within the radius
+          if (dist * 1000 <= 1000) {
+            insideCoordinate = true;
+            outDevice = location.name;
+          }
+        }
       }
     }
 
@@ -181,7 +209,7 @@ const timeclockMutations = {
         outDeviceType: deviceType,
         outDevice,
         userId: getUserId,
-        ...doc
+        ...doc,
       });
     } else {
       throw new Error('User not in the coordinate');
@@ -193,27 +221,31 @@ const timeclockMutations = {
   /**
    * Removes a single timeclock
    */
-  timeclockRemove(_root, { _id }, { models }: IContext) {
+  async timeclockRemove(_root, { _id }, { models }: IContext) {
     return models.Timeclocks.removeTimeClock(_id);
   },
 
-  timeclockEdit(_root, { _id, ...doc }: ITimeClockEdit, { models }: IContext) {
+  async timeclockEdit(
+    _root,
+    { _id, ...doc }: ITimeClockEdit,
+    { models }: IContext
+  ) {
     return models.Timeclocks.updateTimeClock(_id, doc);
   },
 
-  timeclockCreate(_root, doc, { models }: IContext) {
+  async timeclockCreate(_root, doc, { models }: IContext) {
     return models.Timeclocks.createTimeClock(doc);
   },
 
-  absenceTypeAdd(_root, doc, { models }: IContext) {
+  async absenceTypeAdd(_root, doc, { models }: IContext) {
     return models.AbsenceTypes.createAbsenceType(doc);
   },
 
-  absenceTypeRemove(_root, { _id }, { models }: IContext) {
+  async absenceTypeRemove(_root, { _id }, { models }: IContext) {
     return models.AbsenceTypes.removeAbsenceType(_id);
   },
 
-  absenceTypeEdit(
+  async absenceTypeEdit(
     _root,
     { _id, ...doc }: IAbsenceTypeEdit,
     { models }: IContext
@@ -232,7 +264,7 @@ const timeclockMutations = {
       reason: `${checkType} request`,
       userId: getUserId,
       startTime: checkTime,
-      checkInOutRequest: true
+      checkInOutRequest: true,
     });
   },
 
@@ -247,127 +279,231 @@ const timeclockMutations = {
   async solveAbsenceRequest(
     _root,
     { _id, status, ...doc }: IAbsenceEdit,
-    { models }: IContext
+    { models, user, subdomain }: IContext
   ) {
+    const dateFormat = 'MM/DD/YYYY';
+    let hasSpervisor = false;
+    let hasUserId = false;
     const shiftRequest = await models.Absences.getAbsence(_id);
-    let updated = models.Absences.updateAbsence(_id, {
-      status,
-      solved: true,
-      ...doc
-    });
+    let updated = {};
 
     const findUserSchedules = await models.Schedules.find({
-      userId: shiftRequest.userId
+      userId: shiftRequest.userId,
     });
 
     const findUserScheduleShifts = await models.Shifts.find({
       scheduleId: {
-        $in: findUserSchedules.map(schedule => schedule._id)
+        $in: findUserSchedules.map((schedule) => schedule._id),
       },
-      shiftStart: {
-        $gte: fixDate(shiftRequest.startTime)
-      }
     });
 
-    if (!shiftRequest.checkInOutRequest) {
-      const findAbsenceType = await models.AbsenceTypes.getAbsenceType(
-        shiftRequest.absenceTypeId || ''
-      );
+    if (shiftRequest.checkInOutRequest) {
+      // if request is check in/out request
+      return models.Absences.updateAbsence(_id, {
+        status: `${shiftRequest.reason} / ${status}`,
+        solved: true,
+        ...doc,
+      });
+    }
 
-      // if request is shift request
-      if (findAbsenceType && findAbsenceType.shiftRequest) {
-        updated = models.Absences.updateAbsence(_id, {
-          status: `Shift request / ${status}`,
-          ...doc
+    const findAbsenceType = await models.AbsenceTypes.getAbsenceType(
+      shiftRequest.absenceTypeId || ''
+    );
+
+    if (findAbsenceType && findAbsenceType.requestToType === 'supervisor') {
+      if (findAbsenceType && findAbsenceType.branchIds) {
+        for (const branchId of findAbsenceType.branchIds) {
+          const branch = await sendCoreMessage({
+            subdomain,
+            action: 'branches.findOne',
+            data: { _id: branchId },
+            isRPC: true,
+            defaultValue: [],
+          });
+
+          if (branch && branch?.supervisorId === user._id) {
+            hasSpervisor = true;
+          }
+        }
+      }
+
+      if (!hasSpervisor) {
+        throw new Error('Only branch superviser can edit');
+      }
+    }
+
+    if (findAbsenceType && findAbsenceType.requestToType === 'individuals') {
+      if (findAbsenceType && findAbsenceType.absenceUserIds) {
+        for (const userId of findAbsenceType.absenceUserIds) {
+          if (userId === user._id) {
+            hasUserId = true;
+          }
+        }
+      }
+
+      if (!hasUserId) {
+        throw new Error('Only selected user can edit');
+      }
+    }
+
+    // if request is shift request
+    if (findAbsenceType && findAbsenceType.shiftRequest) {
+      updated = models.Absences.updateAbsence(_id, {
+        status: `Shift request / ${status}`,
+        solved: true,
+        ...doc,
+      });
+
+      // if shift request is approved
+      if (status === 'Approved') {
+        const schedule = await models.Schedules.createSchedule({
+          userId: shiftRequest.userId,
+          solved: true,
+          status: 'Approved',
+          createdByRequest: true,
         });
 
-        // if shift request is approved
-        if (status === 'Approved') {
-          if (findAbsenceType.requestTimeType === 'by day') {
-            const requestDates = shiftRequest.requestDates || [];
+        if (
+          shiftRequest.absenceTimeType === 'by day' ||
+          findAbsenceType.requestTimeType === 'by day'
+        ) {
+          const requestDates = shiftRequest.requestDates || [];
 
-            const schedule = await models.Schedules.createSchedule({
+          const scheduleShiftsWriteOps: any[] = [];
+          const scheduleShiftUpdateOps: any[] = [];
+          const timeclockBulkWriteOps: any[] = [];
+
+          for (const requestDate of requestDates) {
+            const requestStartTime = new Date(requestDate + ' 09:00:00');
+            const requestEndTime = dayjs(requestStartTime)
+              .add(findAbsenceType.requestHoursPerDay, 'hour')
+              .toDate();
+
+            timeclockBulkWriteOps.push({
               userId: shiftRequest.userId,
-              solved: true,
-              status: 'Approved',
-              createdByRequest: true
+              shiftStart: requestStartTime,
+              shiftEnd: requestEndTime,
+              shiftActive: false,
+              deviceType: 'Shift request',
             });
 
-            const scheduleShiftsWriteOps: any[] = [];
-            const scheduleShiftUpdateOps: any[] = [];
-            const timeclockBulkWriteOps: any[] = [];
-
-            for (const requestDate of requestDates) {
-              const requestStartTime = new Date(requestDate + ' 09:00:00');
-              const requestEndTime = dayjs(requestStartTime)
-                .add(findAbsenceType.requestHoursPerDay, 'hour')
-                .toDate();
-
-              timeclockBulkWriteOps.push({
-                userId: shiftRequest.userId,
-                shiftStart: requestStartTime,
-                shiftEnd: requestEndTime,
-                shiftActive: false,
-                deviceType: 'Shift request'
-              });
-
-              const findOverrideShift = findUserScheduleShifts.find(
-                shift =>
-                  dayjs(new Date(shift.shiftStart || '')).format(
-                    'MM/DD/YYYY'
-                  ) === requestDate
-              );
-              if (findOverrideShift) {
-                scheduleShiftUpdateOps.push({
-                  updateOne: {
-                    filter: {
-                      _id: findOverrideShift._id
+            const findOverrideShift = findUserScheduleShifts.find(
+              (shift) =>
+                dayjs(new Date(shift.shiftStart || '')).format(dateFormat) ===
+                requestDate
+            );
+            if (findOverrideShift) {
+              scheduleShiftUpdateOps.push({
+                updateOne: {
+                  filter: {
+                    _id: findOverrideShift._id,
+                  },
+                  update: {
+                    $set: {
+                      scheduleId: findOverrideShift.scheduleId,
+                      shiftStart: requestStartTime,
+                      shiftEnd: requestEndTime,
+                      solved: true,
+                      status: 'Approved',
                     },
-                    update: {
-                      $set: {
-                        scheduleId: schedule._id,
-                        shiftStart: requestStartTime,
-                        shiftEnd: requestEndTime,
-                        solved: true,
-                        status: 'Approved'
-                      }
-                    }
-                  }
-                });
-
-                continue;
-              }
-
-              scheduleShiftsWriteOps.push({
-                insertOne: {
-                  document: {
-                    scheduleId: schedule._id,
-                    shiftStart: requestStartTime,
-                    shiftEnd: requestEndTime,
-                    solved: true,
-                    status: 'Approved'
-                  }
-                }
+                  },
+                },
               });
+
+              continue;
             }
 
-            if (scheduleShiftsWriteOps.length) {
-              await models.Shifts.bulkWrite(scheduleShiftsWriteOps);
-            }
-            if (scheduleShiftUpdateOps.length) {
-              await models.Shifts.bulkWrite(scheduleShiftUpdateOps);
-            }
-            await models.Timeclocks.insertMany(timeclockBulkWriteOps);
-            return;
+            scheduleShiftsWriteOps.push({
+              insertOne: {
+                document: {
+                  scheduleId: schedule._id,
+                  shiftStart: requestStartTime,
+                  shiftEnd: requestEndTime,
+                  solved: true,
+                  status: 'Approved',
+                },
+              },
+            });
           }
 
-          //  shift request - by time
-          if (shiftRequest.userId) {
+          if (scheduleShiftsWriteOps.length) {
+            await models.Shifts.bulkWrite(scheduleShiftsWriteOps);
+          }
+          if (scheduleShiftUpdateOps.length) {
+            await models.Shifts.bulkWrite(scheduleShiftUpdateOps);
+          }
+          await models.Timeclocks.insertMany(timeclockBulkWriteOps);
+          return;
+        }
+
+        let overrideScheduleShiftFound = false;
+
+        //  shift request - by time
+        if (shiftRequest.userId && shiftRequest.endTime) {
+          const scheduleShiftUpdateOps: any[] = [];
+
+          const requestStartTime = shiftRequest.startTime;
+          const requestEndTime = shiftRequest.endTime;
+
+          for (const userScheduleShift of findUserScheduleShifts) {
+            const shiftStart = new Date(
+              userScheduleShift.shiftStart || ''
+            ).getTime();
+            const shiftEnd = new Date(
+              userScheduleShift.shiftEnd || ''
+            ).getTime();
+
+            // overriding cases
+            if (
+              (shiftStart >= requestStartTime.getTime() &&
+                shiftEnd <= requestEndTime.getTime()) ||
+              (shiftEnd >= requestStartTime.getTime() &&
+                shiftEnd <= requestEndTime.getTime()) ||
+              (shiftStart >= requestStartTime.getTime() &&
+                shiftEnd <= requestEndTime.getTime()) ||
+              (shiftStart <= requestEndTime.getTime() &&
+                shiftEnd >= requestEndTime.getTime())
+            ) {
+              scheduleShiftUpdateOps.push({
+                updateOne: {
+                  filter: {
+                    _id: userScheduleShift._id,
+                  },
+                  update: {
+                    $set: {
+                      scheduleId: userScheduleShift.scheduleId,
+                      shiftStart: requestStartTime,
+                      shiftEnd: requestEndTime,
+                      solved: true,
+                      status: 'Approved',
+                    },
+                  },
+                },
+              });
+
+              overrideScheduleShiftFound = true;
+            }
+          }
+
+          // create timeclock - since request is shift request
+          await models.Timeclocks.createTimeClock({
+            userId: shiftRequest.userId,
+            shiftStart: shiftRequest.startTime,
+            shiftEnd: shiftRequest.endTime,
+            shiftActive: false,
+            deviceType: 'Shift request',
+          });
+
+          if (scheduleShiftUpdateOps.length) {
+            await models.Shifts.bulkWrite(scheduleShiftUpdateOps);
+          }
+
+          if (!overrideScheduleShiftFound) {
             const newSchedule = await models.Schedules.createSchedule({
               userId: shiftRequest.userId,
               solved: true,
               status: 'Approved',
-              createdByRequest: true
+              createdByRequest: true,
             });
 
             await models.Shifts.createShift({
@@ -375,15 +511,7 @@ const timeclockMutations = {
               shiftStart: shiftRequest.startTime,
               shiftEnd: shiftRequest.endTime,
               solved: true,
-              status: 'Approved'
-            });
-
-            await models.Timeclocks.createTimeClock({
-              userId: shiftRequest.userId,
-              shiftStart: shiftRequest.startTime,
-              shiftEnd: shiftRequest.endTime,
-              shiftActive: false,
-              deviceType: 'Shift request'
+              status: 'Approved',
             });
           }
         }
@@ -392,12 +520,17 @@ const timeclockMutations = {
       return updated;
     }
 
-    // if request is check in/out request
-    return models.Absences.updateAbsence(_id, {
-      status: `${shiftRequest.reason} / ${status}`,
-      solved: true,
-      ...doc
-    });
+    // send mobile notification
+    sendMobileNotification(
+      [shiftRequest.userId || ''],
+      'requestSolved',
+      shiftRequest,
+      'request',
+      {
+        reason: shiftRequest.reason,
+        approved: status === 'Approved',
+      }
+    );
   },
 
   async solveScheduleRequest(
@@ -408,7 +541,7 @@ const timeclockMutations = {
     const updated = models.Schedules.updateSchedule(_id, {
       status,
       solved: true,
-      ...doc
+      ...doc,
     });
 
     await models.Shifts.updateMany(
@@ -428,7 +561,7 @@ const timeclockMutations = {
     const updated = await models.Shifts.updateShift(_id, {
       status,
       solved: true,
-      ...doc
+      ...doc,
     });
 
     // check if all shifts of a schedule solved
@@ -461,7 +594,7 @@ const timeclockMutations = {
         shiftStart: shift.shiftStart,
         shiftEnd: shift.shiftEnd,
         scheduleConfigId: shift.scheduleConfigId,
-        lunchBreakInMins: shift.lunchBreakInMins
+        lunchBreakInMins: shift.lunchBreakInMins,
       });
     }
 
@@ -485,14 +618,14 @@ const timeclockMutations = {
 
     const totalSchedules = await models.Schedules.find({
       userId: { $in: scheduledUserIds },
-      ...filterApprovedSchedules
+      ...filterApprovedSchedules,
     });
 
     if (!totalSchedules.length) {
       return [];
     }
 
-    const totalScheduleIds = totalSchedules.map(schedule => schedule._id);
+    const totalScheduleIds = totalSchedules.map((schedule) => schedule._id);
 
     const findManyOps: any[] = [];
 
@@ -500,20 +633,20 @@ const timeclockMutations = {
       const shiftDuplicateCases = [
         {
           shiftStart: { $gte: shift.shiftStart },
-          shiftEnd: { $lte: shift.shiftEnd }
+          shiftEnd: { $lte: shift.shiftEnd },
         },
         {
-          shiftEnd: { $gte: shift.shiftStart, $lte: shift.shiftEnd }
+          shiftEnd: { $gte: shift.shiftStart, $lte: shift.shiftEnd },
         },
         { shiftStart: { $gte: shift.shiftStart, $lte: shift.shiftEnd } },
         {
           shiftStart: {
-            $lte: shift.shiftEnd
+            $lte: shift.shiftEnd,
           },
           shiftEnd: {
-            $gte: shift.shiftStart
-          }
-        }
+            $gte: shift.shiftStart,
+          },
+        },
       ];
 
       findManyOps.push(...shiftDuplicateCases);
@@ -523,44 +656,54 @@ const timeclockMutations = {
       $and: [
         { scheduleId: { $in: totalScheduleIds } },
         {
-          $or: findManyOps
-        }
-      ]
+          $or: findManyOps,
+        },
+      ],
     });
 
-    const duplicateScheduleIds = duplicateShifts.map(shift => shift.scheduleId);
-    const duplicateSchedules = totalSchedules.filter(schedule =>
+    const duplicateScheduleIds = duplicateShifts.map(
+      (shift) => shift.scheduleId
+    );
+    const duplicateSchedules = totalSchedules.filter((schedule) =>
       duplicateScheduleIds.includes(schedule._id)
     );
 
     for (const schedule of duplicateSchedules) {
-      schedule.shiftIds = duplicateShifts.map(shift => shift._id);
+      schedule.shiftIds = duplicateShifts.map((shift) => shift._id);
     }
 
     return duplicateSchedules;
   },
   async submitSchedule(
     _root,
-    { branchIds, departmentIds, userIds, shifts, totalBreakInMins },
+    {
+      branchIds,
+      departmentIds,
+      userIds,
+      shifts,
+      totalBreakInMins,
+      scheduleConfigId,
+    },
     { subdomain, models }: IContext
   ) {
     return createScheduleShiftsByUserIds(
       await returnUnionOfUserIds(branchIds, departmentIds, userIds, subdomain),
       shifts,
       models,
-      totalBreakInMins
+      totalBreakInMins,
+      scheduleConfigId
     );
   },
 
-  scheduleRemove(_root, { _id }, { models }: IContext) {
-    models.Schedules.removeSchedule(_id);
-    models.Shifts.remove({ scheduleId: _id });
+  async scheduleRemove(_root, { _id }, { models }: IContext) {
+    await models.Schedules.removeSchedule(_id);
+    await models.Shifts.deleteMany({ scheduleId: _id });
     return;
   },
   async scheduleShiftRemove(_root, { _id }, { models }: IContext) {
     const getShift = await models.Shifts.getShift(_id);
-    const getShiftsCount = await models.Shifts.count({
-      scheduleId: getShift.scheduleId
+    const getShiftsCount = await models.Shifts.countDocuments({
+      scheduleId: getShift.scheduleId,
     });
     // if it's the only one shift in schedule, remove schedule
     if (getShiftsCount === 1 && getShift.scheduleId) {
@@ -569,30 +712,89 @@ const timeclockMutations = {
 
     return models.Shifts.removeShift(_id);
   },
-  payDateAdd(_root, { dateNums }, { models }: IContext) {
+
+  async editSchedule(_root, { _id, shifts }, { models }: IContext) {
+    const scheduleShiftUpdateOps: any[] = [];
+    const scheduleShiftIds: string[] = [];
+    const prevScheduleShiftIds: string[] = (
+      await models.Shifts.find({
+        scheduleId: _id,
+      })
+    ).map((s) => s._id);
+
+    for (const shift of shifts) {
+      if (!shift._id) {
+        scheduleShiftUpdateOps.push({
+          insertOne: {
+            document: {
+              scheduleId: _id,
+              ...shift,
+            },
+          },
+        });
+        continue;
+      }
+
+      scheduleShiftIds.push(shift._id);
+
+      scheduleShiftUpdateOps.push({
+        updateOne: {
+          filter: {
+            _id: shift._id,
+          },
+          update: {
+            $set: {
+              scheduleId: _id,
+              scheduleConfigId: shift.scheduleConfigId,
+              shiftStart: shift.shiftStart,
+              shiftEnd: shift.shiftEnd,
+            },
+          },
+        },
+      });
+    }
+
+    // compare prev shift and incoming shift ids, delete if any is missing
+    const set = new Set(scheduleShiftIds);
+
+    // Use the spread operator to convert the Sets back to arrays
+    const removeShiftIds = prevScheduleShiftIds.filter(
+      (item) => !set.has(item)
+    );
+
+    if (removeShiftIds.length) {
+      await models.Shifts.deleteMany({ _id: { $in: removeShiftIds } });
+    }
+    if (scheduleShiftUpdateOps.length) {
+      await models.Shifts.bulkWrite(scheduleShiftUpdateOps);
+    }
+
+    return;
+  },
+  async payDateAdd(_root, { dateNums }, { models }: IContext) {
     return models.PayDates.createPayDate({ payDates: dateNums });
   },
 
-  payDateEdit(_root, { _id, dateNums }, { models }: IContext) {
+  async payDateEdit(_root, { _id, dateNums }, { models }: IContext) {
     return models.PayDates.updatePayDate(_id, { payDates: dateNums });
   },
 
-  payDateRemove(_root, { _id }, { models }: IContext) {
+  async payDateRemove(_root, { _id }, { models }: IContext) {
     return models.PayDates.removePayDate(_id);
   },
 
-  holidayAdd(_root, { name, startDate, endDate }, { models }: IContext) {
+  async holidayAdd(_root, { name, startDate, endDate }, { models }: IContext) {
     return models.Absences.createAbsence({
       holidayName: name,
       startTime: startDate,
       endTime: endDate,
       status: 'Holiday',
       reason: 'Holiday',
-      solved: true
+      solved: true,
     });
   },
 
-  holidayEdit(
+  async holidayEdit(
     _root,
     { _id, name, startDate, endDate, doc },
     { models }: IContext
@@ -602,11 +804,11 @@ const timeclockMutations = {
       startTime: startDate,
       endTime: endDate,
       status: 'Holiday',
-      ...doc
+      ...doc,
     });
   },
 
-  holidayRemove(_root, { _id }, { models }: IContext) {
+  async holidayRemove(_root, { _id }, { models }: IContext) {
     return models.Absences.removeAbsence(_id);
   },
 
@@ -617,7 +819,11 @@ const timeclockMutations = {
       lunchBreakInMins,
       scheduleConfig,
       configShiftStart,
-      configShiftEnd
+      configShiftEnd,
+      overtimeExists,
+      startFlexible,
+      endFlexible,
+      locations,
     },
     { models }: IContext
   ) {
@@ -626,19 +832,23 @@ const timeclockMutations = {
         scheduleName,
         lunchBreakInMins,
         shiftStart: configShiftStart,
-        shiftEnd: configShiftEnd
+        shiftEnd: configShiftEnd,
+        overtimeExists,
+        startFlexible,
+        endFlexible,
+        locations,
       }
     );
 
     const timeFormat = 'HH:mm';
 
-    scheduleConfig.forEach(async scheduleShift => {
+    scheduleConfig.forEach(async (scheduleShift) => {
       await models.Shifts.createShift({
         scheduleConfigId: newScheduleConfig._id,
         configShiftStart: dayjs(scheduleShift.shiftStart).format(timeFormat),
         configShiftEnd: dayjs(scheduleShift.shiftEnd).format(timeFormat),
         configName: scheduleShift.configName,
-        overnightShift: scheduleShift.overnightShift
+        overnightShift: scheduleShift.overnightShift,
       });
     });
 
@@ -649,7 +859,7 @@ const timeclockMutations = {
     const scheduleConfig = await models.ScheduleConfigs.getScheduleConfig(_id);
 
     await models.ScheduleConfigs.deleteMany({
-      scheduleConfigId: scheduleConfig._id
+      scheduleConfigId: scheduleConfig._id,
     });
 
     return models.ScheduleConfigs.removeScheduleConfig(_id);
@@ -664,7 +874,11 @@ const timeclockMutations = {
       scheduleConfig,
       configShiftStart,
       configShiftEnd,
-      doc
+      locations,
+      overtimeExists,
+      startFlexible,
+      endFlexible,
+      doc,
     },
     { models }: IContext
   ) {
@@ -675,63 +889,116 @@ const timeclockMutations = {
         lunchBreakInMins,
         shiftEnd: configShiftEnd,
         shiftStart: configShiftStart,
-        ...doc
+        overtimeExists,
+        startFlexible,
+        endFlexible,
+        locations,
+        ...doc,
       }
     );
 
     const timeFormat = 'HH:mm';
 
-    scheduleConfig.forEach(async scheduleShift => {
+    scheduleConfig.forEach(async (scheduleShift) => {
       const selector = {
         $and: [
           { scheduleConfigId: _id },
-          { configName: scheduleShift.configName }
-        ]
+          { configName: scheduleShift.configName },
+        ],
       };
 
       const updated = await models.Shifts.updateOne(selector, {
         configShiftStart: dayjs(scheduleShift.shiftStart).format(timeFormat),
         configShiftEnd: dayjs(scheduleShift.shiftEnd).format(timeFormat),
         overnightShift: scheduleShift.overnightShift,
-        ...scheduleShift
+        ...scheduleShift,
       });
     });
 
     return newScheduleConfig;
   },
 
-  scheduleConfigOrderEdit(
-    _root,
-    { userId, ...params },
-    { models, user }: IContext
-  ) {
-    const getUserId = userId || user._id;
-
-    const query = { userId: getUserId };
-    const update = {
-      $set: {
-        userId: getUserId,
-        ...params
-      }
-    };
-    const options = { upsert: true };
-
-    return models.ScheduleConfigOrder.updateOne(query, update, options);
+  async deviceConfigAdd(_root, doc: IDeviceConfig, { models }: IContext) {
+    return await models.DeviceConfigs.createDeviceConfig(doc);
   },
 
-  checkReport(_root, doc, { models, user }: IContext) {
+  async deviceConfigEdit(
+    _root,
+    { _id, ...doc }: IDeviceConfigDocument,
+    { models }: IContext
+  ) {
+    await models.DeviceConfigs.updateDeviceConfig(_id, doc);
+  },
+
+  async deviceConfigRemove(
+    _root,
+    { _id }: IDeviceConfigDocument,
+    { models }: IContext
+  ) {
+    return models.DeviceConfigs.removeDeviceConfig(_id);
+  },
+
+  async checkReport(_root, doc, { models, user }: IContext) {
     const getUserId = doc.userId || user._id;
     return models.ReportChecks.createReportCheck({
       userId: getUserId,
-      ...doc
+      ...doc,
     });
   },
 
-  checkSchedule(_root, { scheduleId }, { models }: IContext) {
+  async checkSchedule(_root, { scheduleId }, { models }: IContext) {
     return models.Schedules.updateSchedule(scheduleId, {
-      scheduleChecked: true
+      scheduleChecked: true,
     });
-  }
+  },
+
+  async createTimeClockFromLog(
+    _root,
+    { userId, timelog, inDevice },
+    { models }: IContext
+  ) {
+    return models.Timeclocks.createTimeClock({
+      shiftStart: timelog,
+      userId,
+      inDeviceType: 'log',
+      inDevice,
+      shiftActive: true,
+    });
+  },
+
+  async extractAllDataFromMsSQL(_root, params, { subdomain }: IContext) {
+    try {
+      const checkIfExtractingAlready = await redis.get(
+        'extractAllDataFromMsSQL'
+      );
+
+      // await redis.del('extractAllDataFromMsSQL');
+
+      if (checkIfExtractingAlready) {
+        return {
+          message:
+            'Someone else is extracting\nPlease wait for few mins and try again',
+        };
+      }
+
+      await redis.set('extractAllDataFromMsSQL', '{}');
+      const waitForQuery = await connectAndQueryFromMsSql(subdomain, params);
+
+      // wait for 5s to delete queue
+      setTimeout(async () => {
+        await redis.del('extractAllDataFromMsSQL');
+      }, 5000);
+
+      return waitForQuery;
+    } catch (error) {
+      await redis.del('extractAllDataFromMsSQL');
+      return error;
+    }
+  },
+
+  async extractTimeLogsFromMsSQL(_root, params, { subdomain }: IContext) {
+    return connectAndQueryTimeLogsFromMsSql(subdomain, params);
+  },
 };
 
 moduleRequireLogin(timeclockMutations);

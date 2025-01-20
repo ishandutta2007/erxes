@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { ErxesProxyTarget } from 'src/proxy/targets';
+import { ErxesProxyTarget } from '../proxy/targets';
 import { supergraphConfigPath, supergraphPath } from './paths';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
@@ -22,7 +22,7 @@ type SupergraphConfig = {
   };
 };
 
-const createSupergraphConfig = (proxyTargets: ErxesProxyTarget[]) => {
+const writeSupergraphConfig = (proxyTargets: ErxesProxyTarget[]) => {
   const superGraphConfigNext = supergraphConfigPath + '.next';
   const config: SupergraphConfig = {
     federation_version: '=2.3.1',
@@ -55,7 +55,7 @@ const createSupergraphConfig = (proxyTargets: ErxesProxyTarget[]) => {
       !fs.existsSync(supergraphConfigPath) ||
       !isSameFile(supergraphConfigPath, superGraphConfigNext)
     ) {
-      execSync(`cp ${superGraphConfigNext}  ${supergraphConfigPath}`);
+      fs.cpSync(superGraphConfigNext, supergraphConfigPath, { force: true });
     }
   }
 };
@@ -69,14 +69,14 @@ const supergraphComposeOnce = async () => {
     const superGraphqlNext = supergraphPath + '.next';
 
     await execSync(
-      `yarn rover supergraph compose --config ${supergraphConfigPath} --output ${superGraphqlNext} --elv2-license=accept`
+      `yarn rover supergraph compose --config ${supergraphConfigPath} --output ${superGraphqlNext} --elv2-license=accept  --client-timeout=80000`
     );
 
     if (
       !fs.existsSync(supergraphPath) ||
       !isSameFile(supergraphPath, superGraphqlNext)
     ) {
-      execSync(`cp ${superGraphqlNext} ${supergraphPath}`);
+      fs.cpSync(superGraphqlNext, supergraphPath, { force: true });
       console.log(`NEW Supergraph Schema was printed to ${supergraphPath}`);
     }
   }
@@ -85,7 +85,7 @@ const supergraphComposeOnce = async () => {
 export default async function supergraphCompose(
   proxyTargets: ErxesProxyTarget[]
 ) {
-  await createSupergraphConfig(proxyTargets);
+  await writeSupergraphConfig(proxyTargets);
   await supergraphComposeOnce();
   if (NODE_ENV === 'development') {
     setInterval(async () => {

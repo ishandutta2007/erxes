@@ -6,7 +6,7 @@ import { colors } from '@erxes/ui/src/styles';
 import { BoxRoot, FullContent } from '@erxes/ui/src/styles/main';
 import { __ } from '@erxes/ui/src/utils';
 import { METHODS } from '@erxes/ui-engage/src/constants';
-// import { isEnabled } from "@erxes/ui/src/utils/core";
+import { isEnabled } from '@erxes/ui/src/utils/core';
 
 const Box = styled(BoxRoot)`
   width: 320px;
@@ -38,6 +38,7 @@ const Box = styled(BoxRoot)`
 type Props = {
   onChange: (name: 'method', value: string) => void;
   method: string;
+  kind?: string;
 };
 
 class ChannelStep extends React.Component<Props> {
@@ -45,7 +46,7 @@ class ChannelStep extends React.Component<Props> {
     const onClick = () => this.props.onChange('method', name);
 
     return (
-      <Box selected={this.props.method === name} onClick={onClick}>
+      <Box $selected={this.props.method === name} onClick={onClick}>
         <Icon icon={icon} />
         <span>{__(name)}</span>
         <p>{__(desc)}</p>
@@ -55,7 +56,7 @@ class ChannelStep extends React.Component<Props> {
 
   render() {
     return (
-      <FullContent center={true}>
+      <FullContent $center={true}>
         {this.renderBox(
           METHODS.EMAIL,
           'envelope-edit',
@@ -71,6 +72,12 @@ class ChannelStep extends React.Component<Props> {
           'comment-alt-message',
           `Send bulk SMS online with simple and direct texts`
         )} */}
+        {isEnabled('clientportal') &&
+          this.renderBox(
+            METHODS.NOTIFICATION,
+            'message',
+            'Send automated notifications to your customers'
+          )}
       </FullContent>
     );
   }

@@ -37,6 +37,7 @@ const listParamsDef = `
   $reportType: String
   $scheduleStatus: String
   $isCurrentUserAdmin: Boolean
+  $searchValue: String
 `;
 
 const listParamsValue = `
@@ -50,6 +51,7 @@ const listParamsValue = `
   reportType: $reportType
   scheduleStatus: $scheduleStatus
   isCurrentUserAdmin: $isCurrentUserAdmin
+  searchValue: $searchValue
 `;
 
 const timelogsMain = `
@@ -117,6 +119,7 @@ const schedulesMain = `
             status
             scheduleConfigId
             lunchBreakInMins
+            scheduleId
           }
           scheduleConfigId
           solved
@@ -180,6 +183,7 @@ const requestsMain = `
           absenceTimeType
           requestDates
           totalHoursOfAbsence
+          note
         }
         totalCount
   }
@@ -280,6 +284,9 @@ const absenceTypes = `
       requestType
       requestTimeType
       requestHoursPerDay
+      requestToType
+      absenceUserIds
+      branchIds
     }
   }
 `;
@@ -311,6 +318,10 @@ const scheduleConfigs = `
       lunchBreakInMins
       shiftStart
       shiftEnd
+      locations
+      overtimeExists
+      startFlexible
+      endFlexible
       configDays{
         _id
         configName
@@ -321,6 +332,30 @@ const scheduleConfigs = `
     }
   }
 
+`;
+
+const deviceConfigs = `
+query deviceConfigs (${listParamsDef}){
+  deviceConfigs(${listParamsValue}) {
+    list {
+      _id 
+      deviceName
+      serialNo
+      extractRequired
+    }
+    totalCount
+  }
+}`;
+
+const timeLogsPerUser = `
+  query timeLogsPerUser($userId: String, $startDate: String, $endDate: String){
+    timeLogsPerUser(userId: $userId, startDate: $startDate, endDate: $endDate){
+      _id
+      timelog
+      deviceName
+      deviceSerialNo
+    }
+  }
 `;
 
 const timeclockBranches = `
@@ -341,17 +376,42 @@ query timeclockDepartments($searchValue: String){
   }
 }`;
 
-const scheduleConfigOrder = `
-query scheduleConfigOrder($userId: String){
-  scheduleConfigOrder(userId: $userId){
-    _id
-    userId
-    orderedList {
-      order
-      pinned
-      scheduleConfigId
-      label
+const timeclockReportByUsers = `
+query timeclockReportByUsers(${listParamsDef}){
+  timeclockReportByUsers(${listParamsValue}){
+   list {
+      user{
+        ${userFields}
+      }
+
+
+      schedules{
+          shifts{
+            shiftStart
+            shiftEnd
+          }
+      }
+      timeclocks{
+            _id
+            shiftStart
+            shiftEnd
+            shiftActive
+            user {
+              ${userFields}
+            }
+            employeeUserName
+            branchName
+            employeeId
+            deviceName
+            deviceType
+            inDevice
+            inDeviceType  
+            outDevice
+            outDeviceType
+          }
+      requests
     }
+    totalCount
   }
 }`;
 
@@ -363,6 +423,7 @@ export default {
   timeclocksPerUser,
 
   timelogsMain,
+  timeLogsPerUser,
 
   schedulesMain,
   requestsMain,
@@ -373,8 +434,9 @@ export default {
   holidays,
 
   scheduleConfigs,
-  scheduleConfigOrder,
+  deviceConfigs,
 
   timeclockBranches,
-  timeclockDepartments
+  timeclockDepartments,
+  timeclockReportByUsers,
 };

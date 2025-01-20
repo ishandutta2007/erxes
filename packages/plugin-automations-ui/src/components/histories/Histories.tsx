@@ -1,20 +1,25 @@
-import Table from '@erxes/ui/src/components/table';
-import withTableWrapper from '@erxes/ui/src/components/table/withTableWrapper';
-import { __ } from '@erxes/ui/src/utils/core';
-import React from 'react';
-import { IAutomationHistory, ITrigger } from '../../types';
-import Row from './Row';
+import { IAutomation, IAutomationHistory, ITrigger } from '../../types';
+
 import EmptyState from '@erxes/ui/src/components/EmptyState';
+import React from 'react';
+import Row from './Row';
+import Table from '@erxes/ui/src/components/table';
+import { __ } from '@erxes/ui/src/utils/core';
+import withTableWrapper from '@erxes/ui/src/components/table/withTableWrapper';
+import { Pagination } from '@erxes/ui/src';
 
 type Props = {
+  automation: IAutomation;
   histories: IAutomationHistory[];
   triggersConst: ITrigger[];
   actionsConst: any[];
+  totalCount: number;
 };
 
 class Histories extends React.Component<Props> {
   render() {
-    const { histories, triggersConst, actionsConst } = this.props;
+    const { histories, triggersConst, actionsConst, totalCount, automation } =
+      this.props;
 
     const triggersByType = {};
     triggersConst.forEach(t => {
@@ -37,7 +42,7 @@ class Histories extends React.Component<Props> {
 
     return (
       <withTableWrapper.Wrapper>
-        <Table whiteSpace="nowrap" bordered={true} hover={true}>
+        <Table $whiteSpace="nowrap" $bordered={true} $hover={true}>
           <thead>
             <tr>
               <th>{__('Title')}</th>
@@ -45,19 +50,23 @@ class Histories extends React.Component<Props> {
               <th>{__('Trigger')}</th>
               <th>{__('Status')}</th>
               <th>{__('Time')}</th>
+              <th>{__('Action')}</th>
             </tr>
           </thead>
           <tbody id="automationHistories">
             {histories.map(history => (
               <Row
                 key={history._id}
+                automation={automation}
                 history={history}
                 triggersByType={triggersByType}
                 actionsByType={actionsByType}
+                constants={{ actionsConst, triggersConst }}
               />
             ))}
           </tbody>
         </Table>
+        <Pagination count={totalCount} hidePerPageChooser perPage={13} />
       </withTableWrapper.Wrapper>
     );
   }

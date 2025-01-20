@@ -1,8 +1,9 @@
 import { colors, dimensions, typography } from '@erxes/ui/src/styles';
+
+import { LogoContainer } from '@erxes/ui-settings/src/styles';
 import { rgba } from '@erxes/ui/src/styles/ecolor';
 import styled from 'styled-components';
 import styledTS from 'styled-components-ts';
-import { LogoContainer } from '@erxes/ui-settings/src/styles';
 
 const coreSpace = `${dimensions.coreSpacing}px`;
 const unitSpace = `${dimensions.unitSpacing}px`;
@@ -17,7 +18,7 @@ const ErxesTopbar = styled.div`
   color: ${colors.colorWhite};
 `;
 
-const TopBarIcon = styledTS<{ isLeft: boolean }>(styled.div)`
+const TopBarIcon = styledTS<{ $isLeft: boolean }>(styled.div)`
   transition: background 0.3s ease-in-out;
   border-radius: ${unitSpace};
   cursor: pointer;
@@ -27,8 +28,8 @@ const TopBarIcon = styledTS<{ isLeft: boolean }>(styled.div)`
   text-align: center;
   position: absolute;
   top: 15px;
-  left: ${props => props.isLeft && '15px'};
-  right: ${props => (props.isLeft ? '0px' : '15px')};
+  left: ${props => props.$isLeft && '15px'};
+  right: ${props => (props.$isLeft ? '0px' : '15px')};
 
   &:hover {
     background-color: ${rgba(colors.colorBlack, 0.2)};
@@ -217,7 +218,7 @@ const WidgetPreviewStyled = styled.div`
   max-height: 660px;
   overflow: hidden;
   position: absolute;
-  right: 8px;
+  right: 80px;
   width: 380px;
   z-index: 1;
 `;
@@ -235,7 +236,7 @@ const Links = styled.div`
 
 const Launcher = styled(LogoContainer)`
   position: absolute;
-  right: ${unitSpace};
+  right: 80px;
   bottom: ${unitSpace};
 `;
 
@@ -276,9 +277,9 @@ const GreetingInfo = styled.div`
   }
 `;
 
-const ErxesContent = styledTS<{ isTabbed: boolean }>(styled.div)`
+const ErxesContent = styledTS<{ $isTabbed: boolean }>(styled.div)`
   height: 100%;
-  margin-top: ${props => (props.isTabbed ? '0px' : '-40px')};
+  margin-top: ${props => (props.$isTabbed ? '0px' : '-40px')};
   flex: 1;
   overflow: auto;
   z-index: 5;

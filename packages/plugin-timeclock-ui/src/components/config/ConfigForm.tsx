@@ -1,47 +1,61 @@
-import { __ } from '@erxes/ui/src/utils';
-import React, { useState } from 'react';
-import Select from 'react-select-plus';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
 import {
+  ConfigFormWrapper,
   CustomRangeContainer,
-  FlexRow,
+  FlexCenter,
   FlexColumn,
   FlexColumnMargined,
-  FlexCenter,
-  ConfigFormWrapper,
-  ToggleDisplay
+  FlexRow,
+  FlexRowJustifyStart,
+  ToggleDisplay,
+  Trigger,
 } from '../../styles';
-import DateControl from '@erxes/ui/src/components/form/DateControl';
-import Form from '@erxes/ui/src/components/form/Form';
-import FormControl from '@erxes/ui/src/components/form/Control';
 import {
   IAbsence,
   IAbsenceType,
   IDeviceConfig,
   IPayDates,
+  IScheduleConfig,
   IScheduleForm,
-  IScheduleConfig
 } from '../../types';
 import { IButtonMutateProps, IFormProps } from '@erxes/ui/src/types';
+import React, { useState } from 'react';
+
+import ControlLabel from '@erxes/ui/src/components/form/Label';
+import DateControl from '@erxes/ui/src/components/form/DateControl';
 import DateTimePicker from '../datepicker/DateTimePicker';
+import Form from '@erxes/ui/src/components/form/Form';
+import FormControl from '@erxes/ui/src/components/form/Control';
+import Tip from '@erxes/ui/src/components/Tip';
+import Button from '@erxes/ui/src/components/Button';
+import { __ } from '@erxes/ui/src/utils';
+import SelectTeamMembers from '@erxes/ui/src/team/containers/SelectTeamMembers';
+import SelectBranches from '@erxes/ui/src/team/containers/SelectBranches';
+import Select from 'react-select';
 import { compareStartAndEndTime } from '../../utils';
+
 import dayjs from 'dayjs';
 
 type Props = {
-  history?: any;
   configType: string;
   absenceType?: IAbsenceType;
   scheduleConfig?: IScheduleConfig;
+  deviceConfig?: IDeviceConfig;
   holiday?: IAbsence;
   payDate?: IPayDates;
   loading?: boolean;
   afterSave?: () => void;
   closeModal: () => void;
-  renderButton: (props: IButtonMutateProps) => void;
+  renderButton: (props: IButtonMutateProps) => JSX.Element;
+};
+
+const requestToTypes = {
+  default: 'Default /Whom have "Manage timeclock" permission/',
+  supervisor: 'Branch supervisor',
+  individuals: 'Set individuals',
 };
 
 function ConfigForm(props: Props) {
-  const { renderButton, scheduleConfig } = props;
+  const { renderButton, scheduleConfig, deviceConfig } = props;
   const { absenceType, holiday, payDate } = props;
 
   const [requestTime, setRequestTime] = useState(
@@ -52,6 +66,10 @@ function ConfigForm(props: Props) {
     absenceType?.requestType || 'shift request'
   );
 
+  const [requestToType, setRequestToType] = useState(
+    absenceType?.requestToType || 'default'
+  );
+
   const [hoursPerDay, setHoursPerDay] = useState(8);
 
   const [payPeriod, setPayPeriod] = useState('');
@@ -59,8 +77,37 @@ function ConfigForm(props: Props) {
   const [explanationRequired, setExplRequired] = useState(
     (absenceType && absenceType.explRequired) || false
   );
+
+  const [startFlexible, setStartFlexible] = useState(
+    (scheduleConfig && scheduleConfig.startFlexible) || false
+  );
+
+  const [endFlexible, setEndFlexible] = useState(
+    (scheduleConfig && scheduleConfig.endFlexible) || false
+  );
+
+  const [scheduleOvertimeExists, setScheduleOverTimeExists] = useState(
+    (scheduleConfig && scheduleConfig.overtimeExists) || false
+  );
+
   const [attachmentRequired, setAttachRequired] = useState(
     (absenceType && absenceType.attachRequired) || false
+  );
+
+  const [deviceExtractRequired, setDeviceExtractRequired] = useState(
+    (deviceConfig && deviceConfig.extractRequired) || false
+  );
+
+  const [locationsFormValues, setLocationsFormValues] = useState<any>(
+    scheduleConfig?.locations || []
+  );
+
+  const [absenceUserIds, setAbsenceUserIds] = useState(
+    (absenceType && absenceType.absenceUserIds) || []
+  );
+
+  const [branchIds, setBranchIds] = useState(
+    (absenceType && absenceType.branchIds) || []
   );
 
   const defaultStartTime = new Date(
@@ -85,23 +132,25 @@ function ConfigForm(props: Props) {
   const configDaysTime: IScheduleForm = {
     configTime: {
       shiftStart: shiftStartTime,
-      shiftEnd: shiftEndTime
+      shiftEnd: shiftEndTime,
     },
     validCheckIn: {
       shiftStart: defaultStartTime,
-      shiftEnd: defaultEndTime
+      shiftEnd: defaultEndTime,
     },
     validCheckout: {
       shiftStart: defaultStartTime,
-      shiftEnd: defaultEndTime
+      shiftEnd: defaultEndTime,
     },
     overtime: {
       shiftStart: defaultStartTime,
-      shiftEnd: defaultEndTime
-    }
+      shiftEnd: defaultEndTime,
+    },
   };
 
-  scheduleConfig?.configDays.forEach(configDay => {
+  const [isSubmitted, setSubmitted] = useState(false);
+
+  scheduleConfig?.configDays.forEach((configDay) => {
     configDaysTime[configDay.configName].shiftStart = new Date(
       new Date().toLocaleDateString() + ' ' + configDay.configShiftStart
     );
@@ -111,48 +160,186 @@ function ConfigForm(props: Props) {
   });
 
   const [configDays, setConfigDays] = useState<IScheduleForm>({
-    ...configDaysTime
+    ...configDaysTime,
   });
 
   const [holidayDates, setHolidayDates] = useState({
     startingDate: (holiday && holiday.startTime) || null,
-    endingDate: (holiday && holiday.endTime) || null
+    endingDate: (holiday && holiday.endTime) || null,
   });
   const [payDates, setpayDates] = useState({
     date1: new Date(),
-    date2: new Date()
+    date2: new Date(),
   });
+
+  const [isHovered, setIsHovered] = useState(false);
 
   const { afterSave, closeModal } = props;
 
-  const toggleRequestType = e => {
+  const onRequestToTypeChange = (e) => {
+    setRequestToType(e.value);
+  };
+
+  const toggleRequestType = (e) => {
     setRequestType(e.value);
   };
-  const toggleRequestTime = e => {
+  const toggleRequestTime = (e) => {
     setRequestTime(e.value);
   };
-  const togglePayPeriod = e => {
+  const togglePayPeriod = (e) => {
     setPayPeriod(e.target.value);
   };
-  const onAbsenceHoursPerDay = e => {
+  const onAbsenceHoursPerDay = (e) => {
     setHoursPerDay(parseInt(e.target.value, 10));
   };
-  const toggleExplRequired = e => {
+  const toggleExplRequired = (e) => {
     setExplRequired(e.target.checked);
   };
-  const toggleAttachRequired = e => {
+  const toggleAttachRequired = (e) => {
     setAttachRequired(e.target.checked);
+  };
+  const toggleDeviceExtractRequired = (e) => {
+    setDeviceExtractRequired(e.target.checked);
   };
 
   const onConfigDateChange = (dateNum: string, newDate: Date) => {
     payDates[dateNum] = newDate;
     setpayDates({ ...payDates });
   };
-  const onHolidayStartDateChange = newStartDate => {
+  const onHolidayStartDateChange = (newStartDate) => {
     setHolidayDates({ ...holidayDates, startingDate: newStartDate });
   };
-  const onHolidayEndDateChange = newEndDate => {
+  const onHolidayEndDateChange = (newEndDate) => {
     setHolidayDates({ ...holidayDates, endingDate: newEndDate });
+  };
+
+  const addLocationClick = () => {
+    const newLocation = {
+      name: '',
+      longitude: '',
+      latitude: '',
+    };
+    setLocationsFormValues((prevValues) => {
+      // Make sure prevValues is an array
+      if (!Array.isArray(prevValues)) {
+        console.error('prevValues is not an array', prevValues);
+        return [newLocation]; // Reset to an array with the new location
+      }
+      return [...prevValues, newLocation];
+    });
+  };
+
+  const onUserSelect = (users) => {
+    setAbsenceUserIds(users);
+  };
+
+  const onBranchSelect = (branches) => {
+    setBranchIds(branches);
+  };
+
+  const onMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const onMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const onLocationsFormValueChange = (locationNum, e, key) => {
+    setLocationsFormValues((prevValues) => {
+      const newValues = [...prevValues];
+      if (newValues[locationNum]) {
+        newValues[locationNum] = {
+          ...newValues[locationNum],
+          [key]: e.target.value,
+        };
+      }
+      return newValues;
+    });
+  };
+
+  const renderLocationsForm = () => {
+    const remove = (index) => {
+      setLocationsFormValues((prevValues) => {
+        if (!Array.isArray(prevValues)) {
+          console.error('prevValues is not an array', prevValues);
+          return []; // Reset to an empty array
+        }
+        return prevValues.filter((_, i) => i !== index);
+      });
+    };
+
+    return (
+      <>
+        {locationsFormValues.map((location, index) => {
+          return (
+            <FlexRow style={{ margin: '25px' }}>
+              <Tip text={__('Remove')} placement="top">
+                <Button
+                  btnStyle="link"
+                  onClick={() => remove(index)}
+                  icon="times-circle"
+                />
+              </Tip>{' '}
+              <ControlLabel required={true}>Location Name </ControlLabel>
+              <div style={{ marginLeft: '1rem' }}>
+                <FormControl
+                  type="text"
+                  name={`location${index}Name`}
+                  value={location.name}
+                  required={true}
+                  onChange={(e) => onLocationsFormValueChange(index, e, 'name')}
+                />
+              </div>
+              <FlexColumn $marginNum={25}>
+                <FlexColumn $marginNum={10}>
+                  <ControlLabel required={true}>Longitude:</ControlLabel>
+                  <div style={{ marginLeft: '1rem' }}>
+                    <FormControl
+                      type="text"
+                      name={`location${index}Long`}
+                      value={location.longitude}
+                      required={true}
+                      onChange={(e) =>
+                        onLocationsFormValueChange(index, e, 'longitude')
+                      }
+                    />
+                  </div>
+                </FlexColumn>
+                <FlexColumn $marginNum={10}>
+                  <ControlLabel required={true}>Latitude:</ControlLabel>
+                  <div style={{ marginLeft: '1rem' }}>
+                    <FormControl
+                      type="text"
+                      name={`location${index}Lat`}
+                      value={location.latitude}
+                      required={true}
+                      onChange={(e) =>
+                        onLocationsFormValueChange(index, e, 'latitude')
+                      }
+                    />
+                  </div>
+                </FlexColumn>
+              </FlexColumn>
+            </FlexRow>
+          );
+        })}
+      </>
+    );
+  };
+
+  const checkLocationsFormValues = () => {
+    for (const num of Object.keys(locationsFormValues)) {
+      if (
+        locationsFormValues[num].name === '' ||
+        locationsFormValues[num].longitude === '' ||
+        locationsFormValues[num].latitude === ''
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const generateDoc = (
@@ -183,17 +370,20 @@ function ConfigForm(props: Props) {
 
           requestType: `${requestType}`,
           requestTimeType: requestTime,
+          requestToType: requestToType,
 
           explRequired: explanationRequired,
           attachRequired: attachmentRequired,
+          absenceUserIds: absenceUserIds,
+          branchIds: branchIds,
           shiftRequest: requestType === 'shift request',
-          _id: values._id
+          _id: values._id,
         };
 
         if (requestTime === 'by day') {
           generateValues = {
             ...generateValues,
-            requestHoursPerDay: hoursPerDay || 8
+            requestHoursPerDay: hoursPerDay || 8,
           };
         }
 
@@ -208,7 +398,7 @@ function ConfigForm(props: Props) {
           _id: values._id,
           name: values.holidayName,
           startDate: holidayDates.startingDate,
-          endDate: holidayDates.endingDate
+          endDate: holidayDates.endingDate,
         };
 
       case 'payDate':
@@ -220,8 +410,8 @@ function ConfigForm(props: Props) {
           _id: values._id,
           dateNums:
             payPeriod === 'twice'
-              ? Object.values(payDates).map(date => date.getDate())
-              : [payDates.date1.getDate()]
+              ? Object.values(payDates).map((date) => date.getDate())
+              : [payDates.date1.getDate()],
         };
 
       case 'schedule':
@@ -232,9 +422,13 @@ function ConfigForm(props: Props) {
           configShiftStart?: string;
           configShiftEnd?: string;
           scheduleConfig: any[];
+          locations?: any[];
+          overtimeExists?: boolean;
+          startFlexible?: boolean;
+          endFlexible?: boolean;
         } = {
           scheduleName: values.scheduleName,
-          scheduleConfig: []
+          scheduleConfig: [],
         };
         if (scheduleConfig) {
           returnVariables._id = scheduleConfig._id;
@@ -243,25 +437,78 @@ function ConfigForm(props: Props) {
 
         returnVariables.lunchBreakInMins = parseInt(`${values.lunchBreak}`, 10);
 
-        Object.keys(configDays).forEach(day_key => {
-          if (day_key.toLocaleLowerCase() !== 'configtime') {
-            returnVariables.scheduleConfig.push({
-              configName: day_key,
-              shiftStart: configDays[day_key].shiftStart,
-              shiftEnd: configDays[day_key].shiftEnd,
-              overnightShift: configDays[day_key].overnightShift
-            });
-          } else {
-            returnVariables.configShiftStart = dayjs(
-              configDays[day_key].shiftStart
-            ).format(timeFormat);
-            returnVariables.configShiftEnd = dayjs(
-              configDays[day_key].shiftEnd
-            ).format(timeFormat);
-          }
-        });
+        // validcheckin
+        const validCheckIn = {
+          ...configDays.validCheckIn,
+          shiftEnd: startFlexible
+            ? configDays.validCheckIn.shiftEnd
+            : configDays.validCheckIn.shiftStart,
+          overnightShift: configDays.validCheckIn.overnightShift,
+          configName: 'validCheckIn',
+        };
+
+        // validcheckout
+        const validCheckout = {
+          ...configDays.validCheckout,
+          shiftEnd: endFlexible
+            ? configDays.validCheckout.shiftEnd
+            : configDays.validCheckout.shiftStart,
+          overnightShift: configDays.validCheckout.overnightShift,
+          configName: 'validCheckout',
+        };
+
+        // overtime
+        const overtime = {
+          ...configDays.overtime,
+          configName: 'overtime',
+        };
+
+        // config time
+        returnVariables.configShiftStart = dayjs(
+          configDays.validCheckIn.shiftStart
+        ).format(timeFormat);
+
+        returnVariables.configShiftEnd = dayjs(
+          configDays.validCheckout.shiftStart
+        ).format(timeFormat);
+
+        // schedule config shifts
+        returnVariables.scheduleConfig.push(
+          validCheckIn,
+          validCheckout,
+          overtime
+        );
+
+        returnVariables.overtimeExists = scheduleOvertimeExists;
+        returnVariables.startFlexible = startFlexible;
+        returnVariables.endFlexible = endFlexible;
+
+        if (
+          Object.keys(locationsFormValues).length &&
+          !checkLocationsFormValues()
+        ) {
+          return null;
+        }
+
+        returnVariables.locations = [];
+
+        for (const location of Object.values(locationsFormValues)) {
+          returnVariables.locations.push(location);
+        }
 
         return returnVariables;
+
+      case 'deviceConfig':
+        if (deviceConfig) {
+          values._id = deviceConfig._id;
+        }
+
+        return {
+          _id: values._id,
+          deviceName: values.deviceName,
+          serialNo: values.serialNo,
+          extractRequired: deviceExtractRequired,
+        };
     }
   };
 
@@ -274,18 +521,90 @@ function ConfigForm(props: Props) {
         return <Form renderContent={renderHolidayContent} />;
       case 'Schedule':
         return <Form renderContent={renderScheduleContent} />;
+      case 'Devices':
+        return <Form renderContent={renderDevicesContent} />;
       // Absence
       default:
         return <Form renderContent={renderAbsenceContent} />;
     }
   };
 
-  const renderAbsenceContent = (formProps: IFormProps) => {
+  const beforeSubmit = () => {
+    setSubmitted(true);
+  };
+  const renderDevicesContent = (formProps: IFormProps) => {
     const { values, isSubmitted } = formProps;
 
     return (
+      <FlexColumn $marginNum={20}>
+        <ControlLabel required={true}>Device Name</ControlLabel>
+        <FormControl
+          {...formProps}
+          name="deviceName"
+          defaultValue={deviceConfig && deviceConfig.deviceName}
+          required={true}
+          autoFocus={true}
+        />
+
+        <ControlLabel required={true}>Serial No.</ControlLabel>
+        <FormControl
+          {...formProps}
+          name="serialNo"
+          defaultValue={deviceConfig && deviceConfig.serialNo}
+          required={true}
+        />
+
+        <FlexRow>
+          <ControlLabel>Extract from device</ControlLabel>
+          <FormControl
+            name="extractRequired"
+            defaultChecked={deviceExtractRequired}
+            componentclass="checkbox"
+            onChange={toggleDeviceExtractRequired}
+          />
+        </FlexRow>
+
+        <FlexCenter style={{ marginTop: '10px' }}>
+          {renderButton({
+            name: 'deviceConfig',
+            values: generateDoc(values, 'deviceConfig'),
+            isSubmitted,
+            beforeSubmit,
+            callback: closeModal || afterSave,
+            object: deviceConfig || null,
+          })}
+        </FlexCenter>
+      </FlexColumn>
+    );
+  };
+
+  const renderAbsenceContent = (formProps: IFormProps) => {
+    const { values, isSubmitted } = formProps;
+
+    const requestOptions = [
+      'shift request',
+      'paid absence',
+      'unpaid absence',
+    ].map((ipt) => ({
+      value: ipt,
+      label: __(ipt),
+    }));
+
+    const periosOptions = ['by day', 'by hour'].map((ipt) => ({
+      value: ipt,
+      label: __(ipt),
+    }));
+
+    const renderRequestToTypes = (array) => {
+      return array.map((ipt) => ({
+        value: ipt,
+        label: __(requestToTypes[ipt]),
+      }));
+    };
+
+    return (
       <ConfigFormWrapper>
-        <FlexColumn marginNum={30}>
+        <FlexColumn $marginNum={30}>
           <ControlLabel required={true}>Name</ControlLabel>
           <FormControl
             {...formProps}
@@ -298,14 +617,15 @@ function ConfigForm(props: Props) {
           <ControlLabel required={true}>Request Type</ControlLabel>
 
           <Select
-            value={requestType}
+            value={requestOptions.find((o) => o.value === requestType)}
             onChange={toggleRequestType}
             placeholder="Select type"
-            multi={false}
+            isMulti={false}
+            isClearable={true}
             options={['shift request', 'paid absence', 'unpaid absence'].map(
-              ipt => ({
+              (ipt) => ({
                 value: ipt,
-                label: __(ipt)
+                label: __(ipt),
               })
             )}
           />
@@ -313,13 +633,13 @@ function ConfigForm(props: Props) {
           <ControlLabel required={true}>Request Time Period</ControlLabel>
 
           <Select
-            value={requestTime}
+            value={periosOptions.find((o) => o.value === requestTime)}
             onChange={toggleRequestTime}
             placeholder="Select type"
-            multi={false}
-            options={['by day', 'by hour'].map(ipt => ({
+            isMulti={false}
+            options={['by day', 'by hour'].map((ipt) => ({
               value: ipt,
-              label: __(ipt)
+              label: __(ipt),
             }))}
           />
           <ToggleDisplay display={requestTime === 'by day'}>
@@ -341,7 +661,7 @@ function ConfigForm(props: Props) {
             <ControlLabel>Explanation Required</ControlLabel>
             <FormControl
               name="explRequired"
-              componentClass="checkbox"
+              componentclass="checkbox"
               defaultChecked={explanationRequired}
               onChange={toggleExplRequired}
             />
@@ -350,18 +670,63 @@ function ConfigForm(props: Props) {
             <ControlLabel>Attachment Required</ControlLabel>
             <FormControl
               name="attachRequired"
-              componentClass="checkbox"
+              componentclass="checkbox"
               defaultChecked={attachmentRequired}
               onChange={toggleAttachRequired}
             />
           </FlexRow>
+
+          <ControlLabel required={true}>Send request to</ControlLabel>
+
+          <Select
+            value={renderRequestToTypes(Object.keys(requestToTypes)).find(
+              (option) => option.value === requestToType
+            )}
+            onChange={onRequestToTypeChange}
+            placeholder="Select type"
+            options={renderRequestToTypes(Object.keys(requestToTypes))}
+          />
+
+          {requestToType === 'individuals' && (
+            <>
+              <ControlLabel required={true}>Select team members</ControlLabel>
+
+              <SelectTeamMembers
+                customField="employeeId"
+                label={'Team member'}
+                onSelect={onUserSelect}
+                initialValue={absenceUserIds}
+                multi={true}
+                name="userId"
+              />
+            </>
+          )}
+
+          {requestToType === 'supervisor' && (
+            <>
+              <ControlLabel required={true}>Select branches</ControlLabel>
+
+              <SelectBranches
+                label="Choose branch"
+                name="branchId"
+                initialValue={branchIds || []}
+                customOption={{
+                  value: '',
+                  label: '...Clear branch filter',
+                }}
+                onSelect={onBranchSelect}
+                multi={true}
+              />
+            </>
+          )}
+
           <FlexCenter style={{ marginTop: '10px' }}>
             {renderButton({
               name: 'absenceType',
               values: generateDoc(values, 'absenceType'),
               isSubmitted,
               callback: closeModal || afterSave,
-              object: absenceType || null
+              object: absenceType || null,
             })}
           </FlexCenter>
         </FlexColumn>
@@ -372,23 +737,23 @@ function ConfigForm(props: Props) {
   const renderPayDateContent = (formProps: IFormProps) => {
     const { isSubmitted, values } = formProps;
     return (
-      <FlexColumn marginNum={10}>
+      <FlexColumn $marginNum={10}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <ControlLabel>Pay period</ControlLabel>
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-around',
-              gap: '10px'
+              gap: '10px',
             }}
           >
             <div>Once</div>
             <FormControl
               rows={2}
               name="payPeriod"
-              componentClass="radio"
-              options={['once', 'twice'].map(el => ({
-                value: el
+              componentclass="radio"
+              options={['once', 'twice'].map((el) => ({
+                value: el,
               }))}
               inline={true}
               onChange={togglePayPeriod}
@@ -428,7 +793,7 @@ function ConfigForm(props: Props) {
             isSubmitted,
             values: generateDoc(values, 'payDate'),
             callback: closeModal || afterSave,
-            object: payDate || null
+            object: payDate || null,
           })}
         </FlexCenter>
       </FlexColumn>
@@ -438,7 +803,7 @@ function ConfigForm(props: Props) {
   const renderScheduleContent = (formProps: IFormProps) => {
     const { values, isSubmitted } = formProps;
     return (
-      <FlexColumn marginNum={20}>
+      <FlexColumn $marginNum={20}>
         <ControlLabel required={true}>
           <strong>Name</strong>
         </ControlLabel>
@@ -450,7 +815,7 @@ function ConfigForm(props: Props) {
           autoFocus={true}
         />
 
-        <FlexColumnMargined marginNum={10}>
+        <FlexColumnMargined $marginNum={25}>
           {renderConfigTime(formProps)}
         </FlexColumnMargined>
 
@@ -460,7 +825,7 @@ function ConfigForm(props: Props) {
             values: generateDoc(values, 'schedule'),
             isSubmitted,
             callback: closeModal || afterSave,
-            object: scheduleConfig || null
+            object: scheduleConfig || null,
           })}
         </FlexCenter>
       </FlexColumn>
@@ -470,7 +835,7 @@ function ConfigForm(props: Props) {
   const renderHolidayContent = (formProps: IFormProps) => {
     const { values, isSubmitted } = formProps;
     return (
-      <FlexColumn marginNum={20}>
+      <FlexColumn $marginNum={20}>
         <ControlLabel required={true}>Holiday Name</ControlLabel>
         <FormControl
           {...formProps}
@@ -501,7 +866,7 @@ function ConfigForm(props: Props) {
             values: generateDoc(values, 'holiday'),
             isSubmitted,
             callback: closeModal || afterSave,
-            object: holiday || null
+            object: holiday || null,
           })}
         </FlexCenter>
       </FlexColumn>
@@ -510,11 +875,8 @@ function ConfigForm(props: Props) {
 
   const onStartTimeChange = (day_key, time_val) => {
     const newShift = configDays[day_key];
-    const [
-      getCorrectStartTime,
-      getCorrectEndTime,
-      overnight
-    ] = compareStartAndEndTime(configDays, day_key, time_val, null);
+    const [getCorrectStartTime, getCorrectEndTime, overnight] =
+      compareStartAndEndTime(configDays, day_key, time_val, null);
 
     newShift.shiftStart = getCorrectStartTime;
     newShift.overnightShift = overnight;
@@ -526,11 +888,8 @@ function ConfigForm(props: Props) {
 
   const onEndTimeChange = (day_key, time_val) => {
     const newShift = configDays[day_key];
-    const [
-      getCorrectStartTime,
-      getCorrectEndTime,
-      overnight
-    ] = compareStartAndEndTime(configDays, day_key, null, time_val);
+    const [getCorrectStartTime, getCorrectEndTime, overnight] =
+      compareStartAndEndTime(configDays, day_key, null, time_val);
 
     newShift.shiftStart = getCorrectStartTime;
     newShift.overnightShift = overnight;
@@ -544,30 +903,60 @@ function ConfigForm(props: Props) {
     return (
       <>
         <FlexRow>
-          <ControlLabel>Check in / Check out</ControlLabel>
-          <DateTimePicker
-            curr_day_key={'configTime'}
-            startDate={configDays.configTime.shiftStart}
-            startTime_value={configDays.configTime.shiftStart}
-            endTime_value={configDays.configTime.shiftEnd}
-            overnightShift={configDays.configTime.overnightShift}
-            changeEndTime={onEndTimeChange}
-            changeStartTime={onStartTimeChange}
-            timeOnly={true}
-          />
+          <ControlLabel>Check in</ControlLabel>
+          <FlexRowJustifyStart $widthPercent={50}>
+            <ControlLabel>Flexible</ControlLabel>
+            <FormControl
+              name="startFlexible"
+              componentclass="checkbox"
+              defaultChecked={startFlexible}
+              onChange={() => setStartFlexible(!startFlexible)}
+            />
+
+            <DateTimePicker
+              curr_day_key={'validCheckIn'}
+              startDate={configDays.validCheckIn.shiftStart}
+              startTime_value={configDays.validCheckIn.shiftStart}
+              endTime_value={configDays.validCheckIn.shiftEnd}
+              overnightShift={configDays.validCheckIn.overnightShift}
+              changeEndTime={onEndTimeChange}
+              changeStartTime={onStartTimeChange}
+              timeOnly={true}
+              flexitbleTime={startFlexible}
+            />
+          </FlexRowJustifyStart>
+        </FlexRow>
+        <FlexRow>
+          <ControlLabel> Check out</ControlLabel>
+
+          <FlexRowJustifyStart $widthPercent={50}>
+            <ControlLabel>Flexible</ControlLabel>
+            <FormControl
+              name="endFlexible"
+              componentclass="checkbox"
+              defaultChecked={endFlexible}
+              onChange={() => setEndFlexible(!endFlexible)}
+            />
+
+            <DateTimePicker
+              curr_day_key={'validCheckout'}
+              startDate={configDays.validCheckout.shiftStart}
+              startTime_value={configDays.validCheckout.shiftStart}
+              endTime_value={configDays.validCheckout.shiftEnd}
+              overnightShift={configDays.validCheckout.overnightShift}
+              changeEndTime={onEndTimeChange}
+              changeStartTime={onStartTimeChange}
+              timeOnly={true}
+              flexitbleTime={endFlexible}
+            />
+          </FlexRowJustifyStart>
         </FlexRow>
 
         <FlexRow>
           <ControlLabel>Lunch break</ControlLabel>
 
-          <div
-            style={{
-              display: 'flex',
-              width: '67%',
-              alignItems: 'center'
-            }}
-          >
-            <div style={{ width: '10%' }}>
+          <FlexRowJustifyStart $widthPercent={50}>
+            <div style={{ width: '15%', textAlign: 'center' }}>
               <FormControl
                 {...formProps}
                 defaultValue={
@@ -579,47 +968,55 @@ function ConfigForm(props: Props) {
                 required={true}
               />
             </div>
-            <div style={{ width: '80%' }}>minutes</div>
-          </div>
+            <div>minutes</div>
+          </FlexRowJustifyStart>
         </FlexRow>
+
         <FlexRow>
-          <ControlLabel>Valid Check-In</ControlLabel>
-          <DateTimePicker
-            curr_day_key={'validCheckIn'}
-            startDate={configDays.validCheckIn.shiftStart}
-            startTime_value={configDays.validCheckIn.shiftStart}
-            endTime_value={configDays.validCheckIn.shiftEnd}
-            overnightShift={configDays.validCheckIn.overnightShift}
-            changeEndTime={onEndTimeChange}
-            changeStartTime={onStartTimeChange}
-            timeOnly={true}
-          />
+          <FlexRow $gapPx={16}>
+            <ControlLabel>Overtime</ControlLabel>
+            <FormControl
+              name="scheduleOvertimeExists"
+              componentclass="checkbox"
+              defaultChecked={scheduleOvertimeExists}
+              onChange={() =>
+                setScheduleOverTimeExists(!scheduleOvertimeExists)
+              }
+            />
+          </FlexRow>
+          <FlexRowJustifyStart $widthPercent={50}>
+            {scheduleOvertimeExists && (
+              <DateTimePicker
+                curr_day_key={'overtime'}
+                startDate={configDays.overtime.shiftStart}
+                startTime_value={configDays.overtime.shiftStart}
+                endTime_value={configDays.overtime.shiftEnd}
+                changeEndTime={onEndTimeChange}
+                changeStartTime={onStartTimeChange}
+                timeOnly={true}
+                flexitbleTime={scheduleOvertimeExists}
+              />
+            )}
+          </FlexRowJustifyStart>
         </FlexRow>
+
         <FlexRow>
-          <ControlLabel>Valid Check-Out</ControlLabel>
-          <DateTimePicker
-            curr_day_key={'validCheckout'}
-            startDate={configDays.validCheckout.shiftStart}
-            startTime_value={configDays.validCheckout.shiftStart}
-            endTime_value={configDays.validCheckout.shiftEnd}
-            overnightShift={configDays.validCheckout.overnightShift}
-            changeEndTime={onEndTimeChange}
-            changeStartTime={onStartTimeChange}
-            timeOnly={true}
-          />
+          <Trigger
+            type="trigger"
+            $isHoverActionBar={isHovered}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+          >
+            <div
+              onClick={addLocationClick}
+              className="passive"
+              style={{ width: '100%' }}
+            >
+              Add locations
+            </div>
+          </Trigger>
         </FlexRow>
-        <FlexRow>
-          <ControlLabel>Overtime</ControlLabel>
-          <DateTimePicker
-            curr_day_key={'overtime'}
-            startDate={configDays.overtime.shiftStart}
-            startTime_value={configDays.overtime.shiftStart}
-            endTime_value={configDays.overtime.shiftEnd}
-            changeEndTime={onEndTimeChange}
-            changeStartTime={onStartTimeChange}
-            timeOnly={true}
-          />
-        </FlexRow>
+        {renderLocationsForm()}
       </>
     );
   };

@@ -1,23 +1,22 @@
-import dayjs from 'dayjs';
-import ActionButtons from '@erxes/ui/src/components/ActionButtons';
-import Button from '@erxes/ui/src/components/Button';
-import FormControl from '@erxes/ui/src/components/form/Control';
-import Icon from '@erxes/ui/src/components/Icon';
-import Label from '@erxes/ui/src/components/Label';
-import ModalTrigger from '@erxes/ui/src/components/ModalTrigger';
-import Tags from '@erxes/ui/src/components/Tags';
-import TextInfo from '@erxes/ui/src/components/TextInfo';
-import Tip from '@erxes/ui/src/components/Tip';
-import WithPermission from 'coreui/withPermission';
-import { DateWrapper } from '@erxes/ui/src/styles/main';
-import { Capitalize } from '@erxes/ui-settings/src/permissions/styles';
-import { __, getEnv } from 'coreui/utils';
-import { RowTitle } from '@erxes/ui-engage/src/styles';
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { ILeadIntegration } from '@erxes/ui-leads/src/types';
-import Manage from './Manage';
-import { isEnabled } from '@erxes/ui/src/utils/core';
+import { __, getEnv } from "coreui/utils";
+
+import ActionButtons from "@erxes/ui/src/components/ActionButtons";
+import Button from "@erxes/ui/src/components/Button";
+import { Capitalize } from "@erxes/ui-settings/src/permissions/styles";
+import { DateWrapper } from "@erxes/ui/src/styles/main";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import { ILeadIntegration } from "@erxes/ui-leads/src/types";
+import Icon from "@erxes/ui/src/components/Icon";
+import Label from "@erxes/ui/src/components/Label";
+import { Link } from "react-router-dom";
+import Manage from "./Manage";
+import ModalTrigger from "@erxes/ui/src/components/ModalTrigger";
+import React from "react";
+import { RowTitle } from "@erxes/ui-engage/src/styles";
+import Tags from "@erxes/ui/src/components/Tags";
+import TextInfo from "@erxes/ui/src/components/TextInfo";
+import Tip from "@erxes/ui/src/components/Tip";
+import dayjs from "dayjs";
 
 type Props = {
   integration: ILeadIntegration;
@@ -36,7 +35,7 @@ class Row extends React.Component<Props> {
     return (
       <Link to={`/forms/edit/${integration._id}/${formId}`}>
         <Button btnStyle="link">
-          <Tip text={__('Manage')} placement="top">
+          <Tip text={__("Manage")} placement="top">
             <Icon icon="edit-3" />
           </Tip>
         </Button>
@@ -47,7 +46,7 @@ class Row extends React.Component<Props> {
   renderEditAction(integration) {
     const trigger = (
       <Button btnStyle="link">
-        <Tip text={__('Install code')} placement="top">
+        <Tip text={__("Install code")} placement="top">
           <Icon icon="code" />
         </Tip>
       </Button>
@@ -77,11 +76,9 @@ class Row extends React.Component<Props> {
     }
 
     return (
-      <WithPermission action="integrationsArchive">
-        <Tip text={__('Archive')} placement="top">
-          <Button btnStyle="link" onClick={onClick} icon="archive-alt" />
-        </Tip>
-      </WithPermission>
+      <Tip text={__("Archive")} placement="top">
+        <Button btnStyle="link" onClick={onClick} icon="archive-alt" />
+      </Tip>
     );
   }
 
@@ -91,13 +88,13 @@ class Row extends React.Component<Props> {
 
     const onClick = () => {
       window.open(
-        `${REACT_APP_API_URL}/pl:contacts/file-export?type=customer&popupData=true&form=${integration.formId}`,
-        '_blank'
+        `${REACT_APP_API_URL}/file-export?type=customer&popupData=true&form=${integration.formId}`,
+        "_blank"
       );
     };
 
     return (
-      <Tip text={__('Download responses')} placement="top">
+      <Tip text={__("Download responses")} placement="top">
         <Button btnStyle="link" onClick={onClick} icon="down-arrow" />
       </Tip>
     );
@@ -109,7 +106,7 @@ class Row extends React.Component<Props> {
     return (
       <Link to={`/forms/responses/${integration._id}/${integration.formId}`}>
         <Button btnStyle="link">
-          <Tip text={__('Submissions')} placement="top">
+          <Tip text={__("Submissions")} placement="top">
             <Icon icon="list" />
           </Tip>
         </Button>
@@ -127,11 +124,9 @@ class Row extends React.Component<Props> {
     }
 
     return (
-      <WithPermission action="integrationsArchive">
-        <Tip text={__('Unarchive')} placement="top">
-          <Button btnStyle="link" onClick={onClick} icon="redo" />
-        </Tip>
-      </WithPermission>
+      <Tip text={__("Unarchive")} placement="top">
+        <Button btnStyle="link" onClick={onClick} icon="redo" />
+      </Tip>
     );
   }
 
@@ -141,16 +136,14 @@ class Row extends React.Component<Props> {
     const onClick = () => remove(integration._id);
 
     return (
-      <WithPermission action="integrationsRemove">
-        <Tip text={__('Delete')} placement="top">
-          <Button
-            id="integrationDelete"
-            btnStyle="link"
-            onClick={onClick}
-            icon="times-circle"
-          />
-        </Tip>
-      </WithPermission>
+      <Tip text={__("Delete")} placement="top">
+        <Button
+          id="integrationDelete"
+          btnStyle="link"
+          onClick={onClick}
+          icon="times-circle"
+        />
+      </Tip>
     );
   }
 
@@ -160,7 +153,7 @@ class Row extends React.Component<Props> {
     const onClick = () => copy(integration._id);
 
     return (
-      <Tip text={__('Duplicate')} placement="top">
+      <Tip text={__("Duplicate")} placement="top">
         <Button btnStyle="link" onClick={onClick} icon="copy-1" />
       </Tip>
     );
@@ -172,14 +165,14 @@ class Row extends React.Component<Props> {
     const lead = integration.leadData || {};
 
     const createdUser = form.createdUser || {
-      _id: '',
-      details: { fullName: '' }
+      _id: "",
+      details: { fullName: "" }
     };
     const tags = integration.tags;
 
     const percentage: string | number = lead.conversionRate
       ? lead.conversionRate.toString()
-      : '0.00';
+      : "0.00";
 
     const onChange = e => {
       if (toggleBulk) {
@@ -187,15 +180,15 @@ class Row extends React.Component<Props> {
       }
     };
 
-    const labelStyle = integration.isActive ? 'success' : 'warning';
-    const status = integration.isActive ? __('Active') : __('Archived');
+    const labelStyle = integration.isActive ? "success" : "warning";
+    const status = integration.isActive ? __("Active") : __("Archived");
 
     return (
       <tr>
         <td>
           <FormControl
             checked={isChecked}
-            componentClass="checkbox"
+            componentclass="checkbox"
             onChange={onChange}
           />
         </td>
@@ -213,17 +206,17 @@ class Row extends React.Component<Props> {
           <TextInfo ignoreTrans={true}>{lead.viewCount || 0}</TextInfo>
         </td>
         <td>
-          <TextInfo textStyle="primary" ignoreTrans={true}>
+          <TextInfo $textStyle="primary" ignoreTrans={true}>
             {percentage.substring(0, 4)} %
           </TextInfo>
         </td>
         <td>
-          <TextInfo textStyle="danger" ignoreTrans={true}>
+          <TextInfo $textStyle="danger" ignoreTrans={true}>
             {lead.contactsGathered || 0}
           </TextInfo>
         </td>
         <td>
-          <strong>{integration.brand ? integration.brand.name : ''}</strong>
+          <strong>{integration.brand ? integration.brand.name : ""}</strong>
         </td>
         <td>
           <div key={createdUser._id}>
@@ -233,14 +226,12 @@ class Row extends React.Component<Props> {
           </div>
         </td>
         <td>
-          <Icon icon="calender" />{' '}
-          <DateWrapper>{dayjs(form.createdDate).format('ll')}</DateWrapper>
+          <Icon icon="calender" />{" "}
+          <DateWrapper>{dayjs(form.createdDate).format("ll")}</DateWrapper>
         </td>
-        {isEnabled('tags') && (
-          <td>
-            <Tags tags={tags} limit={2} />
-          </td>
-        )}
+        <td>
+          <Tags tags={tags} limit={2} />
+        </td>
         <td>
           <Label lblStyle="simple">{integration.leadData.loadType}</Label>
         </td>

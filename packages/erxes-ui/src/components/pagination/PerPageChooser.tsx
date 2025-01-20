@@ -1,33 +1,41 @@
-import DropdownToggle from '../DropdownToggle';
-import Icon from '../Icon';
-import { IRouterProps } from '../../types';
-import { __, router } from '../../utils/core';
-import React from 'react';
-import Dropdown from 'react-bootstrap/Dropdown';
-import { withRouter } from 'react-router-dom';
-import { Option, PerPageButton } from './styles';
+import { Option, PerPageButton } from "./styles";
+import { __, router } from "../../utils/core";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import Dropdown from "../Dropdown";
+import Icon from "../Icon";
+import React from "react";
+
+type Props = {
+  count?: number;
+};
 
 // per page chooser component
-const PerPageChooser = ({ history }: IRouterProps) => {
-  const currentPerPage = Number(router.getParam(history, 'perPage')) || 20;
+const PerPageChooser = ({ count }: Props) => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const onClick = perPage => {
-    router.setParams(history, { perPage });
+  const currentPerPage = Number(router.getParam(location, "perPage")) || 20;
 
-    const storageValue = window.localStorage.getItem('pagination:perPage');
+  const onClick = (perPage) => {
+    if (perPage !== currentPerPage) {
+      router.setParams(navigate, location, { perPage, page: 1 });
 
-    let items: any = {};
+      const storageValue = window.localStorage.getItem("pagination:perPage");
 
-    if (storageValue) {
-      items = JSON.parse(storageValue);
+      let items = {};
+
+      if (storageValue) {
+        items = JSON.parse(storageValue);
+      }
+
+      items[window.location.pathname] = perPage;
+
+      window.localStorage.setItem("pagination:perPage", JSON.stringify(items));
     }
-
-    items[window.location.pathname] = perPage;
-
-    window.localStorage.setItem('pagination:perPage', JSON.stringify(items));
   };
 
-  const renderOption = n => {
+  const renderOption = (n) => {
     return (
       <Option>
         <a href="#number" onClick={onClick.bind(null, n)}>
@@ -38,20 +46,20 @@ const PerPageChooser = ({ history }: IRouterProps) => {
   };
 
   return (
-    <Dropdown className="dropdown-btn" drop="up">
-      <Dropdown.Toggle as={DropdownToggle} id="per-page-chooser">
+    <Dropdown
+      toggleComponent={
         <PerPageButton>
-          {currentPerPage} {__('per page')} <Icon icon="angle-up" />
+          {currentPerPage} {__("per page")} <Icon icon="angle-up" />
         </PerPageButton>
-      </Dropdown.Toggle>
-      <Dropdown.Menu>
-        {renderOption(20)}
-        {renderOption(50)}
-        {renderOption(100)}
-        {renderOption(200)}
-      </Dropdown.Menu>
+      }
+      drop="up"
+    >
+      {renderOption(20)}
+      {renderOption(50)}
+      {renderOption(100)}
+      {renderOption(200)}
     </Dropdown>
   );
 };
 
-export default withRouter<IRouterProps>(PerPageChooser);
+export default PerPageChooser;

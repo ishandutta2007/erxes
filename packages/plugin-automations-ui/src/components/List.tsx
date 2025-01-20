@@ -1,26 +1,27 @@
-import Button from '@erxes/ui/src/components/Button';
-import DataWithLoader from '@erxes/ui/src/components/DataWithLoader';
-import FormControl from '@erxes/ui/src/components/form/Control';
-import Pagination from '@erxes/ui/src/components/pagination/Pagination';
-import Table from '@erxes/ui/src/components/table';
-import withTableWrapper from '@erxes/ui/src/components/table/withTableWrapper';
-import { __, router } from 'coreui/utils';
-import Wrapper from '@erxes/ui/src/layout/components/Wrapper';
-import { BarItems } from '@erxes/ui/src/layout/styles';
-import React from 'react';
-import { withRouter } from 'react-router-dom';
-import { IRouterProps } from '@erxes/ui/src/types';
-import { IAutomation, AutomationsCount } from '../types';
-import Row from './Row';
-import { EmptyContent } from '../styles';
-import Sidebar from './Sidebar';
-import { isEnabled } from '@erxes/ui/src/utils/core';
-import TaggerPopover from '@erxes/ui-tags/src/components/TaggerPopover';
-import { TAG_TYPES } from '@erxes/ui-tags/src/constants';
+import { AutomationsCount, IAutomation } from "../types";
+import { __, router } from "@erxes/ui/src/utils";
 
-interface IProps extends IRouterProps {
+import { BarItems } from "@erxes/ui/src/layout/styles";
+import Button from "@erxes/ui/src/components/Button";
+import DataWithLoader from "@erxes/ui/src/components/DataWithLoader";
+import { EmptyContent } from "../styles";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import Pagination from "@erxes/ui/src/components/pagination/Pagination";
+import React from "react";
+import Row from "./Row";
+import Sidebar from "./Sidebar";
+import { TAG_TYPES } from "@erxes/ui-tags/src/constants";
+import Table from "@erxes/ui/src/components/table";
+import TaggerPopover from "@erxes/ui-tags/src/components/TaggerPopover";
+import Wrapper from "@erxes/ui/src/layout/components/Wrapper";
+import { isEnabled } from "@erxes/ui/src/utils/core";
+import withTableWrapper from "@erxes/ui/src/components/table/withTableWrapper";
+
+interface IProps {
   automations: IAutomation[];
   loading: boolean;
+  navigate: any;
+  location: any;
   searchValue: string;
   totalCount: number;
   toggleBulk: () => void;
@@ -64,7 +65,7 @@ class AutomationsList extends React.Component<IProps, State> {
   onChange = () => {
     const { toggleAll, automations } = this.props;
 
-    toggleAll(automations, 'automations');
+    toggleAll(automations, "automations");
   };
 
   search = e => {
@@ -72,14 +73,13 @@ class AutomationsList extends React.Component<IProps, State> {
       clearTimeout(this.timer);
     }
 
-    const { history } = this.props;
+    const { navigate, location } = this.props;
     const searchValue = e.target.value;
 
     this.setState({ searchValue });
 
     this.timer = setTimeout(() => {
-      router.removeParams(history, 'page');
-      router.setParams(history, { searchValue });
+      router.setParams(navigate, location, { searchValue, page: undefined });
     }, 500);
   };
 
@@ -98,7 +98,7 @@ class AutomationsList extends React.Component<IProps, State> {
       automation => automation._id
     );
 
-    const isRestore = this.props?.queryParams?.status === 'archived';
+    const isRestore = this.props?.queryParams?.status === "archived";
 
     this.props.archiveAutomations(
       { automationIds, isRestore },
@@ -108,7 +108,7 @@ class AutomationsList extends React.Component<IProps, State> {
 
   moveCursorAtTheEnd = e => {
     const tmpValue = e.target.value;
-    e.target.value = '';
+    e.target.value = "";
     e.target.value = tmpValue;
   };
 
@@ -122,7 +122,7 @@ class AutomationsList extends React.Component<IProps, State> {
 
   render() {
     const {
-      history,
+      navigate,
       loading,
       toggleBulk,
       duplicate,
@@ -132,6 +132,7 @@ class AutomationsList extends React.Component<IProps, State> {
       queryParams,
       isExpand,
       counts,
+      location,
       addAutomation,
       emptyBulk
     } = this.props;
@@ -140,35 +141,35 @@ class AutomationsList extends React.Component<IProps, State> {
 
     const mainContent = (
       <withTableWrapper.Wrapper>
-        <Table whiteSpace="nowrap" bordered={true} hover={true}>
+        <Table $whiteSpace="nowrap" $bordered={true} $hover={true}>
           <thead>
             <tr>
               <th>
                 <FormControl
                   checked={isAllSelected}
-                  componentClass="checkbox"
+                  componentclass="checkbox"
                   onChange={this.onChange}
                 />
               </th>
-              <th>{__('Name')}</th>
-              <th>{__('Status')}</th>
-              <th>{__('Triggers')}</th>
-              <th>{__('Action')}</th>
-              {isEnabled('tags') && <th>{__('Tags')}</th>}
-              <th>{__('Last updated by')}</th>
-              <th>{__('Created by')}</th>
-              <th>{__('Last update')}</th>
-              <th>{__('Created date')}</th>
-              <th>{__('Actions')}</th>
+              <th>{__("Name")}</th>
+              <th>{__("Status")}</th>
+              <th>{__("Triggers")}</th>
+              <th>{__("Action")}</th>
+              <th>{__("Tags")}</th>
+              <th>{__("Last updated by")}</th>
+              <th>{__("Created by")}</th>
+              <th>{__("Last update")}</th>
+              <th>{__("Created date")}</th>
+              <th>{__("Actions")}</th>
             </tr>
           </thead>
-          <tbody id="automations" className={isExpand ? 'expand' : ''}>
+          <tbody id="automations" className={isExpand ? "expand" : ""}>
             {(automations || []).map(automation => (
               <Row
                 key={automation._id}
                 automation={automation}
                 isChecked={bulk.includes(automation)}
-                history={history}
+                navigate={navigate}
                 removeAutomations={this.removeAutomations}
                 toggleBulk={toggleBulk}
                 duplicate={duplicate}
@@ -198,21 +199,19 @@ class AutomationsList extends React.Component<IProps, State> {
             icon="archive-alt"
             onClick={() => this.archiveAutomations(bulk)}
           >
-            {queryParams.status === 'archived' ? 'Restore' : 'Archive'}
+            {queryParams.status === "archived" ? "Restore" : "Archive"}
           </Button>
-          {isEnabled('tags') && (
-            <TaggerPopover
-              type={TAG_TYPES.AUTOMATION}
-              successCallback={emptyBulk}
-              singleSelect
-              targets={bulk}
-              trigger={
-                <Button btnStyle="simple" size="small" icon="tag-alt">
-                  Tag
-                </Button>
-              }
-            />
-          )}
+          <TaggerPopover
+            type={TAG_TYPES.AUTOMATION}
+            successCallback={emptyBulk}
+            singleSelect
+            targets={bulk}
+            trigger={
+              <Button btnStyle="simple" size="small" icon="tag-alt">
+                Tag
+              </Button>
+            }
+          />
         </BarItems>
       );
     }
@@ -221,7 +220,7 @@ class AutomationsList extends React.Component<IProps, State> {
       <BarItems>
         <FormControl
           type="text"
-          placeholder={__('Search an automation')}
+          placeholder={__("Type to search")}
           onChange={this.search}
           value={this.state.searchValue}
           autoFocus={true}
@@ -234,7 +233,7 @@ class AutomationsList extends React.Component<IProps, State> {
           icon="plus-circle"
           onClick={addAutomation}
         >
-          {__('Create an automation')}
+          {__("Create an automation")}
         </Button>
       </BarItems>
     );
@@ -247,8 +246,8 @@ class AutomationsList extends React.Component<IProps, State> {
       <Wrapper
         header={
           <Wrapper.Header
-            title={__('Automations')}
-            breadcrumb={[{ title: __('Automations') }]}
+            title={__("Automations")}
+            breadcrumb={[{ title: __("Automations") }]}
             queryParams={queryParams}
           />
         }
@@ -256,7 +255,8 @@ class AutomationsList extends React.Component<IProps, State> {
         leftSidebar={
           <Sidebar
             counts={counts || ({} as any)}
-            history={history}
+            location={location}
+            navigate={navigate}
             queryParams={queryParams}
           />
         }
@@ -271,9 +271,9 @@ class AutomationsList extends React.Component<IProps, State> {
                 <img src="/images/actions/automation.svg" alt="empty-img" />
 
                 <p>
-                  <b>{__('You don’t have any automations yet')}.</b>
+                  <b>{__("You don’t have any automations yet")}.</b>
                   {__(
-                    'Automatically execute repetitive tasks and make sure nothing falls through the cracks'
+                    "Automatically execute repetitive tasks and make sure nothing falls through the cracks"
                   )}
                   .
                 </p>
@@ -287,7 +287,4 @@ class AutomationsList extends React.Component<IProps, State> {
   }
 }
 
-export default withTableWrapper(
-  'Automation',
-  withRouter<IRouterProps>(AutomationsList)
-);
+export default withTableWrapper("Automation", AutomationsList);

@@ -1,16 +1,18 @@
-import { colors } from '@erxes/ui/src/styles';
-import styled from 'styled-components';
-import styledTS from 'styled-components-ts';
-import { rgba } from '@erxes/ui/src/styles/ecolor';
-import { getEnv, __ } from '@erxes/ui/src/utils';
-import DropdownToggle from '@erxes/ui/src/components/DropdownToggle';
-import Dropdown from 'react-bootstrap/Dropdown';
-import WithPermission from 'coreui/withPermission';
-import { gql } from '@apollo/client';
-import React from 'react';
-import { useQuery } from '@apollo/client';
-import { ICompany } from '../../../companies/types';
-import { ICustomer } from '../../types';
+import { __, getEnv } from "@erxes/ui/src/utils";
+
+import Dropdown from "@erxes/ui/src/components/Dropdown";
+import DropdownToggle from "@erxes/ui/src/components/DropdownToggle";
+import { ICompany } from "../../../companies/types";
+import { ICustomer } from "../../types";
+import React from "react";
+import WithPermission from "@erxes/ui/src/components/WithPermission";
+import { colors } from "@erxes/ui/src/styles";
+import { gql } from "@apollo/client";
+import { rgba } from "@erxes/ui/src/styles/ecolor";
+import styled from "styled-components";
+import styledTS from "styled-components-ts";
+import { useQuery } from "@apollo/client";
+
 const ActionItem = styled.button`
   width: 100%;
   text-align: left;
@@ -81,7 +83,7 @@ export default function PrintAction({ coc, contentType }: Props) {
   }
 
   const trigger = (
-    <ActionButton>{loading ? 'loading' : __('Print document')}</ActionButton>
+    <ActionButton>{loading ? "loading" : __("Print document")}</ActionButton>
   );
   const documents = data?.documents || ([] as { _id: string; name: string }[]);
 
@@ -91,21 +93,16 @@ export default function PrintAction({ coc, contentType }: Props) {
 
   return (
     <WithPermission action="manageDocuments">
-      <Dropdown>
-        <Dropdown.Toggle as={DropdownToggle} id="dropdown-select">
-          {trigger}
-        </Dropdown.Toggle>
-        <Dropdown.Menu>
-          {documents.map(document => {
-            return (
-              <li key={document._id}>
-                <ActionItem onClick={print.bind(this, document._id)}>
-                  {document.name}
-                </ActionItem>
-              </li>
-            );
-          })}
-        </Dropdown.Menu>
+      <Dropdown as={DropdownToggle} toggleComponent={trigger}>
+        {documents.map(document => {
+          return (
+            <li key={document._id}>
+              <ActionItem onClick={print.bind(this, document._id)}>
+                {document.name}
+              </ActionItem>
+            </li>
+          );
+        })}
       </Dropdown>
     </WithPermission>
   );

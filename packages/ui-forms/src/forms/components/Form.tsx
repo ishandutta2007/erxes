@@ -15,10 +15,9 @@ import React from 'react';
 import { __ } from '@erxes/ui/src/utils';
 
 type Props = {
-  fields: IField[];
-  renderPreviewWrapper?: (previewRenderer, fields: IField[]) => void;
+  renderPreviewWrapper?: (previewRenderer, fields: IField[]) => any;
   onDocChange?: (doc: IFormData) => void;
-  saveForm: (params: IFormData) => void;
+  saveForm?: (params: IFormData) => void;
   formData?: IFormData;
   isReadyToSave: boolean;
   type: string;
@@ -27,6 +26,8 @@ type Props = {
   currentMode?: 'create' | 'update' | undefined;
   currentField?: IField;
   color?: string;
+  isAviableToSaveWhenReady?: boolean;
+  fieldTypes?: string[];
 };
 
 type State = {
@@ -45,43 +46,48 @@ class Form extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
 
-    const { form = {} as IForm } = props;
+    const formData = { ...(props.form || {}), ...(props.formData || {}) };
 
     this.state = {
-      fields: (props.formData ? props.formData.fields : props.fields) || [],
-      title: form.title || 'Form Title',
-      description: form.description || '',
-      buttonText: form.buttonText || 'Send',
+      fields: formData?.fields || [],
+      title: formData.title || 'Form Title',
+      description: formData.description || '',
+      buttonText: formData.buttonText || 'Send',
       currentMode: undefined,
       currentField: undefined,
       type: props.type || '',
-      numberOfPages: form.numberOfPages || 1,
-      currentPage: 1
+      numberOfPages: formData.numberOfPages || 1,
+      currentPage: 1,
     };
   }
 
   componentWillReceiveProps(nextProps: Props) {
-    const { saveForm, type, isReadyToSave, formData } = this.props;
-    const { title, buttonText, description, fields } = this.state;
+    const { formData, isReadyToSave, saveForm, type } = this.props;
 
     if (nextProps.formData && nextProps.formData !== formData) {
       this.setState({
-        fields: nextProps.formData.fields || []
+        fields: nextProps.formData.fields || [],
       });
     }
 
-    if (nextProps.isReadyToSave && isReadyToSave !== nextProps.isReadyToSave) {
-      saveForm(
-        nextProps.formData
-          ? { ...nextProps.formData }
-          : {
+    if (
+      nextProps.isAviableToSaveWhenReady &&
+      nextProps.isReadyToSave &&
+      isReadyToSave !== nextProps.isReadyToSave
+    ) {
+      const { title, buttonText, description, fields } = this.state;
+      saveForm &&
+        saveForm(
+          nextProps.formData
+            ? { ...nextProps.formData, type: nextProps.type }
+            : {
               title,
               description,
               buttonText,
               fields,
-              type
+              type,
             }
-      );
+        );
     }
   }
 
@@ -119,7 +125,7 @@ class Form extends React.Component<Props, State> {
         <FormGroup>
           <ControlLabel>{__('Form description')}</ControlLabel>
           <FormControl
-            componentClass="textarea"
+            componentclass="textarea"
             name="description"
             value={description}
             onChange={onChangeField}
@@ -155,8 +161,8 @@ class Form extends React.Component<Props, State> {
       currentField: {
         _id: `tempId${Math.random().toString()}`,
         contentType: 'form',
-        type: choice
-      }
+        type: choice,
+      },
     });
   };
 
@@ -173,9 +179,18 @@ class Form extends React.Component<Props, State> {
     if (currentMode === 'create') {
       selector = {
         fields: [...fields, field],
-        currentField: undefined
+        currentField: undefined,
+      };
+    } else if (currentMode === 'update') {
+      selector = {
+        fields: fields.map(prevField =>
+          prevField._id === field._id ? { ...prevField, ...field } : prevField
+        ),
+        currentField: undefined,
       };
     }
+
+    console.log({ selector, currentMode });
 
     this.setState(selector, () => {
       if (onDocChange) {
@@ -215,27 +230,29 @@ class Form extends React.Component<Props, State> {
     });
   };
 
-  render() {
+  renderPreview() {
     const { renderPreviewWrapper } = this.props;
-    const {
-      currentMode,
-      currentField,
-      fields,
-      description,
-      numberOfPages
-    } = this.state;
+    if (!renderPreviewWrapper) {
+      return null;
+    }
 
     const renderer = () => {
       return (
         <FieldsPreview
-          formDesc={description}
-          fields={fields}
+          formDesc={this.state.description}
+          fields={this.state.fields}
           onFieldClick={this.onFieldClick}
           onChangeFieldsOrder={this.onChangeFieldsOrder}
           currentPage={this.state.currentPage}
         />
       );
     };
+
+    return renderPreviewWrapper(renderer, this.state.fields);
+  }
+
+  render() {
+    const { currentMode, currentField, fields, numberOfPages } = this.state;
 
     return (
       <FlexContent>
@@ -248,6 +265,7 @@ class Form extends React.Component<Props, State> {
           <FieldChoices
             type={this.props.type}
             onChoiceClick={this.onChoiceClick}
+            fieldTypes={this.props.fieldTypes}
           />
         </LeftItem>
         {currentField && (
@@ -261,7 +279,7 @@ class Form extends React.Component<Props, State> {
             onCancel={this.onFieldFormCancel}
           />
         )}
-        {renderPreviewWrapper && renderPreviewWrapper(renderer, fields)}
+        {this.renderPreview()}
       </FlexContent>
     );
   }

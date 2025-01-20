@@ -1,12 +1,14 @@
-import { USER_ROLES } from '@erxes/api-utils/src/constants';
+import { IContext, IModels } from "../../../connectionResolver";
 import {
   checkPermission,
   requireLogin
-} from '@erxes/api-utils/src/permissions';
-import { fetchSegment, sendSegmentsMessage } from '../../../messageBroker';
-import { IContext, IModels } from '../../../connectionResolver';
-import { paginate } from '../../utils';
-import { fetchEs } from '@erxes/api-utils/src/elasticsearch';
+} from "@erxes/api-utils/src/permissions";
+import { escapeRegExp, getConfig, paginate } from "../../utils";
+
+import { USER_ROLES } from "@erxes/api-utils/src/constants";
+import { fetchEs } from "@erxes/api-utils/src/elasticsearch";
+import { IUserDocument } from "@erxes/api-utils/src/types";
+import { fetchSegment } from "../../modules/segments/queryBuilder";
 
 export class Builder {
   public params: { segment?: string; segmentData?: string };
@@ -16,7 +18,7 @@ export class Builder {
   public models: IModels;
   public subdomain: string;
 
-  private contentType: 'users';
+  private contentType: "users";
 
   constructor(
     models: IModels,
@@ -24,7 +26,7 @@ export class Builder {
     params: { segment?: string; segmentData?: string },
     context
   ) {
-    this.contentType = 'users';
+    this.contentType = "users";
     this.context = context;
     this.params = params;
     this.models = models;
@@ -38,7 +40,7 @@ export class Builder {
   }
 
   public resetNegativeList() {
-    this.negativeList = [{ term: { status: 'deleted' } }];
+    this.negativeList = [{ term: { status: "deleted" } }];
   }
 
   public resetPositiveList() {
@@ -52,17 +54,17 @@ export class Builder {
   // filter by segment
   public async segmentFilter(segment: any, segmentData?: any) {
     const selector = await fetchSegment(
+      this.models,
       this.subdomain,
-      segment._id,
-      { returnSelector: true },
-      segmentData
+      segmentData ? segmentData : segment._id,
+      { returnSelector: true }
     );
 
     this.positiveList = [...this.positiveList, selector];
   }
 
   public getRelType() {
-    return 'users';
+    return "users";
   }
 
   /*
@@ -81,18 +83,15 @@ export class Builder {
 
     // filter by segment
     if (this.params.segment) {
-      const segment = await sendSegmentsMessage({
-        isRPC: true,
-        action: 'findOne',
-        subdomain: this.subdomain,
-        data: { _id: this.params.segment }
+      const segment = await this.models.Segments.findOne({
+        _id: this.params.segment
       });
 
       await this.segmentFilter(segment);
     }
   }
 
-  public async runQueries(action = 'search'): Promise<any> {
+  public async runQueries(action = "search"): Promise<any> {
     const queryOptions: any = {
       query: {
         bool: {
@@ -106,7 +105,7 @@ export class Builder {
 
     const totalCountResponse = await fetchEs({
       subdomain: this.subdomain,
-      action: 'count',
+      action: "count",
       index: this.contentType,
       body: queryOptions,
       defaultValue: 0
@@ -150,6 +149,7 @@ interface IListArgs {
   brandIds?: string[];
   departmentId?: string;
   branchId?: string;
+  isAssignee?: boolean;
   departmentIds: string[];
   branchIds: string[];
   unitId?: string;
@@ -164,7 +164,7 @@ const getChildIds = async (model, ids) => {
   const orderQry: any[] = [];
   for (const item of items) {
     orderQry.push({
-      order: { $regex: new RegExp(item.order) }
+      order: { $regex: new RegExp(`^${escapeRegExp(item.order)}`) }
     });
   }
 
@@ -177,7 +177,8 @@ const getChildIds = async (model, ids) => {
 const queryBuilder = async (
   models: IModels,
   params: IListArgs,
-  subdomain: string
+  subdomain: string,
+  user: IUserDocument
 ) => {
   const {
     searchValue,
@@ -190,6 +191,7 @@ const queryBuilder = async (
     departmentId,
     unitId,
     branchId,
+    isAssignee,
     departmentIds,
     branchIds,
     segment,
@@ -200,13 +202,15 @@ const queryBuilder = async (
     isActive
   };
 
+  let andCondition: any[] = [];
+
   if (searchValue) {
     const fields = [
-      { email: new RegExp(`.*${params.searchValue}.*`, 'i') },
-      { employeeId: new RegExp(`.*${params.searchValue}.*`, 'i') },
-      { username: new RegExp(`.*${params.searchValue}.*`, 'i') },
-      { 'details.fullName': new RegExp(`.*${params.searchValue}.*`, 'i') },
-      { 'details.position': new RegExp(`.*${params.searchValue}.*`, 'i') }
+      { email: new RegExp(`.*${params.searchValue}.*`, "i") },
+      { employeeId: new RegExp(`.*${params.searchValue}.*`, "i") },
+      { username: new RegExp(`.*${params.searchValue}.*`, "i") },
+      { "details.fullName": new RegExp(`.*${params.searchValue}.*`, "i") },
+      { "details.position": new RegExp(`.*${params.searchValue}.*`, "i") }
     ];
 
     selector.$or = fields;
@@ -244,14 +248,69 @@ const queryBuilder = async (
     selector.departmentIds = { $in: [departmentId] };
   }
 
-  if (branchIds && branchIds.length) {
-    selector.branchIds = { $in: await getChildIds(models.Branches, branchIds) };
-  }
+  if (
+    isAssignee &&
+    branchIds &&
+    branchIds.length &&
+    departmentIds &&
+    departmentIds.length
+  ) {
+    const checker = await getConfig(
+      "CHECK_TEAM_MEMBER_SHOWN",
+      undefined,
+      models
+    );
 
-  if (departmentIds && departmentIds.length) {
-    selector.departmentIds = {
-      $in: await getChildIds(models.Departments, departmentIds)
-    };
+    if (checker) {
+      const customCond: any[] = [];
+
+      const branchUserIds = await getConfig(
+        "BRANCHES_MASTER_TEAM_MEMBERS_IDS",
+        undefined,
+        models
+      );
+      const departmentUserIds = await getConfig(
+        "DEPARTMENTS_MASTER_TEAM_MEMBERS_IDS",
+        undefined,
+        models
+      );
+
+      if (
+        !branchUserIds ||
+        !branchUserIds.length ||
+        !branchUserIds.includes(user._id)
+      ) {
+        customCond.push({
+          branchIds: { $in: await getChildIds(models.Branches, branchIds) }
+        });
+      }
+
+      if (
+        !departmentUserIds ||
+        !departmentUserIds.length ||
+        !departmentUserIds.includes(user._id)
+      ) {
+        customCond.push({
+          departmentIds: {
+            $in: await getChildIds(models.Departments, departmentIds)
+          }
+        });
+      }
+
+      andCondition = customCond.length ? [{ $or: customCond }] : [];
+    }
+  } else {
+    if (branchIds && branchIds.length) {
+      selector.branchIds = {
+        $in: await getChildIds(models.Branches, branchIds)
+      };
+    }
+
+    if (departmentIds && departmentIds.length) {
+      selector.departmentIds = {
+        $in: await getChildIds(models.Departments, departmentIds)
+      };
+    }
   }
 
   if (unitId) {
@@ -274,6 +333,10 @@ const queryBuilder = async (
     selector._id = { $in: list.map(l => l._id) };
   }
 
+  if (andCondition.length) {
+    return { $and: [{ ...selector }, ...andCondition] };
+  }
+
   return selector;
 };
 
@@ -284,11 +347,11 @@ const userQueries = {
   async users(
     _root,
     args: IListArgs,
-    { userBrandIdsSelector, models, subdomain }: IContext
+    { userBrandIdsSelector, models, subdomain, user }: IContext
   ) {
     const selector = {
       ...userBrandIdsSelector,
-      ...(await queryBuilder(models, args, subdomain)),
+      ...(await queryBuilder(models, args, subdomain, user)),
       ...NORMAL_USER_SELECTOR
     };
 
@@ -299,13 +362,13 @@ const userQueries = {
         ? { [sortField]: sortDirection }
         : { username: 1 };
 
-    return paginate(models.Users.find(selector).sort(sort), args);
+    return paginate(models.Users.find(selector).sort(sort as any), args);
   },
 
   /**
    * All users
    */
-  allUsers(
+  async allUsers(
     _root,
     {
       isActive,
@@ -322,7 +385,7 @@ const userQueries = {
     if (!!ids?.length) {
       selector._id = { $in: ids };
     }
-    if (assignedToMe === 'true') {
+    if (assignedToMe === "true") {
       selector._id = user._id;
     }
 
@@ -334,7 +397,7 @@ const userQueries = {
   /**
    * Get one user
    */
-  userDetail(_root, { _id }: { _id: string }, { models }: IContext) {
+  async userDetail(_root, { _id }: { _id: string }, { models }: IContext) {
     return models.Users.findOne({ _id });
   },
 
@@ -344,11 +407,11 @@ const userQueries = {
   async usersTotalCount(
     _root,
     args: IListArgs,
-    { userBrandIdsSelector, models, subdomain }: IContext
+    { userBrandIdsSelector, models, subdomain, user }: IContext
   ) {
     const selector = {
       ...userBrandIdsSelector,
-      ...(await queryBuilder(models, args, subdomain)),
+      ...(await queryBuilder(models, args, subdomain, user)),
       ...NORMAL_USER_SELECTOR
     };
 
@@ -358,10 +421,16 @@ const userQueries = {
   /**
    * Current user
    */
-  currentUser(_root, _args, { user, models }: IContext) {
-    return user
-      ? models.Users.findOne({ _id: user._id, isActive: { $ne: false } })
+  async currentUser(_root, _args, { user, models, subdomain }: IContext) {
+    // this check is important for preventing injection attacks
+    // if (typeof user?._id !== 'string') {
+    //   throw new Error(`User _id is not a string. It is ${user?._id} instead.`);
+    // }
+    const result = user
+      ? await models.Users.findOne({ _id: user._id, isActive: { $ne: false } })
       : null;
+
+    return result;
   },
 
   /**
@@ -372,9 +441,9 @@ const userQueries = {
   }
 };
 
-requireLogin(userQueries, 'usersTotalCount');
-requireLogin(userQueries, 'userDetail');
+requireLogin(userQueries, "usersTotalCount");
+requireLogin(userQueries, "userDetail");
 
-checkPermission(userQueries, 'users', 'showUsers', []);
+checkPermission(userQueries, "users", "showUsers", []);
 
 export default userQueries;

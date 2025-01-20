@@ -1,10 +1,10 @@
-import { IActivityLogForMonth } from '@erxes/ui-log/src/activityLogs/types';
-import { IUser } from './auth/types';
+import { IActivityLogForMonth } from "@erxes/ui-log/src/activityLogs/types";
+import { IUser } from "./auth/types";
 
 export interface IRouterProps {
-  history: any;
   location: any;
   match: any;
+  navigate: any;
 }
 
 export interface IAttachment {
@@ -20,6 +20,11 @@ export type IAttachmentPreview = {
   type: string;
   data: string;
 } | null;
+
+export interface IPdfAttachment {
+  pdf?: IAttachment;
+  pages: IAttachment[];
+}
 
 export interface IAnimatedLoader {
   height?: string;
@@ -87,6 +92,7 @@ export interface IField {
   contentTypeId?: string;
   type: string;
   validation?: string;
+  regexValidation?: string;
   field?: string;
   text?: string;
   code?: string;
@@ -114,7 +120,6 @@ export interface IField {
   };
   logics?: IFieldLogic[];
   logicAction?: string;
-  groupName?: string;
   pageNumber?: number;
   searchable?: boolean;
   showInCard?: boolean;
@@ -124,6 +129,7 @@ export interface IField {
 
   relationType?: string;
   subFieldIds?: string[];
+  isDisabled?: boolean;
 }
 
 export interface IFormProps {
@@ -141,6 +147,7 @@ export type IOption = {
   value: string;
   avatar?: string;
   extraValue?: string;
+  obj?: any;
 };
 
 export type IButtonMutateProps = {
@@ -151,6 +158,7 @@ export type IButtonMutateProps = {
   confirmationUpdate?: boolean;
   callback?: (data?: any) => void;
   resetSubmit?: () => void;
+  beforeSubmit?: () => void;
   size?: string;
   object?: any;
   text?: string;
@@ -161,12 +169,14 @@ export type IButtonMutateProps = {
 
 export type IMentionUser = {
   id: string;
-  avatar: string;
+  avatar?: string;
   username: string;
   fullName?: string;
+  title?: string;
 };
 
 export type IEditorProps = {
+  placeholder?: string;
   onCtrlEnter?: (evt?: any) => void;
   content: string;
   onChange: (evt: any) => void;
@@ -176,17 +186,20 @@ export type IEditorProps = {
   removeButtons?: string;
   removePlugins?: string;
   toolbarCanCollapse?: boolean;
-  mentionUsers?: IMentionUser[];
+  showMentions?: boolean;
   toolbar?: any[];
   autoFocus?: boolean;
-  toolbarLocation?: 'top' | 'bottom';
+  toolbarLocation?: "top" | "bottom";
   autoGrow?: boolean;
-  autoGrowMinHeight?: number;
-  autoGrowMaxHeight?: number;
+  autoGrowMinHeight?: number | string;
+  autoGrowMaxHeight?: number | string;
   name?: string;
   isSubmitted?: boolean;
   formItems?: any;
   contentType?: string;
+  additionalToolbarContent?: (props: {
+    onClick: (placeholder: string) => void;
+  }) => React.ReactNode;
 };
 
 export type QueryResponse = {
@@ -207,3 +220,8 @@ export type ActivityLogQueryResponse = {
 export type Counts = {
   [key: string]: number;
 };
+
+export interface IAbortController {
+  readonly signal: AbortSignal;
+  abort?: () => void;
+}

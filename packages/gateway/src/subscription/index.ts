@@ -7,7 +7,7 @@ import {
   GraphQLError,
   parse,
   subscribe,
-  validate
+  validate,
 } from 'graphql';
 import * as ws from 'ws';
 import SubscriptionResolver from './SubscriptionResolver';
@@ -19,13 +19,24 @@ import * as fs from 'fs';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { apolloRouterPort } from '../apollo-router';
 import { gql } from '@apollo/client/core';
+import { getSubdomain } from '../util/subdomain';
 
-let disposable: Disposable;
+let disposable: Disposable | undefined;
+
+export async function stopSubscriptionServer() {
+  if (disposable) {
+    try {
+      await disposable.dispose();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
 
 export function makeSubscriptionSchema({ typeDefs, resolvers }: any) {
   if (!typeDefs || !resolvers) {
     throw new Error(
-      'Both `typeDefs` and `resolvers` are required to make the executable subscriptions schema.'
+      'Both `typeDefs` and `resolvers` are required to make the executable subscriptions schema.',
     );
   }
   const supergraph = fs.readFileSync(supergraphPath).toString();
@@ -35,18 +46,16 @@ export function makeSubscriptionSchema({ typeDefs, resolvers }: any) {
   return makeExecutableSchema({
     typeDefs: [
       ...((supergraphTypeDefs && [supergraphTypeDefs]) as DocumentNode[]),
-      typeDefs
+      typeDefs,
     ],
-    resolvers
+    resolvers,
   });
 }
 
-export async function startSubscriptionServer(
-  httpServer: http.Server
-): Promise<Disposable | undefined> {
+export async function startSubscriptionServer(httpServer: http.Server) {
   const wsServer = new ws.Server({
     server: httpServer,
-    path: '/graphql'
+    path: '/graphql',
   });
 
   const typeDefsResolvers = await genTypeDefsAndResolvers();
@@ -59,16 +68,10 @@ export async function startSubscriptionServer(
 
   const schema = makeSubscriptionSchema({
     typeDefs,
-    resolvers
+    resolvers,
   });
 
-  if (disposable) {
-    try {
-      await disposable.dispose();
-    } catch (e) {}
-  }
-
-  // const apolloRouterPort = await getApolloRouterPort();
+  await stopSubscriptionServer();
 
   disposable = useServer(
     {
@@ -77,19 +80,20 @@ export async function startSubscriptionServer(
       context: (ctx, _msg: SubscribeMessage, _args: ExecutionArgs) => {
         const gatewayDataSource = new SubscriptionResolver(
           `http://127.0.0.1:${apolloRouterPort}`,
-          ctx
+          ctx,
         );
-        return { dataSources: { gatewayDataSource } };
+        const subdomain = getSubdomain(ctx.extra.request);
+        return { dataSources: { gatewayDataSource }, subdomain };
       },
       onSubscribe: async (
         _ctx,
-        msg: SubscribeMessage
+        msg: SubscribeMessage,
       ): Promise<ExecutionArgs | readonly GraphQLError[] | void> => {
         const args = {
           schema,
           operationName: msg.payload.operationName,
           document: parse(msg.payload.query),
-          variableValues: msg.payload.variables
+          variableValues: msg.payload.variables,
         };
 
         const operationAST = getOperationAST(args.document, args.operationName);
@@ -102,7 +106,7 @@ export async function startSubscriptionServer(
         // Handle mutation and query requests
         if (operationAST.operation !== 'subscription') {
           return [
-            new GraphQLError('Only subscription operations are supported')
+            new GraphQLError('Only subscription operations are supported'),
           ];
         }
 
@@ -114,10 +118,8 @@ export async function startSubscriptionServer(
         }
         // Ready execution arguments
         return args;
-      }
+      },
     },
-    wsServer
+    wsServer,
   );
-
-  return disposable;
 }

@@ -1,12 +1,12 @@
-import { colors, dimensions } from '@erxes/ui/src/styles';
+import { colors, dimensions } from "@erxes/ui/src/styles";
 
-import { Contents } from '@erxes/ui/src/layout/styles';
-import { DateWrapper } from '@erxes/ui-forms/src/forms/styles';
-import { FlexContent } from '@erxes/ui-log/src/activityLogs/styles';
-import { RightMenuContainer } from '@erxes/ui-cards/src/boards/styles/rightMenu';
-import { rgba } from '@erxes/ui/src/styles/ecolor';
-import styled from 'styled-components';
-import styledTS from 'styled-components-ts';
+import { Contents } from "@erxes/ui/src/layout/styles";
+import { DateWrapper } from "@erxes/ui-forms/src/forms/styles";
+import { FlexContent } from "@erxes/ui-log/src/activityLogs/styles";
+import { RightMenuContainer } from "@erxes/ui-sales/src/boards/styles/rightMenu";
+import { rgba } from "@erxes/ui/src/styles/ecolor";
+import styled from "styled-components";
+import styledTS from "styled-components-ts";
 
 export const Container = styled.div`
   padding: ${dimensions.coreSpacing}px;
@@ -45,20 +45,14 @@ export const Container = styled.div`
       }
     }
 
-    .show-action-menu .custom-menu {
-      visibility: visible;
-      top: -28px;
-    }
-
     .custom-menu {
-      position: absolute;
       right: 0;
       margin: 0;
       top: ${dimensions.unitSpacing}px;
       visibility: hidden;
       transition: all 0.2s linear;
 
-      i {
+      > i {
         background: #e3deee;
         margin-left: ${dimensions.unitSpacing - 5}px;
         padding: ${dimensions.unitSpacing - 5}px;
@@ -79,10 +73,6 @@ export const Container = styled.div`
           background: #ffe4e7;
           color: ${colors.colorCoreRed};
           border: 1px solid ${colors.colorCoreRed};
-        }
-
-        &:hover {
-          box-shadow: 0 0 2px 0 rgba(0, 0, 0, 0.4);
         }
       }
     }
@@ -248,48 +238,6 @@ export const Title = styled(FlexContent)`
   }
 `;
 
-export const BackButton = styled.div`
-  width: 35px;
-  height: 35px;
-  border-radius: 35px;
-  line-height: 35px;
-  background: rgba(0, 0, 0, 0.12);
-  text-align: center;
-  margin-right: ${dimensions.unitSpacing}px;
-  color: ${colors.textPrimary};
-  transition: all ease 0.3s;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.18);
-  }
-`;
-
-export const BackIcon = styled.div`
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  margin: ${dimensions.unitSpacing}px 0;
-  font-weight: 500;
-
-  > i {
-    width: 24px;
-    height: 24px;
-    border-radius: 24px;
-    line-height: 24px;
-    text-align: center;
-    margin-right: ${dimensions.unitSpacing - 5}px;
-    background: #f5f5f5;
-    color: ${colors.colorPrimary};
-    transition: all ease 0.3s;
-  }
-
-  &:hover {
-    i {
-      box-shadow: 0 0 2px 0 rgba(101, 105, 223, 0.4);
-    }
-  }
-`;
-
 export const TypeBoxContainer = styled.div`
   position: relative;
 
@@ -333,8 +281,10 @@ export const TypeBox = styled(FlexContent)`
 
   &:hover {
     border-color: ${colors.colorSecondary};
-    box-shadow: 0px 8px 20px rgba(79, 51, 175, 0.24),
-      0px 2px 6px rgba(79, 51, 175, 0.16), 0px 0px 1px rgba(79, 51, 175, 0.08);
+    box-shadow:
+      0px 8px 20px rgba(79, 51, 175, 0.24),
+      0px 2px 6px rgba(79, 51, 175, 0.16),
+      0px 0px 1px rgba(79, 51, 175, 0.08);
   }
 `;
 
@@ -352,7 +302,6 @@ export const CenterBar = styled.div`
   > div {
     height: 30px;
     border: 1px solid ${colors.borderDarker};
-    border-radius: ${dimensions.coreSpacing + dimensions.unitSpacing}px;
 
     span {
       font-weight: 500;
@@ -517,7 +466,7 @@ export const EmptyContent = styled.div`
 export const EnrollmentWrapper = styledTS<{ noMargin?: boolean }>(styled.div)`
   border: 1px solid ${colors.borderPrimary};
   padding: ${dimensions.unitSpacing}px;
-  margin: ${props => (props.noMargin ? '0 0 10px' : '10px 0 0')};
+  margin: ${props => (props.noMargin ? "0 0 10px" : "10px 0 0")};
   border-radius: 5px;
 
   > div {
@@ -684,7 +633,7 @@ export const ZoomIcon = styledTS<{ disabled: boolean }>(styled.div)`
   text-align: center;
   background: ${props =>
     props.disabled ? colors.bgActive : colors.colorWhite};
-  cursor: ${props => (props.disabled ? 'not-allowed' : 'pointer')};
+  cursor: ${props => (props.disabled ? "not-allowed" : "pointer")};
   margin: 0;
   transition: all ease .3s;
 
@@ -714,4 +663,44 @@ export const MainInfo = styled.div`
   > span {
     margin-right: ${dimensions.unitSpacing}px;
   }
+`;
+
+export const FlexContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+export const Features = styledTS<{ isToggled: boolean }>(styled.span)`
+  transition: all ease .3s;
+  filter: ${props => !props.isToggled && `blur(4px)`};
+  pointer-events: ${props => !props.isToggled && `none`};
+`;
+
+const ToolBarButton = styled.i`
+  background: #e3deee;
+  margin-left: ${dimensions.unitSpacing - 5}px;
+  padding: ${dimensions.unitSpacing - 5}px;
+  border-radius: 50%;
+  color: ${colors.colorSecondary};
+  cursor: pointer;
+  border: 1px solid ${colors.colorSecondary};
+`;
+
+export const ToolBarRemoveBtn = styled(ToolBarButton)`
+  background: #ffe4e7;
+  color: ${colors.colorCoreRed};
+  border: 1px solid ${colors.colorCoreRed};
+`;
+
+export const ToolbarBtn = styledTS<{ $color: string }>(styled(ToolBarButton))`
+  background: ${({ $color }) => rgba($color, 0.12)};
+  color: ${({ $color }) => $color};
+  border: 1px solid ${({ $color }) => $color};
+`;
+
+export const ToolbarText = styled.span`
+  margin-left: 10px;
+  color: #444;
+  font-weight: 500;
 `;

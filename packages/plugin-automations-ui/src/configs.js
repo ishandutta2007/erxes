@@ -1,11 +1,12 @@
 module.exports = {
+  srcDir: __dirname,
   name: 'automations',
   port: 3008,
   scope: 'automations',
   exposes: {
     './routes': './src/routes.tsx',
-    // "./settings": "./src/Settings.tsx",
-    './activityLog': './src/activityLogs/index.tsx'
+    './activityLog': './src/activityLogs/index.tsx',
+    './template': './src/templates/template.tsx'
   },
   routes: {
     url: 'http://localhost:3008/remoteEntry.js',
@@ -13,6 +14,7 @@ module.exports = {
     module: './routes'
   },
   activityLog: './activityLog',
+  template: './template',
   menus: [
     {
       text: 'Automations',
@@ -20,6 +22,13 @@ module.exports = {
       location: 'mainNavigation',
       icon: 'icon-circular',
       permission: 'showAutomations'
+    },
+    {
+      text: 'Automations config',
+      to: '/settings/automations/general',
+      image: '/images/icons/erxes-14.svg',
+      location: 'settings',
+      scope: 'automations'
     }
   ]
 };

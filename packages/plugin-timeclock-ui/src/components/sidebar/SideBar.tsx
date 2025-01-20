@@ -1,15 +1,23 @@
-import { router, __ } from '@erxes/ui/src/utils';
-import Sidebar from '@erxes/ui/src/layout/components/Sidebar';
-import React, { useState } from 'react';
-import SelectTeamMembers from '@erxes/ui/src/team/containers/SelectTeamMembers';
-import { FlexColumnCustom, SidebarActions, SidebarHeader } from '../../styles';
+import {
+  FlexColumnCustom,
+  FlexRow,
+  SidebarActions,
+  SidebarHeader,
+  Trigger
+} from '../../styles';
+import { IBranch, IDepartment } from '@erxes/ui/src/team/types';
+import React, { useEffect, useState } from 'react';
+import { __, router } from '@erxes/ui/src/utils';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+import Button from '@erxes/ui/src/components/Button';
+import ControlLabel from '@erxes/ui/src/components/form/Label';
 import { CustomRangeContainer } from '../../styles';
 import DateControl from '@erxes/ui/src/components/form/DateControl';
-import Button from '@erxes/ui/src/components/Button';
-import Select from 'react-select-plus';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { IBranch, IDepartment } from '@erxes/ui/src/team/types';
 import { IUser } from '@erxes/ui/src/auth/types';
+import Select from 'react-select';
+import SelectTeamMembers from '@erxes/ui/src/team/containers/SelectTeamMembers';
+import Sidebar from '@erxes/ui/src/layout/components/Sidebar';
 import { prepareCurrentUserOption } from '../../utils';
 
 type Props = {
@@ -17,32 +25,54 @@ type Props = {
   isCurrentUserAdmin: boolean;
 
   queryParams: any;
-  history: any;
   branches: IBranch[];
   departments: IDepartment[];
 };
-// get 1st of the next Month
+
 const NOW = new Date();
+// get 1st of the next Month
 const startOfNextMonth = new Date(NOW.getFullYear(), NOW.getMonth() + 1, 1);
 // get 1st of this month
 const startOfThisMonth = new Date(NOW.getFullYear(), NOW.getMonth(), 1);
 
 const LeftSideBar = (props: Props) => {
   const {
-    history,
     branches,
     queryParams,
     departments,
     currentUser,
     isCurrentUserAdmin
   } = props;
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [currUserIds, setUserIds] = useState(queryParams.userIds);
 
-  const [selectedBranches, setBranches] = useState(queryParams.branchIds);
+  const [selectedBranches, setBranches] = useState(queryParams.branchIds || '');
   const [selectedDepartments, setDepartments] = useState(
-    queryParams.departmentIds
+    queryParams.departmentIds || ''
   );
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [currentDateOption, setCurrentDateOption] = useState('thisMonth');
+
+  const onMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const onMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const dateOptions = [
+    { label: 'Today', value: 'today' },
+    { label: 'This Week', value: 'thisWeek' },
+    { label: 'This Month', value: 'thisMonth' }
+  ];
+
+  useEffect(() => {
+    resetParams();
+  }, []);
 
   const returnTotalUserOptions = () => {
     const totalUserOptions: string[] = [];
@@ -75,42 +105,33 @@ const LeftSideBar = (props: Props) => {
   );
 
   const cleanFilter = () => {
-    onBranchSelect([]);
-    onDepartmentSelect([]);
-    onMemberSelect([]);
-    onStartDateChange(startOfThisMonth);
-    onEndDateChange(startOfNextMonth);
-    router.removeParams(
-      history,
-      'userIds',
-      'branchIds',
-      'startDate',
-      'endDate',
-      'departmentIds'
-    );
-    removePageParams();
+    resetParams();
   };
 
-  const removePageParams = () => {
-    router.removeParams(history, 'page', 'perPage');
+  const resetParams = () => {
+    setBranches([]);
+    setDepartments([]);
+    setUserIds([]);
+    setStartDate(startOfThisMonth);
+    setEndDate(startOfNextMonth);
+
+    router.setParams(navigate, location, {
+      branchIds: [],
+      departmentIds: [],
+      userIds: [],
+      startDate: startOfThisMonth,
+      endDate: startOfNextMonth
+    });
   };
 
   const setParams = (key: string, value: any) => {
     if (value) {
-      router.setParams(history, {
+      // removePageParams();
+      router.setParams(navigate, location, {
         [key]: value
       });
-
-      removePageParams();
     }
   };
-
-  if (!queryParams.startDate) {
-    setParams('startDate', startOfThisMonth);
-  }
-  if (!queryParams.endDate) {
-    setParams('endDate', startOfNextMonth);
-  }
 
   const renderDepartmentOptions = (depts: IDepartment[]) => {
     return depts.map(dept => ({
@@ -165,7 +186,6 @@ const LeftSideBar = (props: Props) => {
 
   const onEndDateChange = date => {
     setEndDate(date);
-
     setParams('endDate', date);
   };
 
@@ -176,7 +196,7 @@ const LeftSideBar = (props: Props) => {
           <DateControl
             required={false}
             value={startDate}
-            name="startDate"
+            name='startDate'
             placeholder={'Starting date'}
             dateFormat={'YYYY-MM-DD'}
             onChange={onStartDateChange}
@@ -184,7 +204,7 @@ const LeftSideBar = (props: Props) => {
           <DateControl
             required={false}
             value={endDate}
-            name="endDate"
+            name='endDate'
             placeholder={'Ending date'}
             dateFormat={'YYYY-MM-DD'}
             onChange={onEndDateChange}
@@ -198,16 +218,79 @@ const LeftSideBar = (props: Props) => {
     return <SidebarActions>{renderSidebarActions()}</SidebarActions>;
   };
 
+  const onDateButtonClick = (type: string) => {
+    setCurrentDateOption(type);
+    if (type === 'today') {
+      const startOfToday = new Date(NOW.setHours(0, 0, 0, 0));
+      const endOfToday = new Date(NOW.setHours(23, 59, 59, 999));
+      setStartDate(startOfToday);
+      setEndDate(endOfToday);
+      setParams('startDate', startOfToday);
+      setParams('endDate', endOfToday);
+    }
+
+    if (type === 'thisMonth') {
+      const endOfThisMonth = new Date(startOfNextMonth.getTime() - 1);
+
+      setStartDate(startOfThisMonth);
+      setParams('startDate', startOfThisMonth);
+
+      setEndDate(endOfThisMonth);
+      setParams('endDate', endOfThisMonth);
+    }
+
+    if (type === 'thisWeek') {
+      const startOfThisWeek = new Date(NOW.setHours(0, 0, 0, 0));
+      const endOfThisWeek = new Date(NOW.setHours(23, 59, 59, 999));
+
+      // Set the date to the beginning of the current week (Monday)
+      startOfThisWeek.setDate(NOW.getDate() - NOW.getDay() + 1);
+
+      // Set the date to the end of the week (Sunday)
+      endOfThisWeek.setDate(startOfThisWeek.getDate() + 6);
+
+      setStartDate(startOfThisWeek);
+      setParams('startDate', startOfThisWeek);
+
+      setEndDate(endOfThisWeek);
+      setParams('endDate', endOfThisWeek);
+    }
+  };
+
+  const renderDateFilterMenu = () => {
+    return (
+      <Trigger
+        type='trigger'
+        $isHoverActionBar={isHovered}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}>
+        {dateOptions.map(d => {
+          return (
+            <div
+              key={d.value}
+              className={d.value === currentDateOption ? 'active' : 'passive'}
+              onClick={() => onDateButtonClick(d.value)}>
+              {d.label}
+            </div>
+          );
+        })}
+      </Trigger>
+    );
+  };
+
   return (
     <Sidebar wide={true} hasBorder={true} header={renderSidebarHeader()}>
-      <FlexColumnCustom marginNum={20}>
+      <FlexColumnCustom
+        $marginNum={20}
+        style={{ gap: '1rem', padding: '1rem' }}>
+        {renderDateFilterMenu()}
         <div>
           <ControlLabel>Departments</ControlLabel>
           <Select
             value={selectedDepartments}
             onChange={onDepartmentSelect}
-            placeholder="Select departments"
-            multi={true}
+            placeholder='Select departments'
+            isMulti={true}
             options={departments && renderDepartmentOptions(departments)}
           />
         </div>
@@ -216,8 +299,8 @@ const LeftSideBar = (props: Props) => {
           <Select
             value={selectedBranches}
             onChange={onBranchSelect}
-            placeholder="Select branches"
-            multi={true}
+            placeholder='Select branches'
+            isMulti={true}
             options={branches && renderBranchOptions(branches)}
           />
         </div>
@@ -225,9 +308,9 @@ const LeftSideBar = (props: Props) => {
           <ControlLabel>Team members</ControlLabel>
           <SelectTeamMembers
             initialValue={currUserIds}
-            customField="employeeId"
-            label="Select team member"
-            name="userIds"
+            customField='employeeId'
+            label='Select team member'
+            name='userIds'
             customOption={prepareCurrentUserOption(currentUser)}
             filterParams={filterParams}
             queryParams={queryParams}
@@ -235,7 +318,7 @@ const LeftSideBar = (props: Props) => {
           />
         </div>
 
-        <Button btnStyle="warning" onClick={cleanFilter}>
+        <Button btnStyle='warning' onClick={cleanFilter}>
           Clear filter
         </Button>
       </FlexColumnCustom>

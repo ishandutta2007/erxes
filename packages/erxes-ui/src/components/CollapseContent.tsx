@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import Collapse from 'react-bootstrap/Collapse';
-import styled, { css } from 'styled-components';
-import styledTS from 'styled-components-ts';
-import { rgba } from '../styles/ecolor';
-import colors from '../styles/colors';
-import Icon from './Icon';
+import React, { useState } from "react";
+import styled, { css } from "styled-components";
+
+import { Disclosure } from "@headlessui/react";
+import Icon from "./Icon";
+import colors from "../styles/colors";
+import { dimensions } from "../styles";
+import { rgba } from "../styles/ecolor";
+import styledTS from "styled-components-ts";
 
 const Title = styledTS<{
-  compact?: boolean;
-  hasImage?: boolean;
-  background?: string;
+  $compact?: boolean;
+  $hasImage?: boolean;
+  $background?: string;
 }>(styled.a)`
-  padding: ${props => (props.compact ? '10px 20px' : '20px')};
+  padding: ${(props) => (props.$compact ? "10px 20px" : "20px")};
   transition: background 0.3s ease;
   display: flex;
   align-items: center;
@@ -19,27 +21,24 @@ const Title = styledTS<{
   position: relative;
   overflow: hidden;
   color: ${colors.textPrimary};
+  cursor: pointer;
 
   h4 {
-    font-weight: 500;
     margin: 0;
+    font-weight: 400;
   }
 
-  &:hover {
-    cursor: pointer;
-  }
-
-  ${props =>
-    props.hasImage &&
+  ${(props) =>
+    props.$hasImage &&
     css`
       &:after {
-        content: '';
+        content: "";
         display: block;
         position: absolute;
         border-radius: 100% 12%;
         width: 300px;
         height: 200%;
-        background-color: ${rgba(props.background, 0.13)};
+        background-color: ${rgba(props.$background, 0.13)};
         right: -40px;
         top: -30px;
       }
@@ -60,13 +59,29 @@ const Title = styledTS<{
 const Left = styled.div`
   display: flex;
   align-items: center;
+
+  .description {
+    color: ${colors.colorCoreGray};
+  }
+
+  > i {
+    margin-right: ${dimensions.unitSpacing}px;
+    transform: none !important;
+  }
 `;
 
-const Container = styledTS<{ open: boolean }>(styled.div)`
+const Container = styledTS<{ $open: boolean; $transparent?: boolean }>(
+  styled.div
+)`
   margin-bottom: 10px;
-  box-shadow: 0 0 6px 1px rgba(0,0,0,0.08);
+  box-shadow: ${(props) =>
+    props.$transparent ? "none" : "0 0 6px 1px rgba(0,0,0,0.08)"};
   border-radius: 4px;
-  background: ${props => (props.open ? colors.bgLight : colors.colorWhite)};
+  background: ${(props) => (props.$open ? colors.bgLight : colors.colorWhite)};
+  border-bottom: ${(props) =>
+    props.$transparent && !props.$open
+      ? `1px solid ${colors.borderPrimary}`
+      : "none"};
 
   &:last-child {
     margin-bottom: 0;
@@ -75,12 +90,13 @@ const Container = styledTS<{ open: boolean }>(styled.div)`
   > ${Title} i {
     font-size: 20px;
     transition: transform ease 0.3s;
-    transform: ${props => props.open && 'rotate(180deg)'};
+    transform: ${(props) => props.$open && "rotate(180deg)"};
+    line-height: ${dimensions.coreSpacing}px;
   }
 `;
 
-const Content = styledTS<{ full: boolean }>(styled.div)`
-  padding: ${props => (props.full ? '0' : '20px')};
+const Content = styledTS<{ $full: boolean }>(styled.div)`
+  padding: ${(props) => (props.$full ? "0" : "20px")};
   border-top: 1px solid ${colors.borderPrimary};
   background: ${colors.colorWhite};
   border-bottom-left-radius: 4px;
@@ -108,50 +124,66 @@ type Props = {
   imageBackground?: string;
   id?: string;
   full?: boolean;
+  transparent?: boolean;
 };
 
-function CollapseContent(props: Props) {
-  const [open, toggleCollapse] = useState<boolean>(props.open || false);
+function CollapseContent({
+  open,
+  onClick,
+  image,
+  imageBackground,
+  transparent,
+  contendId,
+  compact,
+  beforeTitle,
+  description,
+  title,
+  full,
+  id,
+  children,
+}: Props) {
+  const [toggleOpen, toggleCollapse] = useState<boolean>(open || false);
 
-  const onClick = () => {
-    toggleCollapse(!open);
-    if (props.onClick) {
-      props.onClick();
+  const onTitleClick = () => {
+    toggleCollapse(!toggleOpen);
+
+    if (onClick) {
+      onClick();
     }
   };
-  const hasImage = props.image ? true : false;
+
+  const hasImage = image ? true : false;
 
   return (
-    <Container open={open} id={props.id}>
-      <Title
-        href={props.contendId && `#${props.contendId}`}
-        id={props.contendId}
-        onClick={onClick}
-        compact={props.compact}
-        hasImage={hasImage}
-        background={props.imageBackground}
+    <Disclosure as={Container} id={id} $transparent={transparent} defaultOpen={open}>
+      <Disclosure.Button
+        as={Title}
+        href={contendId && `#${contendId}`}
+        id={contendId}
+        onClick={onTitleClick}
+        $compact={compact}
+        $hasImage={hasImage}
+        $background={imageBackground}
       >
         <Left>
-          {props.beforeTitle}
+          {beforeTitle}
           <div>
-            <h4>{props.title}</h4>
-            {props.description}
+            <h4>{title}</h4>
+            <span className="description">{description}</span>
           </div>
         </Left>
         {hasImage ? (
-          <img alt="heading" src={props.image} />
+          <img alt="heading" src={image} />
         ) : (
           <Icon icon="angle-down" />
         )}
-      </Title>
-      <Collapse in={open}>
+      </Disclosure.Button>
+      <Disclosure.Panel>
         <div>
-          <Content full={hasImage || props.full || false}>
-            {props.children}
-          </Content>
+          <Content $full={hasImage || full || false}>{children}</Content>
         </div>
-      </Collapse>
-    </Container>
+      </Disclosure.Panel>
+    </Disclosure>
   );
 }
 

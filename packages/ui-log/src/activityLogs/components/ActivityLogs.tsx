@@ -1,13 +1,13 @@
-import { TabTitle, Tabs } from '@erxes/ui/src/components/tabs';
+import { TabTitle, Tabs } from "@erxes/ui/src/components/tabs";
 
-import { ActivityContent } from '@erxes/ui/src/styles/main';
-import ActivityList from './ActivityList';
-import DataWithLoader from '@erxes/ui/src/components/DataWithLoader';
-import { IActivityLog } from '../types';
-import { IUser } from '@erxes/ui/src/auth/types';
-import React from 'react';
-import { __ } from 'coreui/utils';
-import { hasAnyActivity } from '../utils';
+import { ActivityContent } from "@erxes/ui/src/styles/main";
+import ActivityList from "./ActivityList";
+import DataWithLoader from "@erxes/ui/src/components/DataWithLoader";
+import { IActivityLog } from "../types";
+import { IUser } from "@erxes/ui/src/auth/types";
+import React from "react";
+import { __ } from "coreui/utils";
+import { hasAnyActivity } from "../utils";
 
 type Props = {
   activityLogs: IActivityLog[];
@@ -31,7 +31,7 @@ class ActivityLogs extends React.PureComponent<Props, State> {
     super(props);
 
     this.state = {
-      currentTab: 'activity'
+      currentTab: "activity"
     };
   }
 
@@ -56,7 +56,7 @@ class ActivityLogs extends React.PureComponent<Props, State> {
     const hasActivity = hasAnyActivity(activityLogs);
 
     return (
-      <ActivityContent isEmpty={!hasActivity}>
+      <ActivityContent $isEmpty={!hasActivity}>
         <DataWithLoader
           loading={loadingLogs}
           count={!loadingLogs && hasActivity ? 1 : 0}
@@ -84,7 +84,7 @@ class ActivityLogs extends React.PureComponent<Props, State> {
       return (
         <TabTitle
           key={Math.random()}
-          className={currentTab === name ? 'active' : ''}
+          className={currentTab === name ? "active" : ""}
           onClick={this.onTabClick.bind(this, name)}
         >
           {__(label)}
@@ -100,16 +100,16 @@ class ActivityLogs extends React.PureComponent<Props, State> {
       <div>
         <Tabs grayBorder={true}>
           <TabTitle
-            className={currentTab === 'activity' ? 'active' : ''}
-            onClick={this.onTabClick.bind(this, 'activity')}
+            className={currentTab === "activity" ? "active" : ""}
+            onClick={this.onTabClick.bind(this, "activity")}
           >
-            {__('Activity')}
+            {__("Activity")}
           </TabTitle>
           <TabTitle
-            className={currentTab === 'internalnotes:note' ? 'active' : ''}
-            onClick={this.onTabClick.bind(this, 'internalnotes:note')}
+            className={currentTab === "core:internalNote" ? "active" : ""}
+            onClick={this.onTabClick.bind(this, "core:internalNote")}
           >
-            {__('Notes')}
+            {__("Notes")}
           </TabTitle>
           {this.renderExtraTabs()}
         </Tabs>

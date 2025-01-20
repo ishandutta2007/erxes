@@ -1,10 +1,12 @@
-import { Attributes } from '../styles';
+import { AttributeTrigger, Attributes } from '../styles';
+import ControlLabel from '@erxes/ui/src/components/form/Label';
 import { FieldsCombinedByType } from '@erxes/ui-forms/src/settings/properties/types';
+import FormControl from '@erxes/ui/src/components/form/Control';
+import FormGroup from '@erxes/ui/src/components/form/Group';
 import Icon from '@erxes/ui/src/components/Icon';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Popover from 'react-bootstrap/Popover';
+import Popover from '@erxes/ui/src/components/Popover';
 import React from 'react';
-import { __ } from 'coreui/utils';
+import { __, colors } from '@erxes/ui/src';
 
 type Props = {
   config: any;
@@ -18,12 +20,23 @@ type Props = {
   onlySet?: boolean;
 };
 
-export default class Attribution extends React.Component<Props> {
+type State = {
+  searchValue: string;
+};
+
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+export default class Attribution extends React.Component<Props, State> {
   private overlay: any;
 
-  hideContent = () => {
-    this.overlay.hide();
-  };
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      searchValue: ''
+    };
+  }
 
   getComma = preValue => {
     if (this.props.fieldType === 'select' && preValue) {
@@ -37,9 +50,7 @@ export default class Attribution extends React.Component<Props> {
     return '';
   };
 
-  onClickAttribute = item => {
-    this.overlay.hide();
-
+  onClickAttribute = (item, close) => {
     const { config, setConfig, onlySet, inputName = 'value' } = this.props;
 
     if (onlySet) {
@@ -51,56 +62,82 @@ export default class Attribution extends React.Component<Props> {
     }
 
     setConfig(config);
+    close();
   };
 
-  renderContent() {
+  render() {
     const { attributions, attrType, attrTypes } = this.props;
+    const { searchValue } = this.state;
     let filterAttrs = attributions;
 
+    const onSearch = e => {
+      const { value } = e.currentTarget as HTMLInputElement;
+
+      this.setState({ searchValue: value });
+    };
+
     if (attrType && attrType !== 'String') {
-      filterAttrs = filterAttrs.filter(f => f.type === attrType);
-    }
-    if (attrTypes?.length) {
-      filterAttrs = filterAttrs.filter(f => attrTypes.includes(f.type));
+      filterAttrs = filterAttrs.filter(
+        ({ type, validation = '' }) =>
+          type === attrType || validation === attrType.toLowerCase()
+      );
     }
 
-    return (
-      <Popover id="attribute-popover">
+    if (attrTypes?.length) {
+      filterAttrs = filterAttrs.filter(
+        ({ type, validation = '' }) =>
+          attrTypes.includes(type) ||
+          attrTypes.includes(capitalizeFirstLetter(validation))
+      );
+    }
+
+    if (searchValue) {
+      filterAttrs = filterAttrs.filter(option =>
+        new RegExp(searchValue, 'i').test(option.label)
+      );
+    }
+
+    const lists = close => {
+      return (
         <Attributes>
           <React.Fragment>
+            <FormGroup>
+              <ControlLabel>{__('Search')}</ControlLabel>
+              <FormControl
+                placeholder="Type to search"
+                value={searchValue}
+                onChange={onSearch}
+              />
+            </FormGroup>
             <li>
               <b>{__('Attributions')}</b>
             </li>
             {filterAttrs.map(item => (
               <li
                 key={item.name}
-                onClick={this.onClickAttribute.bind(this, item)}
+                onClick={this.onClickAttribute.bind(this, item, close)}
               >
                 {__(item.label)}
               </li>
             ))}
           </React.Fragment>
         </Attributes>
-      </Popover>
-    );
-  }
+      );
+    };
 
-  render() {
     return (
-      <OverlayTrigger
-        ref={overlay => {
-          this.overlay = overlay;
-        }}
-        trigger="click"
+      <Popover
+        innerRef={this.overlay}
+        trigger={
+          <AttributeTrigger>
+            {__('Attribution')} <Icon icon="angle-down" />
+          </AttributeTrigger>
+        }
         placement="top"
-        overlay={this.renderContent()}
-        rootClose={true}
-        container={this}
+        closeAfterSelect={true}
       >
-        <span>
-          {__('Attribution')} <Icon icon="angle-down" />
-        </span>
-      </OverlayTrigger>
+        {lists}
+      </Popover>
     );
   }
 }

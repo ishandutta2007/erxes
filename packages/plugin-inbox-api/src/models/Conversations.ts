@@ -12,8 +12,11 @@ import {
   IConversationDocument
 } from './definitions/conversations';
 import { IModels } from '../connectionResolver';
-import { sendCoreMessage, sendFormsMessage } from '../messageBroker';
-import { sendToWebhook } from '../messageBroker';
+import { sendCoreMessage } from '../messageBroker';
+import { putCreateLog } from '../logUtils';
+import { MODULE_NAMES } from '../constants';
+import { sendToWebhook } from '@erxes/api-utils/src';
+import graphqlPubsub from '@erxes/api-utils/src/graphqlPubsub';
 export interface IConversationModel extends Model<IConversationDocument> {
   getConversation(_id: string): IConversationDocument;
   createConversation(doc: IConversation): Promise<IConversationDocument>;
@@ -136,6 +139,19 @@ export const loadClass = (models: IModels, subdomain: string) => {
         }
       });
 
+      await putCreateLog(
+        models,
+        subdomain,
+        {
+          type: MODULE_NAMES.CONVERSATION,
+          newData: result,
+          object: result
+        },
+        {
+          _id: doc.customerId
+        }
+      );
+
       return result;
     }
 
@@ -150,7 +166,7 @@ export const loadClass = (models: IModels, subdomain: string) => {
       doc.updatedAt = new Date();
 
       // clean custom field values
-      doc.customFieldsData = await sendFormsMessage({
+      doc.customFieldsData = await sendCoreMessage({
         subdomain,
         action: 'fields.prepareCustomFieldsData',
         data: doc.customFieldsData,
@@ -303,6 +319,9 @@ export const loadClass = (models: IModels, subdomain: string) => {
         readUserIds.push(userId);
         await models.Conversations.updateConversation(_id, { readUserIds });
       }
+      graphqlPubsub.publish(`conversationChanged:${_id}`, {
+        conversationChanged: { conversationId: _id, type: 'inbox:conversation' }
+      });
 
       return models.Conversations.findOne({ _id });
     }
@@ -379,7 +398,7 @@ export const loadClass = (models: IModels, subdomain: string) => {
       });
 
       // Removing conversations and conversation messages
-      const conversationIds = conversations.map(conv => conv._id);
+      const conversationIds = conversations.map((conv) => conv._id);
 
       await models.ConversationMessages.deleteMany({
         conversationId: { $in: conversationIds }
@@ -393,7 +412,7 @@ export const loadClass = (models: IModels, subdomain: string) => {
      */
     public static async removeEngageConversations(engageMessageId: string) {
       await stream(
-        async chunk => {
+        async (chunk) => {
           await models.ConversationMessages.deleteMany({
             conversationId: { $in: chunk }
           });
@@ -428,7 +447,7 @@ export const loadClass = (models: IModels, subdomain: string) => {
         isCustomerRead: { $ne: true }
       };
 
-      const conversationIds = conversations.map(c => c._id);
+      const conversationIds = conversations.map((c) => c._id);
 
       return {
         conversationId: { $in: conversationIds },
@@ -479,8 +498,8 @@ export const loadClass = (models: IModels, subdomain: string) => {
       const type = args.skillId ? 'SS' : '';
 
       return users
-        .map(user => user.code + type)
-        .filter(code => code !== '' && code !== undefined)
+        .map((user) => user.code + type)
+        .filter((code) => code !== '' && code !== undefined)
         .join('|');
     }
   }

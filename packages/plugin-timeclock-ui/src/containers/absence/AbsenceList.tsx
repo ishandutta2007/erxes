@@ -24,7 +24,6 @@ type Props = {
 
   isCurrentUserAdmin: boolean;
 
-  history: any;
   queryParams: any;
   explanation?: string;
   userId?: string;
@@ -67,9 +66,9 @@ const ListContainer = (props: FinalProps) => {
     return <Spinner />;
   }
 
-  const solveAbsence = (absenceId: string, status: string) => {
+  const solveAbsence = (absenceId: string, variables: any) => {
     solveAbsenceMutation({
-      variables: { _id: absenceId, status: `${status}` }
+      variables: { _id: absenceId, ...variables }
     })
       .then(() => Alert.success('Successfully solved absence request'))
       .catch(err => Alert.error(err.message));
@@ -209,11 +208,7 @@ export default withProps<Props>(
       gql(mutations.solveAbsenceRequest),
       {
         name: 'solveAbsenceMutation',
-        options: ({ absenceId, absenceStatus }) => ({
-          variables: {
-            _id: absenceId,
-            status: absenceStatus
-          },
+        options: () => ({
           refetchQueries: ['requestsMain']
         })
       }

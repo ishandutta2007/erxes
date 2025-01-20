@@ -12,6 +12,7 @@ import React from 'react';
 import TopBar from './TopBar';
 import { WebPreview } from '@erxes/ui-engage/src/styles';
 import WidgetContent from './WidgetContent';
+import { readFile } from '@erxes/ui/src/utils/core';
 
 type Props = {
   teamMembers: IUser[];
@@ -34,6 +35,7 @@ type Props = {
   messengerApps?: IMessengerApps;
   activeStep?: string;
   facebook?: string;
+  instagram?: string;
   twitter?: string;
   youtube?: string;
 };
@@ -93,7 +95,7 @@ class CommonPreview extends React.Component<Props> {
           style={Object.assign(
             {
               backgroundColor: color,
-              backgroundImage: `url(${logoPreviewUrl})`
+              backgroundImage: `url(${readFile(logoPreviewUrl || '')})`
             },
             logoPreviewStyle
           )}

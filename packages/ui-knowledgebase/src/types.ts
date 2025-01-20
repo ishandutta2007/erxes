@@ -1,4 +1,4 @@
-import { IAttachment, QueryResponse } from '@erxes/ui/src/types';
+import { IAttachment, IPdfAttachment, QueryResponse } from '@erxes/ui/src/types';
 
 import { IBrand } from '@erxes/ui/src/brands/types';
 import { IUser } from '@erxes/ui/src/auth/types';
@@ -9,18 +9,24 @@ export interface IArticle {
   summary: string;
   content: string;
   status: string;
+  isPrivate: boolean;
   reactionChoices: string[];
   reactionCounts: any;
   createdBy: string;
   createdUser: IUser;
   createdDate: Date;
+  scheduledDate: Date;
   modifiedBy: string;
   modifiedDate: Date;
   topicId: string;
   categoryId: string;
   image: IAttachment;
   attachments: [IAttachment];
+  pdfAttachment: IPdfAttachment;
   forms: IErxesForm[];
+  code?: string;
+  publishedUserId?: string;
+  publishedUser?: IUser;
 }
 
 export interface ITopic {
@@ -38,6 +44,7 @@ export interface ITopic {
   modifiedDate: Date;
   parentCategories: ICategory[];
   notificationSegmentId: string;
+  code?: string;
 }
 
 export interface ICategory {
@@ -52,6 +59,7 @@ export interface ICategory {
   modifiedDate: Date;
   firstTopic: ITopic;
   parentCategoryId?: string;
+  code?: string;
 }
 
 export interface IErxesForm {
@@ -66,7 +74,9 @@ export type ArticleVariables = {
   summary: string;
   content: string;
   status: string;
+  isPrivate: boolean;
   categoryIds: string[];
+  code?: string;
 };
 
 export type AddArticlesMutationResponse = {
@@ -94,6 +104,8 @@ export type CategoryVariables = {
   topicIds: string[];
 };
 
+
+
 export type AddCategoriesMutationResponse = {
   addCategoriesMutation: (params: {
     variables: CategoryVariables;
@@ -116,6 +128,7 @@ export type TopicVariables = {
   brandId: string;
   languageCode: string;
   color: string;
+  code?: string;
 };
 
 export type AddTopicsMutationResponse = {

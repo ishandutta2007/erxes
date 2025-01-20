@@ -1,23 +1,21 @@
+import { debugError, debugInfo } from '@erxes/api-utils/src/debuggers';
+import { sendMessage } from '@erxes/api-utils/src/messageBroker';
+import { getEnv } from '@erxes/api-utils/src';
 import { IModels } from './connectionResolver';
-import {
-  ACTIVITY_CONTENT_TYPES,
-  ACTIVITY_LOG_ACTIONS,
-  CAMPAIGN_KINDS
-} from './constants';
-import { debugEngages, debugError } from './debuggers';
+import { ACTIVITY_CONTENT_TYPES, CAMPAIGN_KINDS } from './constants';
 import { prepareEmailParams } from './emailUtils';
-import messageBroker from './messageBroker';
 import {
   getTelnyxInfo,
   handleMessageCallback,
-  prepareMessage
+  prepareMessage,
 } from './telnyxUtils';
 import { ICustomer, IEmailParams, ISmsParams } from './types';
 import {
   createTransporter,
   getConfig,
   getConfigs,
-  setCampaignCount
+  getValueAsString,
+  setCampaignCount,
 } from './utils';
 
 export const start = async (
@@ -31,10 +29,16 @@ export const start = async (
     createdBy,
     title,
     fromEmail,
-    email
+    email,
   } = data;
 
   const configs = await getConfigs(models);
+  const configSet = await getValueAsString(
+    models,
+    "configSet",
+    "AWS_SES_CONFIG_SET",
+    "erxes"
+  );
 
   await models.Stats.findOneAndUpdate(
     { engageMessageId },
@@ -55,7 +59,7 @@ export const start = async (
   const sendCampaignEmail = async (customer: ICustomer) => {
     try {
       await transporter.sendMail(
-        prepareEmailParams(customer, data, configs.configSet)
+        prepareEmailParams(subdomain, customer, data, configSet)
       );
 
       const msg = `Sent email to: ${customer.primaryEmail}`;
@@ -90,15 +94,15 @@ export const start = async (
     );
 
     filteredCustomers = customers.filter(
-      c => c.primaryEmail && c.emailValidationStatus === 'valid'
+      (c) => c.primaryEmail && c.emailValidationStatus === 'valid'
     );
   } else {
     filteredCustomers = customers;
   }
 
   const malformedEmails = filteredCustomers
-    .filter(c => !c.primaryEmail.includes('@'))
-    .map(c => c.primaryEmail);
+    .filter((c) => !c.primaryEmail.includes('@'))
+    .map((c) => c.primaryEmail);
 
   if (malformedEmails.length > 0) {
     await models.Logs.createLog(
@@ -109,12 +113,12 @@ export const start = async (
   }
 
   // customer email can come as malformed
-  filteredCustomers = filteredCustomers.filter(c =>
+  filteredCustomers = filteredCustomers.filter((c) =>
     c.primaryEmail.includes('@')
   );
 
   // finalized email list
-  emails = filteredCustomers.map(customer => customer.primaryEmail);
+  emails = filteredCustomers.map((customer) => customer.primaryEmail);
 
   await models.Logs.createLog(
     engageMessageId,
@@ -126,14 +130,14 @@ export const start = async (
   await setCampaignCount(models, {
     _id: engageMessageId,
     totalCustomersCount: filteredCustomers.length,
-    validCustomersCount: filteredCustomers.length
+    validCustomersCount: filteredCustomers.length,
   });
 
   for (const customer of filteredCustomers) {
     // multiple customers could have same emails, so check before sending
     const delivery = await models.DeliveryReports.findOne({
       engageMessageId,
-      email: customer.primaryEmail
+      email: customer.primaryEmail,
     });
 
     if (delivery) {
@@ -146,15 +150,15 @@ export const start = async (
       continue;
     }
 
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       setTimeout(resolve, 1000);
     });
 
     await sendCampaignEmail(customer);
 
     try {
-      await messageBroker().sendMessage('putActivityLog', {
-        action: ACTIVITY_LOG_ACTIONS.SEND_EMAIL_CAMPAIGN,
+      await sendMessage('putActivityLog', {
+        subdomain,
         data: {
           action: 'send',
           contentType: 'campaign',
@@ -163,10 +167,10 @@ export const start = async (
             campaignId: engageMessageId,
             title,
             to: customer.primaryEmail,
-            type: ACTIVITY_CONTENT_TYPES.EMAIL
+            type: ACTIVITY_CONTENT_TYPES.EMAIL,
           },
-          createdBy
-        }
+          createdBy,
+        },
       });
     } catch (e) {
       await models.Logs.createLog(
@@ -184,20 +188,14 @@ export const sendBulkSms = async (
   subdomain: string,
   data: ISmsParams
 ) => {
-  const {
-    customers,
-    engageMessageId,
-    shortMessage,
-    createdBy,
-    title,
-    kind
-  } = data;
+  const { customers, engageMessageId, shortMessage, createdBy, title, kind } =
+    data;
 
   const telnyxInfo = await getTelnyxInfo(subdomain);
   const smsLimit = await getConfig(models, 'smsLimit', 0);
 
   const validCustomers = customers.filter(
-    c => c.primaryPhone && c.phoneValidationStatus === 'valid'
+    (c) => c.primaryPhone && c.phoneValidationStatus === 'valid'
   );
 
   if (kind === CAMPAIGN_KINDS.AUTO) {
@@ -233,18 +231,18 @@ export const sendBulkSms = async (
   await setCampaignCount(models, {
     _id: engageMessageId,
     totalCustomersCount: customers.length,
-    validCustomersCount: validCustomers.length
+    validCustomersCount: validCustomers.length,
   });
 
   for (const customer of validCustomers) {
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       setTimeout(resolve, 1000);
     });
 
     const msg = await prepareMessage({
       shortMessage,
       to: customer.primaryPhone,
-      integrations: telnyxInfo.integrations
+      integrations: telnyxInfo.integrations,
     });
 
     try {
@@ -253,7 +251,7 @@ export const sendBulkSms = async (
         async (err: any, res: any) => {
           await handleMessageCallback(models, err, res, {
             engageMessageId,
-            msg
+            msg,
           });
         }
       ); // end sms creation
@@ -266,8 +264,8 @@ export const sendBulkSms = async (
     }
 
     try {
-      await messageBroker().sendMessage('putActivityLog', {
-        action: ACTIVITY_LOG_ACTIONS.SEND_SMS_CAMPAIGN,
+      await sendMessage('putActivityLog', {
+        subdomain,
         data: {
           action: 'send',
           contentType: 'campaign',
@@ -276,10 +274,10 @@ export const sendBulkSms = async (
             campaignId: engageMessageId,
             title,
             to: customer.primaryPhone,
-            type: ACTIVITY_CONTENT_TYPES.SMS
+            type: ACTIVITY_CONTENT_TYPES.SMS,
           },
-          createdBy
-        }
+          createdBy,
+        },
       });
     } catch (e) {
       await models.Logs.createLog(
@@ -291,20 +289,30 @@ export const sendBulkSms = async (
   } // end customers loop
 }; // end sendBuklSms()
 
-export const sendEmail = async (models: IModels, data: any) => {
+export const sendEmail = async (
+  subdomain: string,
+  models: IModels,
+  data: any
+) => {
   const transporter = await createTransporter(models);
   const { customer } = data;
-  const configs = await getConfigs(models);
+
+  const configSet = await getValueAsString(
+    models,
+    "configSet",
+    "AWS_SES_CONFIG_SET",
+    "erxes"
+  );
 
   try {
     await transporter.sendMail(
-      prepareEmailParams(customer, data, configs.configSet)
+      prepareEmailParams(subdomain, customer, data, configSet)
     );
 
-    debugEngages(`Sent email to: ${customer.primaryEmail}`);
+    debugInfo(`Sent email to: ${customer?.primaryEmail}`);
   } catch (e) {
     debugError(
-      `Error occurred while sending email to ${customer.primaryEmail}: ${e.message}`
+      `Error occurred while sending email to ${customer?.primaryEmail}: ${e.message}`
     );
   }
 };

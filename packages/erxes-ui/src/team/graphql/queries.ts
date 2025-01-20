@@ -34,6 +34,7 @@ const allUsers = `
       details {
         avatar
         fullName
+        position
         ${nameFields}
       }
     }
@@ -60,6 +61,7 @@ const listParamsDef = `
   $brandIds: [String]
   $departmentId: String
   $unitId: String
+  $isAssignee: Boolean
   $branchId: String
   $departmentIds: [String]
   $branchIds: [String]
@@ -75,6 +77,7 @@ const listParamsValue = `
   departmentId: $departmentId,
   unitId: $unitId,
   branchId: $branchId,
+  isAssignee: $isAssignee
   departmentIds: $departmentIds
   branchIds:$branchIds
   segment: $segment,
@@ -92,7 +95,7 @@ const users = `
       groupIds
       brandIds
       score
-
+      positionIds
       details {
         ${detailFields}
       }
@@ -166,6 +169,7 @@ const departmentsMain = `
     departmentsMain(${commonStructureParamsValue},withoutUserFilter:$withoutUserFilter) {
       list {
         ${departmentField}
+        workhours
       }
       totalCount
       totalUsersCount
@@ -200,6 +204,7 @@ export const unitField = `
   }
   code
   userIds
+  userCount
   users {
     _id
     details {
@@ -262,9 +267,26 @@ export const branchField = `
     }
   }
   radius
+  hasChildren
   ${contactInfoFields}
 `;
 
+const positionField = `
+  _id
+  title
+  parentId
+  code
+  order
+  userIds
+  userCount
+  users {
+    _id
+    details {
+      avatar
+      fullName
+    }
+  }
+`;
 const branches = `
   query branches(${commonStructureParamsDef}, $withoutUserFilter: Boolean) {
     branches (${commonStructureParamsValue}, withoutUserFilter: $withoutUserFilter){
@@ -275,11 +297,34 @@ const branches = `
 `;
 
 const branchesMain = `
-  query branchesMain(${commonStructureParamsDef}, $withoutUserFilter: Boolean) {
-    branchesMain (${commonStructureParamsValue}, withoutUserFilter: $withoutUserFilter){
+  query branchesMain(${commonStructureParamsDef}, $withoutUserFilter: Boolean,$parentId:String,$onlyFirstLevel:Boolean) {
+    branchesMain (${commonStructureParamsValue}, withoutUserFilter: $withoutUserFilter,parentId: $parentId,onlyFirstLevel:$onlyFirstLevel){
       list {
         ${branchField}
         parent {${branchField}}
+        workhours
+      }
+      totalCount
+      totalUsersCount
+    }
+  }
+`;
+
+const positions = `
+  query positions(${commonStructureParamsDef}, $withoutUserFilter: Boolean) {
+    positions (${commonStructureParamsValue}, withoutUserFilter: $withoutUserFilter){
+      ${positionField}
+      parent {${positionField}}
+    }
+  }
+`;
+
+const positionsMain = `
+  query positionsMain(${commonStructureParamsDef}) {
+    positionsMain (${commonStructureParamsValue}){
+      list {
+        ${positionField}
+        parent {${positionField}}
       }
       totalCount
       totalUsersCount
@@ -298,6 +343,11 @@ const userDetail = `
       groupIds
       branchIds
       departmentIds
+      positionIds
+      positions {
+        _id
+        title
+      }
 
       details {
         ${detailFields}
@@ -370,7 +420,7 @@ const structureDetail = `
 `;
 
 const departmentDetail = `
-  query departmentDetail($_id: String) {
+  query departmentDetail($_id: String!) {
     departmentDetail(_id: $_id) {
       ${departmentField}
     }
@@ -378,7 +428,7 @@ const departmentDetail = `
 `;
 
 const unitDetail = `
-  query unitDetail($_id: String) {
+  query unitDetail($_id: String!) {
     unitDetail(_id: $_id) {
       ${unitField}
     }
@@ -399,9 +449,17 @@ const noDepartmentUsers = `
 `;
 
 const branchDetail = `
-  query branchDetail($_id: String) {
+  query branchDetail($_id: String!) {
     branchDetail(_id: $_id) {
       ${branchField}
+    }
+  }
+`;
+
+const postionDetail = `
+  query PositionDetail($_id: String) {
+    positionDetail(_id: $_id) {
+      ${positionField}
     }
   }
 `;
@@ -507,6 +565,21 @@ const userMovements = `
   }
 `;
 
+const userList = `
+  query objects($searchValue: String, $requireUsername: Boolean) {
+    users(searchValue: $searchValue, requireUsername: $requireUsername) {
+      _id
+      username
+      email
+      details {
+        avatar
+        fullName
+        position
+      }
+    }
+  }
+`;
+
 export default {
   userSkills,
   userDetail,
@@ -529,5 +602,9 @@ export default {
   channels: channelQueries.channels,
   skillTypes,
   fieldsGroups,
-  userMovements
+  userMovements,
+  userList,
+  positionsMain,
+  positions,
+  postionDetail,
 };

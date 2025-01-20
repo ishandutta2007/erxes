@@ -1,33 +1,34 @@
-import * as strip from 'strip';
-import * as _ from 'underscore';
+import * as strip from "strip";
+import * as _ from "underscore";
 
 import {
   checkPermission,
   requireLogin
-} from '@erxes/api-utils/src/permissions';
-import { IUserDocument } from '@erxes/api-utils/src/types';
+} from "@erxes/api-utils/src/permissions";
+import { IUserDocument } from "@erxes/api-utils/src/types";
 
-import { MESSAGE_TYPES } from '../../models/definitions/constants';
-import { IMessageDocument } from '../../models/definitions/conversationMessages';
-import { IConversationDocument } from '../../models/definitions/conversations';
-import { AUTO_BOT_MESSAGES } from '../../models/definitions/constants';
-import { debug, serviceDiscovery, graphqlPubsub } from '../../configs';
+import { IMessageDocument } from "../../models/definitions/conversationMessages";
+import { IConversationDocument } from "../../models/definitions/conversations";
+import { AUTO_BOT_MESSAGES } from "../../models/definitions/constants";
+import { debugError } from "@erxes/api-utils/src/debuggers";
 import {
-  sendContactsMessage,
-  sendCardsMessage,
   sendCoreMessage,
-  sendIntegrationsMessage,
   sendNotificationsMessage,
-  sendToWebhook,
   sendCommonMessage,
-  sendAutomationsMessage
-} from '../../messageBroker';
-import { putUpdateLog } from '../../logUtils';
-import QueryBuilder, { IListArgs } from '../../conversationQueryBuilder';
-import { CONVERSATION_STATUSES } from '../../models/definitions/constants';
-import { generateModels, IContext, IModels } from '../../connectionResolver';
-import { isServiceRunning } from '../../utils';
-import { IIntegrationDocument } from '../../models/definitions/integrations';
+  sendAutomationsMessage,
+  sendSalesMessage,
+  sendTicketsMessage,
+  sendPurchasesMessage,
+  sendTasksMessage
+} from "../../messageBroker";
+import { putUpdateLog } from "../../logUtils";
+import QueryBuilder, { IListArgs } from "../../conversationQueryBuilder";
+import { CONVERSATION_STATUSES } from "../../models/definitions/constants";
+import { generateModels, IContext, IModels } from "../../connectionResolver";
+import { isServiceRunning } from "../../utils";
+import { IIntegrationDocument } from "../../models/definitions/integrations";
+import graphqlPubsub from "@erxes/api-utils/src/graphqlPubsub";
+import { sendToWebhook } from "@erxes/api-utils/src";
 
 export interface IConversationMessageAdd {
   conversationId: string;
@@ -53,7 +54,6 @@ interface IConversationConvert {
   itemId: string;
   stageId: string;
   itemName: string;
-  bookingProductId?: string;
   customFieldsData?: { [key: string]: any };
   priority?: string;
   assignedUserIds?: string[];
@@ -78,9 +78,9 @@ const sendConversationToServices = async (
       subdomain,
       isRPC: true,
       serviceName,
-      action: 'api_to_integrations',
+      action: "api_to_integrations",
       data: {
-        action: `reply-${integration.kind.split('-')[1]}`,
+        action: `reply-${integration.kind.split("-")[1]}`,
         type: serviceName,
         payload: JSON.stringify(payload),
         integrationId: integration._id
@@ -136,7 +136,7 @@ export const publishConversationsChanged = async (
   const models = await generateModels(subdomain);
 
   for (const _id of _ids) {
-    graphqlPubsub.publish('conversationChanged', {
+    graphqlPubsub.publish(`conversationChanged:${_id}`, {
       conversationChanged: { conversationId: _id, type }
     });
 
@@ -144,7 +144,7 @@ export const publishConversationsChanged = async (
 
     sendAutomationsMessage({
       subdomain,
-      action: 'trigger',
+      action: "trigger",
       data: {
         type: `inbox:conversation`,
         targets: [conversation]
@@ -163,18 +163,22 @@ export const publishMessage = async (
   message: IMessageDocument,
   customerId?: string
 ) => {
-  graphqlPubsub.publish('conversationMessageInserted', {
-    conversationMessageInserted: message
-  });
+  graphqlPubsub.publish(
+    `conversationMessageInserted:${message.conversationId}`,
+    {
+      conversationMessageInserted: message
+    }
+  );
 
   // widget is listening for this subscription to show notification
   // customerId available means trying to notify to client
   if (customerId) {
-    const unreadCount = await models.ConversationMessages.widgetsGetUnreadMessagesCount(
-      message.conversationId
-    );
+    const unreadCount =
+      await models.ConversationMessages.widgetsGetUnreadMessagesCount(
+        message.conversationId
+      );
 
-    graphqlPubsub.publish('conversationAdminMessageInserted', {
+    graphqlPubsub.publish(`conversationAdminMessageInserted:${customerId}`, {
       conversationAdminMessageInserted: {
         customerId,
         unreadCount
@@ -200,40 +204,44 @@ export const sendNotifications = async (
   }
 ) => {
   for (const conversation of conversations) {
+    if (!conversation || !conversation._id) {
+      throw new Error("Error: Conversation or Conversation ID is undefined");
+    }
+
+    if (!user || !user._id) {
+      throw new Error("Error: User or User ID is undefined");
+    }
+
     const doc = {
       createdUser: user,
       link: `/inbox/index?_id=${conversation._id}`,
-      title: 'Conversation updated',
+      title: "Conversation updated",
       content: messageContent
         ? messageContent
-        : conversation.content || 'Conversation updated',
+        : conversation.content || "Conversation updated",
       notifType: type,
       receivers: conversationNotifReceivers(conversation, user._id),
-      action: 'updated conversation',
-      contentType: 'conversation',
+      action: "updated conversation",
+      contentType: "conversation",
       contentTypeId: conversation._id
     };
 
     switch (type) {
-      case 'conversationAddMessage':
+      case "conversationAddMessage":
         doc.action = `sent you a message`;
         doc.receivers = conversationNotifReceivers(conversation, user._id);
-
         break;
-      case 'conversationAssigneeChange':
-        doc.action = 'has assigned you to conversation ';
-
+      case "conversationAssigneeChange":
+        doc.action = "has assigned you to conversation ";
         break;
-      case 'unassign':
-        doc.notifType = 'conversationAssigneeChange';
-        doc.action = 'has removed you from conversation';
-
+      case "unassign":
+        doc.notifType = "conversationAssigneeChange";
+        doc.action = "has removed you from conversation";
         break;
-      case 'conversationStateChange':
+      case "conversationStateChange":
         doc.action = `changed conversation status to ${(
-          conversation.status || ''
+          conversation.status || ""
         ).toUpperCase()}`;
-
         break;
       default:
         break;
@@ -241,16 +249,15 @@ export const sendNotifications = async (
 
     await sendNotificationsMessage({
       subdomain,
-      action: 'send',
+      action: "send",
       data: doc
     });
 
     if (mobile) {
-      // send mobile notification ======
       try {
         await sendCoreMessage({
           subdomain,
-          action: 'sendMobileNotification',
+          action: "sendMobileNotification",
           data: {
             title: doc.title,
             body: strip(doc.content),
@@ -262,13 +269,13 @@ export const sendNotifications = async (
             customerId: conversation.customerId,
             conversationId: conversation._id,
             data: {
-              type: 'messenger',
+              type: "messenger",
               id: conversation._id
             }
           }
         });
       } catch (e) {
-        debug.error(`Failed to send mobile notification: ${e.message}`);
+        debugError(`Failed to send mobile notification: ${e.message}`);
       }
     }
   }
@@ -302,16 +309,16 @@ const conversationMutations = {
     await sendNotifications(subdomain, {
       user,
       conversations: [conversation],
-      type: 'conversationAddMessage',
+      type: "conversationAddMessage",
       mobile: true,
       messageContent: doc.content
     });
 
     const kind = integration.kind;
 
-    const customer = await sendContactsMessage({
+    const customer = await sendCoreMessage({
       subdomain,
-      action: 'customers.findOne',
+      action: "customers.findOne",
       data: {
         _id: conversation.customerId
       },
@@ -320,15 +327,15 @@ const conversationMutations = {
 
     // if conversation's integration kind is form then send reply to
     // customer's email
-    const email = customer ? customer.primaryEmail : '';
+    const email = customer ? customer.primaryEmail : "";
 
-    if (!doc.internal && kind === 'lead' && email) {
+    if (!doc.internal && kind === "lead" && email) {
       await sendCoreMessage({
         subdomain,
-        action: 'sendEmail',
+        action: "sendEmail",
         data: {
           toEmails: [email],
-          title: 'Reply',
+          title: "Reply",
           template: {
             data: doc.content
           }
@@ -336,14 +343,14 @@ const conversationMutations = {
       });
     }
 
-    const serviceName = integration.kind.split('-')[0];
+    const serviceName = integration.kind.split("-")[0];
     const serviceRunning = await isServiceRunning(serviceName);
 
     if (serviceRunning) {
       const payload = {
         integrationId: integration._id,
         conversationId: conversation._id,
-        content: doc.content || '',
+        content: doc.content || "",
         internal: doc.internal,
         attachments: doc.attachments || [],
         extraInfo: doc.extraInfo,
@@ -363,7 +370,7 @@ const conversationMutations = {
 
         if (!!conversationId && !!content) {
           await models.Conversations.updateConversation(conversationId, {
-            content: content || '',
+            content: content || "",
             updatedAt: new Date()
           });
         }
@@ -391,8 +398,8 @@ const conversationMutations = {
     await sendToWebhook({
       subdomain,
       data: {
-        action: 'create',
-        type: 'inbox:userMessages',
+        action: "create",
+        type: "inbox:userMessages",
         params: dbMessage
       }
     });
@@ -418,18 +425,19 @@ const conversationMutations = {
       _id: { $in: conversationIds }
     });
 
-    const conversations: IConversationDocument[] = await models.Conversations.assignUserConversation(
-      conversationIds,
-      assignedUserId
-    );
+    const conversations: IConversationDocument[] =
+      await models.Conversations.assignUserConversation(
+        conversationIds,
+        assignedUserId
+      );
 
     // notify graphl subscription
-    publishConversationsChanged(subdomain, conversationIds, 'assigneeChanged');
+    publishConversationsChanged(subdomain, conversationIds, "assigneeChanged");
 
     await sendNotifications(subdomain, {
       user,
       conversations,
-      type: 'conversationAssigneeChange'
+      type: "conversationAssigneeChange"
     });
 
     for (const conversation of conversations) {
@@ -437,8 +445,8 @@ const conversationMutations = {
         models,
         subdomain,
         {
-          type: 'conversation',
-          description: 'assignee Changed',
+          type: "conversation",
+          description: "assignee Changed",
           object: oldConversationById[conversation._id],
           newData: { assignedUserId },
           updatedDocument: conversation
@@ -458,32 +466,31 @@ const conversationMutations = {
     { _ids }: { _ids: string[] },
     { user, models, subdomain }: IContext
   ) {
-    const {
-      oldConversations,
-      oldConversationById
-    } = await getConversationById(models, { _id: { $in: _ids } });
-    const updatedConversations = await models.Conversations.unassignUserConversation(
-      _ids
+    const { oldConversations, oldConversationById } = await getConversationById(
+      models,
+      { _id: { $in: _ids } }
     );
+    const updatedConversations =
+      await models.Conversations.unassignUserConversation(_ids);
 
     await sendNotifications(subdomain, {
       user,
       conversations: oldConversations,
-      type: 'unassign'
+      type: "unassign"
     });
 
     // notify graphl subscription
-    publishConversationsChanged(subdomain, _ids, 'assigneeChanged');
+    publishConversationsChanged(subdomain, _ids, "assigneeChanged");
 
     for (const conversation of updatedConversations) {
       await putUpdateLog(
         models,
         subdomain,
         {
-          type: 'conversation',
-          description: 'unassignee',
+          type: "conversation",
+          description: "unassignee",
           object: oldConversationById[conversation._id],
-          newData: { assignedUserId: '' },
+          newData: { assignedUserId: "" },
           updatedDocument: conversation
         },
         user
@@ -501,7 +508,7 @@ const conversationMutations = {
     { _ids, status }: { _ids: string[]; status: string },
     { user, models, subdomain, serverTiming }: IContext
   ) {
-    serverTiming.startTime('changeStatus');
+    serverTiming.startTime("changeStatus");
 
     const { oldConversationById } = await getConversationById(models, {
       _id: { $in: _ids }
@@ -509,9 +516,9 @@ const conversationMutations = {
 
     await models.Conversations.changeStatusConversation(_ids, status, user._id);
 
-    serverTiming.endTime('changeStatus');
+    serverTiming.endTime("changeStatus");
 
-    serverTiming.startTime('sendNotifications');
+    serverTiming.startTime("sendNotifications");
 
     // notify graphl subscription
     publishConversationsChanged(subdomain, _ids, status);
@@ -523,44 +530,23 @@ const conversationMutations = {
     await sendNotifications(subdomain, {
       user,
       conversations: updatedConversations,
-      type: 'conversationStateChange'
+      type: "conversationStateChange"
     });
-
-    serverTiming.endTime('sendNotifications');
-
-    serverTiming.startTime('putLog');
 
     for (const conversation of updatedConversations) {
       await putUpdateLog(
         models,
         subdomain,
         {
-          type: 'conversation',
-          description: 'change status',
+          type: "conversation",
+          description: "change status",
           object: oldConversationById[conversation._id],
           newData: { status },
           updatedDocument: conversation
         },
         user
       );
-
-      if (await serviceDiscovery.isEnabled('zerocodeai')) {
-        // const messagesCount = await models.ConversationMessages.count({ conversationId: conversation._id });
-        // const messages = await models.ConversationMessages.find({ conversationId: conversation._id }).sort({ createdAt: -1 }).limit(messagesCount / 10);
-
-        sendCommonMessage({
-          subdomain,
-          serviceName: 'zerocodeai',
-          action: 'analyze',
-          data: {
-            conversation,
-            messages: [{ content: 'muu' }, { content: 'sain' }]
-          }
-        });
-      }
     }
-
-    serverTiming.endTime('putLog');
 
     return updatedConversations;
   },
@@ -600,8 +586,8 @@ const conversationMutations = {
         models,
         subdomain,
         {
-          type: 'conversation',
-          description: 'resolve all',
+          type: "conversation",
+          description: "resolve all",
           object: oldConversationById[conversation._id],
           newData: param,
           updatedDocument: conversation
@@ -624,47 +610,6 @@ const conversationMutations = {
     return models.Conversations.markAsReadConversation(_id, user._id);
   },
 
-  async conversationCreateVideoChatRoom(
-    _root,
-    { _id },
-    { user, models, subdomain }: IContext
-  ) {
-    let message;
-
-    try {
-      const doc = {
-        conversationId: _id,
-        internal: false,
-        contentType: MESSAGE_TYPES.VIDEO_CALL
-      };
-
-      message = await models.ConversationMessages.addMessage(doc, user._id);
-
-      const videoCallData = await sendIntegrationsMessage({
-        subdomain,
-        action: 'createDailyRoom',
-        data: {
-          erxesApiConversationId: _id,
-          erxesApiMessageId: message._id
-        },
-        isRPC: true
-      });
-
-      const updatedMessage = { ...message._doc, videoCallData };
-
-      // publish new message to conversation detail
-      publishMessage(models, updatedMessage);
-
-      return videoCallData;
-    } catch (e) {
-      debug.error(e.message);
-
-      await models.ConversationMessages.deleteOne({ _id: message._id });
-
-      throw new Error(e.message);
-    }
-  },
-
   async changeConversationOperator(
     _root,
     { _id, operatorStatus }: { _id: string; operatorStatus: string },
@@ -674,15 +619,18 @@ const conversationMutations = {
       conversationId: _id,
       botData: [
         {
-          type: 'text',
+          type: "text",
           text: AUTO_BOT_MESSAGES.CHANGE_OPERATOR
         }
       ]
     });
 
-    graphqlPubsub.publish('conversationMessageInserted', {
-      conversationMessageInserted: message
-    });
+    graphqlPubsub.publish(
+      `conversationMessageInserted:${message.conversationId}`,
+      {
+        conversationMessageInserted: message
+      }
+    );
 
     return models.Conversations.updateOne(
       { _id },
@@ -705,12 +653,38 @@ const conversationMutations = {
       user
     };
 
-    return sendCardsMessage({
-      subdomain,
-      action: 'conversationConvert',
-      data: args,
-      isRPC: true
-    });
+    switch (params.type) {
+      case "deal":
+        return sendSalesMessage({
+          subdomain,
+          action: "conversationConvert",
+          data: args,
+          isRPC: true
+        });
+      case "ticket":
+        return sendTicketsMessage({
+          subdomain,
+          action: "conversationConvert",
+          data: args,
+          isRPC: true
+        });
+      case "purchase":
+        return sendPurchasesMessage({
+          subdomain,
+          action: "conversationConvert",
+          data: args,
+          isRPC: true
+        });
+      case "task":
+        return sendTasksMessage({
+          subdomain,
+          action: "conversationConvert",
+          data: args,
+          isRPC: true
+        });
+      default:
+        break;
+    }
   },
 
   async conversationEditCustomFields(
@@ -723,34 +697,33 @@ const conversationMutations = {
   }
 };
 
-requireLogin(conversationMutations, 'conversationMarkAsRead');
-requireLogin(conversationMutations, 'conversationCreateVideoChatRoom');
-requireLogin(conversationMutations, 'conversationConvertToCard');
+requireLogin(conversationMutations, "conversationMarkAsRead");
+requireLogin(conversationMutations, "conversationConvertToCard");
 
 checkPermission(
   conversationMutations,
-  'conversationMessageAdd',
-  'conversationMessageAdd'
+  "conversationMessageAdd",
+  "conversationMessageAdd"
 );
 checkPermission(
   conversationMutations,
-  'conversationsAssign',
-  'assignConversation'
+  "conversationsAssign",
+  "assignConversation"
 );
 checkPermission(
   conversationMutations,
-  'conversationsUnassign',
-  'assignConversation'
+  "conversationsUnassign",
+  "assignConversation"
 );
 checkPermission(
   conversationMutations,
-  'conversationsChangeStatus',
-  'changeConversationStatus'
+  "conversationsChangeStatus",
+  "changeConversationStatus"
 );
 checkPermission(
   conversationMutations,
-  'conversationResolveAll',
-  'conversationResolveAll'
+  "conversationResolveAll",
+  "conversationResolveAll"
 );
 
 export default conversationMutations;

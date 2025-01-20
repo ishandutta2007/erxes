@@ -1,10 +1,27 @@
-import React from 'react';
-import { Route } from 'react-router-dom';
-import Welcome from './container/Welcome';
+import { Route, Routes } from "react-router-dom";
 
-const routes = () => {
+import React from "react";
+import WelcomeOs from "./container/WelcomeOs";
+import WelcomeSaas from "./components/WelcomeSaas";
+import { getVersion } from "@erxes/ui/src/utils/core";
+
+const routes = ({ currentUser }) => {
+  const { VERSION } = getVersion();
+
   return (
-    <Route key="/welcome" exact={true} path="/welcome" component={Welcome} />
+    <Routes>
+      <Route
+        key="/welcome"
+        path="/welcome"
+        element={
+          VERSION && VERSION === "saas" ? (
+            <WelcomeSaas currentUser={currentUser} />
+          ) : (
+            <WelcomeOs currentUser={currentUser} />
+          )
+        }
+      />
+    </Routes>
   );
 };
 

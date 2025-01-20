@@ -1,6 +1,7 @@
 export const types = `
   type Document {
     _id: String!
+    code: String
 
     createdAt: Date
     createdUserId: String
@@ -29,6 +30,7 @@ const params = `
   limit: Int,
   page: Int,
   perPage: Int,
+  searchValue: String,
   contentType: String,
   subType: String
 `;
@@ -38,10 +40,10 @@ export const queries = `
   documentsDetail(_id: String!): Document
   documentsGetEditorAttributes(contentType: String!): [DocumentEditorAttribute]
   documentsGetContentTypes:[DocumentsTypes]
-  documentsTotalCount: Int
+  documentsTotalCount(searchValue: String, contentType: String): Int
 `;
 
 export const mutations = `
-  documentsSave(_id: String, contentType: String, subType: String, name: String!, content: String, replacer: String): Document
+  documentsSave(_id: String, contentType: String, subType: String, name: String!, content: String, replacer: String, code: String): Document
   documentsRemove(_id: String!): JSON
 `;

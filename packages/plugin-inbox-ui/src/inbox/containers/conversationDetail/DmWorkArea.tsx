@@ -1,19 +1,5 @@
-import { gql } from '@apollo/client';
-import * as compose from 'lodash.flowright';
-import React from 'react';
-import { graphql } from '@apollo/client/react/hoc';
-import strip from 'strip';
+import * as compose from "lodash.flowright";
 
-import { AppConsumer } from 'coreui/appContext';
-import DmWorkArea from '../../components/conversationDetail/workarea/DmWorkArea';
-import { NOTIFICATION_TYPE } from '../../constants';
-import {
-  mutations,
-  queries,
-  subscriptions
-} from '@erxes/ui-inbox/src/inbox/graphql';
-import { IUser } from '@erxes/ui/src/auth/types';
-import { sendDesktopNotification, withProps } from '@erxes/ui/src/utils';
 import {
   AddMessageMutationResponse,
   AddMessageMutationVariables,
@@ -22,8 +8,23 @@ import {
   IMessage,
   MessagesQueryResponse,
   MessagesTotalCountQuery
-} from '@erxes/ui-inbox/src/inbox/types';
-import { isConversationMailKind } from '@erxes/ui-inbox/src/inbox/utils';
+} from "@erxes/ui-inbox/src/inbox/types";
+import {
+  mutations,
+  queries,
+  subscriptions
+} from "@erxes/ui-inbox/src/inbox/graphql";
+import { sendDesktopNotification, withProps } from "@erxes/ui/src/utils";
+
+import { AppConsumer } from "coreui/appContext";
+import DmWorkArea from "../../components/conversationDetail/workarea/DmWorkArea";
+import { IUser } from "@erxes/ui/src/auth/types";
+import { NOTIFICATION_TYPE } from "../../constants";
+import React from "react";
+import { gql } from "@apollo/client";
+import { graphql } from "@apollo/client/react/hoc";
+import { isConversationMailKind } from "@erxes/ui-inbox/src/inbox/utils";
+import strip from "strip";
 
 // messages limit
 let initialLimit = 10;
@@ -49,28 +50,28 @@ type State = {
 };
 
 const getQueryString = (
-  type: 'messagesQuery' | 'countQuery',
+  type: "messagesQuery" | "countQuery",
   dmConfig?: DmConfig
 ): string => {
   const defaultQuery =
-    type === 'messagesQuery'
-      ? 'conversationMessages'
-      : 'conversationMessagesTotalCount';
+    type === "messagesQuery"
+      ? "conversationMessages"
+      : "conversationMessagesTotalCount";
 
   return dmConfig ? dmConfig[type].query : defaultQuery;
 };
 
 const getListQueryName = (dmConfig?: DmConfig) => {
-  return dmConfig ? dmConfig.messagesQuery.name : 'conversationMessages';
+  return dmConfig ? dmConfig.messagesQuery.name : "conversationMessages";
 };
 
 const getQueryResult = (queryResponse: object, countQuery?: boolean) => {
   let key = countQuery
-    ? 'conversationMessagesTotalCount'
-    : 'conversationMessages';
+    ? "conversationMessagesTotalCount"
+    : "conversationMessages";
 
   for (const k of Object.keys(queryResponse)) {
-    if (k.includes('ConversationMessages')) {
+    if (k.includes("ConversationMessages")) {
       key = k;
       break;
     }
@@ -81,11 +82,11 @@ const getQueryResult = (queryResponse: object, countQuery?: boolean) => {
 
 const getQueryResultKey = (queryResponse: object, countQuery?: boolean) => {
   let key = countQuery
-    ? 'conversationMessagesTotalCount'
-    : 'conversationMessages';
+    ? "conversationMessagesTotalCount"
+    : "conversationMessages";
 
   for (const k of Object.keys(queryResponse || {})) {
-    if (k.includes('ConversationMessages')) {
+    if (k.includes("ConversationMessages")) {
       key = k;
       break;
     }
@@ -101,19 +102,15 @@ class WorkArea extends React.Component<FinalProps, State> {
   constructor(props) {
     super(props);
 
-    this.state = { loadingMessages: false, typingInfo: '' };
+    this.state = { loadingMessages: false, typingInfo: "" };
 
     this.prevMessageInsertedSubscription = null;
   }
 
   componentWillReceiveProps(nextProps) {
     const { currentUser } = this.props;
-    const {
-      currentId,
-      currentConversation,
-      messagesQuery,
-      dmConfig
-    } = nextProps;
+    const { currentId, currentConversation, messagesQuery, dmConfig } =
+      nextProps;
 
     // It is first time or subsequent conversation change
     if (
@@ -126,7 +123,7 @@ class WorkArea extends React.Component<FinalProps, State> {
       }
 
       if (this.prevTypingInfoSubscription) {
-        this.setState({ typingInfo: '' });
+        this.setState({ typingInfo: "" });
         this.prevTypingInfoSubscription();
       }
 
@@ -145,7 +142,7 @@ class WorkArea extends React.Component<FinalProps, State> {
           // current user's message is being showed after insert message
           // mutation. So to prevent from duplication we are ignoring current
           // user's messages from subscription
-          const isMessenger = kind === 'messenger';
+          const isMessenger = kind === "messenger";
 
           if (isMessenger && message.userId === currentUser._id) {
             return;
@@ -178,7 +175,7 @@ class WorkArea extends React.Component<FinalProps, State> {
           // send desktop notification
           sendDesktopNotification({
             title: NOTIFICATION_TYPE[kind] || `You have a new ${kind} message`,
-            content: strip(message.content) || ''
+            content: strip(message.content) || ""
           });
 
           return next;
@@ -224,11 +221,9 @@ class WorkArea extends React.Component<FinalProps, State> {
         let messagesQuery = queries.conversationMessages;
 
         if (dmConfig) {
-          messagesQuery = getQueryString('messagesQuery', dmConfig);
+          messagesQuery = getQueryString("messagesQuery", dmConfig);
         }
 
-        // trying to read query by initial variables. Because currenty it is apollo bug.
-        // https://github.com/apollographql/apollo-client/issues/2499
         const selector = {
           query: gql(messagesQuery),
           variables: {
@@ -238,17 +233,22 @@ class WorkArea extends React.Component<FinalProps, State> {
           }
         };
 
-        cache.updateQuery(selector, data => {
-          const key = getQueryResultKey(data || {});
-          const messages = data ? data[key] : [];
+        try {
+          cache.updateQuery(selector, data => {
+            const key = getQueryResultKey(data || {});
+            const messages = data ? data[key] : [];
 
-          // check duplications
-          if (messages.find(m => m._id === message._id)) {
-            return;
-          }
+            // check duplications
+            if (messages.find(m => m._id === message._id)) {
+              return {};
+            }
 
-          return { [key]: [...messages, message] };
-        });
+            return { [key]: [...messages, message] };
+          });
+        } catch (e) {
+          console.error(e);
+          return;
+        }
       };
     }
 
@@ -258,7 +258,7 @@ class WorkArea extends React.Component<FinalProps, State> {
           callback();
 
           // clear saved messages from storage
-          localStorage.removeItem(currentId || '');
+          localStorage.removeItem(currentId || "");
         }
       })
       .catch(e => {
@@ -269,12 +269,8 @@ class WorkArea extends React.Component<FinalProps, State> {
   };
 
   loadMoreMessages = () => {
-    const {
-      currentId,
-      messagesTotalCountQuery,
-      messagesQuery,
-      dmConfig
-    } = this.props;
+    const { currentId, messagesTotalCountQuery, messagesQuery, dmConfig } =
+      this.props;
 
     const conversationMessagesTotalCount = getQueryResult(
       messagesTotalCountQuery,
@@ -356,8 +352,8 @@ const generateWithQuery = (props: Props) => {
   let countQuery = queries.conversationMessagesTotalCount;
 
   if (dmConfig) {
-    listQuery = getQueryString('messagesQuery', dmConfig);
-    countQuery = getQueryString('countQuery', dmConfig);
+    listQuery = getQueryString("messagesQuery", dmConfig);
+    countQuery = getQueryString("countQuery", dmConfig);
   }
 
   return withProps<Props & { currentUser: IUser }>(
@@ -367,11 +363,11 @@ const generateWithQuery = (props: Props) => {
         MessagesQueryResponse,
         { conversationId?: string; limit: number }
       >(gql(listQuery), {
-        name: 'messagesQuery',
+        name: "messagesQuery",
         options: ({ currentId }) => {
           const windowHeight = window.innerHeight;
           const isMail = isConversationMailKind(currentConversation);
-          const isDm = integration.kind === 'messenger' || dmConfig;
+          const isDm = integration.kind === "messenger" || dmConfig;
 
           // 330 - height of above and below sections of detail area
           // 45 -  min height of per message
@@ -385,24 +381,24 @@ const generateWithQuery = (props: Props) => {
               limit: isDm || isMail ? initialLimit : 0,
               skip: 0
             },
-            fetchPolicy: 'network-only'
+            fetchPolicy: "network-only"
           };
         }
       }),
       graphql<Props, MessagesTotalCountQuery, { conversationId?: string }>(
         gql(countQuery),
         {
-          name: 'messagesTotalCountQuery',
+          name: "messagesTotalCountQuery",
           options: ({ currentId }) => ({
             variables: { conversationId: currentId },
-            fetchPolicy: 'network-only'
+            fetchPolicy: "network-only"
           })
         }
       ),
       graphql<Props, AddMessageMutationResponse, AddMessageMutationVariables>(
         gql(mutations.conversationMessageAdd),
         {
-          name: 'addMessageMutation'
+          name: "addMessageMutation"
         }
       )
     )(WorkArea)
@@ -416,6 +412,12 @@ export const resetDmWithQueryCache = () => {
 };
 
 const WithConsumer = (props: Props) => {
+  const [isInitial, setIsInitial] = React.useState(true);
+
+  React.useEffect(() => {
+    setIsInitial(false);
+  }, [WithQuery]);
+
   return (
     <AppConsumer>
       {({ currentUser }) => {
@@ -423,9 +425,9 @@ const WithConsumer = (props: Props) => {
           return null;
         }
 
-        // if (!WithQuery) {
-        WithQuery = generateWithQuery(props);
-        // }
+        if (isInitial) {
+          WithQuery = generateWithQuery(props);
+        }
 
         return <WithQuery {...props} currentUser={currentUser} />;
       }}

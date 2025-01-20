@@ -1,23 +1,25 @@
-import React from 'react';
-import { gql } from '@apollo/client';
-import { graphql } from '@apollo/client/react/hoc';
-import * as compose from 'lodash.flowright';
+import * as compose from "lodash.flowright";
 
-import { Alert, confirm, __ } from 'modules/common/utils';
-import Spinner from 'modules/common/components/Spinner';
-import { queries as permissionQueries } from '../../permissions/graphql/index';
-import { mutations, queries } from '../graphql/index';
-import AppList from '../components/AppList';
+import { Alert, __, confirm } from "modules/common/utils";
 import {
-  AppsQueryResponse,
-  AppsTotalCountQueryResponse,
   AppsAddMutationResponse,
   AppsEditMutationResponse,
+  AppsQueryResponse,
   AppsRemoveMutationResponse,
-  IAppParams,
+  AppsTotalCountQueryResponse,
+  IApp,
   IAppEditParams,
-  IApp
-} from '../types';
+  IAppParams,
+} from "../types";
+import { mutations, queries } from "../graphql/index";
+
+import AppList from "../components/AppList";
+import React from "react";
+import Spinner from "modules/common/components/Spinner";
+import { gql } from "@apollo/client";
+import { graphql } from "@apollo/client/react/hoc";
+import { queries as permissionQueries } from "../../permissions/graphql/index";
+import { UsersGroupsQueryResponse } from "@erxes/ui-settings/src/permissions/types";
 
 type Props = {
   listQuery: AppsQueryResponse;
@@ -25,7 +27,7 @@ type Props = {
   addMutation: (params: { variables: IAppParams }) => Promise<IApp>;
   editMutation: (params: { variables: IAppEditParams }) => Promise<IApp>;
   removeMutation: (params: { variables: { _id: string } }) => Promise<string>;
-  userGroupsQuery: any;
+  userGroupsQuery: UsersGroupsQueryResponse;
 };
 
 class AppListContainer extends React.Component<Props> {
@@ -36,7 +38,7 @@ class AppListContainer extends React.Component<Props> {
       userGroupsQuery,
       addMutation,
       editMutation,
-      removeMutation
+      removeMutation,
     } = this.props;
 
     const isLoading =
@@ -49,9 +51,9 @@ class AppListContainer extends React.Component<Props> {
     const addApp = (doc: IAppParams) => {
       addMutation({ variables: doc })
         .then(() => {
-          Alert.success('You successfully created an app');
+          Alert.success("You successfully created an app");
         })
-        .catch(e => {
+        .catch((e) => {
           Alert.error(__(e.message));
         });
     };
@@ -59,20 +61,22 @@ class AppListContainer extends React.Component<Props> {
     const editApp = (_id: string, doc: IAppParams) => {
       editMutation({ variables: { _id, ...doc } })
         .then(() => {
-          Alert.success('You successfully edited an app');
+          Alert.success("You successfully edited an app");
         })
-        .catch(e => {
+        .catch((e) => {
           Alert.error(__(e.message));
         });
     };
 
     const removeApp = (_id: string) => {
-      confirm().then(() => {
+      confirm("This will permanently delete are you absolutely sure?", {
+        hasDeleteConfirm: true,
+      }).then(() => {
         removeMutation({ variables: { _id } })
           .then(() => {
-            Alert.success('You successfully deleted an app');
+            Alert.success("You successfully deleted an app");
           })
-          .catch(e => {
+          .catch((e) => {
             Alert.error(__(e.message));
           });
       });
@@ -83,7 +87,7 @@ class AppListContainer extends React.Component<Props> {
         apps={listQuery.apps}
         isLoading={isLoading}
         count={totalCountQuery.appsTotalCount}
-        errorMessage={listQuery.error || ''}
+        errorMessage={listQuery.error || ""}
         addApp={addApp}
         editApp={editApp}
         removeApp={removeApp}
@@ -93,28 +97,28 @@ class AppListContainer extends React.Component<Props> {
   }
 }
 
-const options = () => ({ refetchQueries: ['apps'] });
+const options = () => ({ refetchQueries: ["apps"] });
 
 export default compose(
   graphql(gql(queries.apps), {
-    name: 'listQuery'
+    name: "listQuery",
   }),
   graphql<AppsAddMutationResponse, Props>(gql(mutations.appsAdd), {
-    name: 'addMutation',
-    options
+    name: "addMutation",
+    options,
   }),
   graphql<AppsEditMutationResponse, Props>(gql(mutations.appsEdit), {
-    name: 'editMutation',
-    options
+    name: "editMutation",
+    options,
   }),
   graphql<AppsRemoveMutationResponse, Props>(gql(mutations.appsRemove), {
-    name: 'removeMutation',
-    options
+    name: "removeMutation",
+    options,
   }),
   graphql(gql(queries.appsTotalCount), {
-    name: 'totalCountQuery'
+    name: "totalCountQuery",
   }),
   graphql(gql(permissionQueries.usersGroups), {
-    name: 'userGroupsQuery'
+    name: "userGroupsQuery",
   })
 )(AppListContainer);

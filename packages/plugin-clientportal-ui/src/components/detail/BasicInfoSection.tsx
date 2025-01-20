@@ -1,20 +1,21 @@
-import DropdownToggle from '@erxes/ui/src/components/DropdownToggle';
-import { confirm } from '@erxes/ui/src/utils';
-import Alert from '@erxes/ui/src/utils/Alert';
-import Button from '@erxes/ui/src/components/Button';
-import { ModalTrigger } from '@erxes/ui/src/components';
-import Icon from '@erxes/ui/src/components/Icon';
-import Tip from '@erxes/ui/src/components/Tip';
-import { Actions } from '@erxes/ui/src/styles/main';
-import ClientPortalUserForm from '../../containers/ClientPortalUserForm';
-import Dropdown from 'react-bootstrap/Dropdown';
-import { IClientPortalUser } from '../../types';
-import React from 'react';
-import SmsForm from '@erxes/ui-inbox/src/settings/integrations/containers/telnyx/SmsForm';
-import { loadDynamicComponent, __ } from '@erxes/ui/src/utils';
-// import ExtendSubscription from '@erxes/ui-forum/src/containers/ExtendSubscriptionForm';
-import EmailWidget from '@erxes/ui-inbox/src/inbox/components/EmailWidget';
-import { isEnabled } from '@erxes/ui/src/utils/core';
+import { Actions, Flex } from "@erxes/ui/src/styles/main";
+import { __, loadDynamicComponent } from "@erxes/ui/src/utils";
+
+import Alert from "@erxes/ui/src/utils/Alert";
+import Button from "@erxes/ui/src/components/Button";
+import ClientPortalUserForm from "../../containers/ClientPortalUserForm";
+import Dropdown from "@erxes/ui/src/components/Dropdown";
+import DropdownToggle from "@erxes/ui/src/components/DropdownToggle";
+import ExtendSubscription from '@erxes/ui-forum/src/containers/ExtendSubscriptionForm';
+import EmailWidget from "@erxes/ui-inbox/src/inbox/components/EmailWidget";
+import { IClientPortalUser } from "../../types";
+import Icon from "@erxes/ui/src/components/Icon";
+import { ModalTrigger } from "@erxes/ui/src/components";
+import React from "react";
+import SmsForm from "@erxes/ui-inbox/src/settings/integrations/containers/telnyx/SmsForm";
+import Tip from "@erxes/ui/src/components/Tip";
+import { confirm } from "@erxes/ui/src/utils";
+import { isEnabled } from "@erxes/ui/src/utils/core";
 
 type Props = {
   clientPortalUser: IClientPortalUser;
@@ -22,19 +23,22 @@ type Props = {
   isSmall?: boolean;
 };
 
-class BasicInfoSection extends React.Component<Props> {
-  renderActions() {
-    const { clientPortalUser } = this.props;
-    const { phone, email } = clientPortalUser;
+const BasicInfoSection: React.FC<Props> = ({
+  clientPortalUser,
+  remove,
+  isSmall,
+}: Props) => {
+  const renderActions = () => {
+    const { phone, email, isEmailVerified } = clientPortalUser;
 
-    const smsForm = props => <SmsForm {...props} phone={phone} />;
+    const smsForm = (props) => <SmsForm {...props} phone={phone} />;
 
     return (
       <>
-        {(isEnabled('engages') || isEnabled('imap')) && (
+        {(isEnabled("engages") || isEnabled("imap")) && (
           <EmailWidget
-            disabled={email ? false : true}
-            buttonStyle={email ? 'primary' : 'simple'}
+            disabled={isEmailVerified && email ? false : true}
+            buttonStyle={isEmailVerified && email ? "primary" : "simple"}
             emailTo={email}
             customerId={clientPortalUser._id || undefined}
             buttonSize="small"
@@ -48,49 +52,53 @@ class BasicInfoSection extends React.Component<Props> {
             <Button
               disabled={phone ? false : true}
               size="small"
-              btnStyle={phone ? 'primary' : 'simple'}
+              btnStyle={phone ? "primary" : "simple"}
             >
-              <Tip text="Send SMS" placement="top-end">
-                <Icon icon="message" />
-              </Tip>
+              <Icon icon="message" />
             </Button>
           }
           content={smsForm}
+          tipText="Send SMS"
         />
-        <Button
-          href={phone && `tel:${phone}`}
-          size="small"
-          btnStyle={phone ? 'primary' : 'simple'}
-          disabled={phone ? false : true}
-        >
-          <Tip text="Call" placement="top-end">
-            <Icon icon="phone" />
-          </Tip>
-        </Button>
+        <Tip text="Call" placement="top-end">
+          <Flex>
+            <Button
+              href={phone && `tel:${phone}`}
+              size="small"
+              btnStyle={phone ? "primary" : "simple"}
+              disabled={phone ? false : true}
+            >
+              <Icon icon="phone" />
+            </Button>
+          </Flex>
+        </Tip>
       </>
     );
-  }
+  };
 
-  renderButton() {
-    const { isSmall } = this.props;
-
+  const renderButton = () => {
     return (
       <Button size="small" btnStyle="default">
         {isSmall ? (
           <Icon icon="ellipsis-h" />
         ) : (
           <>
-            {__('Action')} <Icon icon="angle-down" />
+            {__("Action")} <Icon icon="angle-down" />
           </>
         )}
       </Button>
     );
-  }
+  };
 
-  renderEditButton() {
-    const { clientPortalUser } = this.props;
+  const renderDropdown = () => {
+    const onClick = () =>
+      confirm()
+        .then(() => remove())
+        .catch((error) => {
+          Alert.error(error.message);
+        });
 
-    const customerForm = props => {
+    const customerForm = (props) => {
       return (
         <ClientPortalUserForm
           {...props}
@@ -100,85 +108,59 @@ class BasicInfoSection extends React.Component<Props> {
       );
     };
 
-    return (
-      <li>
-        <ModalTrigger
-          title="Edit basic info"
-          trigger={<a href="#edit">{__('Edit')}</a>}
-          size="lg"
-          content={customerForm}
-        />
-      </li>
-    );
-  }
-
-  renderDropdown() {
-    const { remove, clientPortalUser } = this.props;
-
-    const onClick = () =>
-      confirm()
-        .then(() => remove())
-        .catch(error => {
-          Alert.error(error.message);
-        });
-
-    const extendSubscription = props => {
-      if (!isEnabled('forum')) {
-        return null;
+    const menuItems = [
+      {
+        title: "Edit basic info",
+        trigger: <a href="#edit">{__("Edit")}</a>,
+        content: customerForm,
+        additionalModalProps: { size: "lg" },
       }
+    ];
 
+    const extendSubscription = (props) => {
       // TODO: use loadDynamicComponent
-      // return (
-      //   <ExtendSubscription {...props} clientPortalUser={clientPortalUser} />
-      // );
+      return (
+        <ExtendSubscription {...props} clientPortalUser={clientPortalUser} />
+      );
     };
 
+    if (isEnabled("forum")) {
+      menuItems.push({
+        title: "Extend Subscription",
+        trigger: <a href="#extend-subscription">{__("Extend Subscription")}</a>,
+        content: extendSubscription,
+        additionalModalProps: { size: "lg" }
+      })
+    }
+
     return (
-      <Dropdown>
-        <Dropdown.Toggle as={DropdownToggle} id="dropdown-action">
-          {this.renderButton()}
-        </Dropdown.Toggle>
-        <Dropdown.Menu>
-          {this.renderEditButton()}
-          {isEnabled('forum') && (
-            <ModalTrigger
-              title="Extend Subscription"
-              trigger={
-                <li>
-                  <a href="#extend-subscription">{__('Extend Subscription')}</a>
-                </li>
-              }
-              size="lg"
-              content={extendSubscription}
-            />
-          )}
-          <li>
-            <a href="#delete" onClick={onClick}>
-              {__('Delete')}
-            </a>
-          </li>
-        </Dropdown.Menu>
+      <Dropdown
+        as={DropdownToggle}
+        toggleComponent={renderButton()}
+        modalMenuItems={menuItems}
+      >
+        <li>
+          <a href="#delete" onClick={onClick}>
+            {__("Delete")}
+          </a>
+        </li>
       </Dropdown>
     );
-  }
+  };
 
-  render() {
-    const { clientPortalUser } = this.props;
-
-    return (
-      <>
-        {loadDynamicComponent(
-          'clientPortalUserDetailAction',
-          { clientPortalUser },
-          true
-        )}
-        <Actions>
-          {this.renderActions()}
-          {this.renderDropdown()}
-        </Actions>
-      </>
-    );
-  }
-}
+  return (
+    <>
+      {loadDynamicComponent(
+        "clientPortalUserDetailAction",
+        { clientPortalUser },
+        true
+      )}
+      <Actions>
+        {renderActions()}
+        {renderDropdown()}
+      </Actions>
+    </>
+  );
+};
 
 export default BasicInfoSection;

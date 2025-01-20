@@ -1,39 +1,56 @@
-import React from 'react';
-import { ControlLabel } from '@erxes/ui/src';
-import { TemplateWrapper } from '../styles';
-import EmailTemplate from './EmailTemplate';
+import React, { useState } from 'react';
 
-type EmailTemplatesProps = {
+import { Button, ControlLabel, colors } from '@erxes/ui/src';
+
+import EmailTemplate from './EmailTemplate';
+import { TemplateWrapper } from '../styles';
+import { FlexRow } from '@erxes/ui-settings/src/styles';
+
+type Props = {
   templates: any[];
   totalCount: number;
   handleSelect: (id: string) => void;
   selectedTemplateId?: string;
 };
 
-class EmailTemplates extends React.Component<EmailTemplatesProps> {
-  constructor(props) {
-    super(props);
-  }
+const SelectEmailTemplate = (props: Props) => {
+  const { templates, totalCount, handleSelect } = props;
 
-  render() {
-    const { templates, totalCount, handleSelect } = this.props;
+  const [type, setType] = useState('list');
 
-    return (
-      <>
+  return (
+    <>
+      <FlexRow $justifyContent="space-between">
         <ControlLabel>{`Total:${totalCount}`}</ControlLabel>
-        <TemplateWrapper>
-          {templates.map(template => (
-            <EmailTemplate
-              key={template._id}
-              template={template}
-              templateId={template._id}
-              handleSelect={handleSelect}
-            />
-          ))}
-        </TemplateWrapper>
-      </>
-    );
-  }
-}
 
-export default EmailTemplates;
+        <FlexRow $justifyContent="end">
+          <Button
+            btnStyle="link"
+            icon="list-ul"
+            iconColor={type === 'list' ? colors.colorPrimary : ''}
+            onClick={() => setType('list')}
+          />
+          <Button
+            btnStyle="link"
+            icon="apps"
+            iconColor={type === 'grid' ? colors.colorPrimary : ''}
+            onClick={() => setType('grid')}
+          />
+        </FlexRow>
+      </FlexRow>
+      <TemplateWrapper $isGrid={type === 'grid'}>
+        {templates.map(template => (
+          <EmailTemplate
+            key={template._id}
+            template={template}
+            templateId={template._id}
+            width={type === 'grid' ? '200px' : ''}
+            handleSelect={handleSelect}
+          />
+        ))}
+      </TemplateWrapper>
+    </>
+  );
+};
+
+export default SelectEmailTemplate;

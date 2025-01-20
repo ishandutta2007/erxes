@@ -1,16 +1,15 @@
 import Button from '@erxes/ui/src/components/Button';
-import Icon from '@erxes/ui/src/components/Icon';
-import Tip from '@erxes/ui/src/components/Tip';
+import Popover from '@erxes/ui/src/components/Popover';
 import { IAttachment } from '@erxes/ui/src/types';
-import { __ } from '@erxes/ui/src/utils/core';
-import Modal from '../../../../containers/conversationDetail/responseTemplate/Modal';
-import PopoverContent from '../../../../containers/conversationDetail/responseTemplate/PopoverContent';
-import { ResponseTemplateStyled } from '@erxes/ui-inbox/src/inbox/styles';
 import { IBrand } from '@erxes/ui/src/brands/types';
 import { IResponseTemplate } from '../../../../../settings/responseTemplates/types';
+import Icon from '@erxes/ui/src/components/Icon';
+import Modal from '../../../../containers/conversationDetail/responseTemplate/Modal';
+import PopoverContent from '../../../../containers/conversationDetail/responseTemplate/PopoverContent';
 import React from 'react';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Popover from 'react-bootstrap/Popover';
+import { ResponseTemplateStyled } from '@erxes/ui-inbox/src/inbox/styles';
+import Tip from '@erxes/ui/src/components/Tip';
+import { __ } from '@erxes/ui/src/utils/core';
 import strip from 'strip';
 
 type Props = {
@@ -21,68 +20,47 @@ type Props = {
   content?: string;
 };
 
-type State = {
-  key?: string;
-  brandId?: string;
-  searchValue: string;
-  options: IResponseTemplate[];
-};
+const ResponseTemplate = (props: Props) => {
+  const { brands, content, brandId, attachments } = props;
 
-class ResponseTemplate extends React.Component<Props, State> {
-  private overlayRef;
+  const saveTrigger = (
+    <Button id="response-template-handler" btnStyle="link">
+      <Tip placement="top" text={__('Save as template')}>
+        <Icon icon="file-upload-alt" />
+      </Tip>
+    </Button>
+  );
 
-  hidePopover = () => {
-    this.overlayRef.hide();
-  };
+  const popover = (close) => (
+    <div className="popover-template" id="templates-popover">
+      <div className='popover-header'>{__('Response Templates')}</div>
+      <PopoverContent {...props} onSelectTemplate={close} />
+    </div>
+  );
 
-  render() {
-    const { brands, content, brandId, attachments } = this.props;
-
-    const saveTrigger = (
-      <Button id="response-template-handler" btnStyle="link">
-        <Tip text={__('Save as template')}>
-          <Icon icon="file-upload-alt" />
-        </Tip>
-      </Button>
-    );
-
-    const popover = (
-      <Popover className="popover-template" id="templates-popover">
-        <Popover.Title as="h3">{__('Response Templates')}</Popover.Title>
-        <Popover.Content>
-          <PopoverContent {...this.props} onSelectTemplate={this.hidePopover} />
-        </Popover.Content>
+  return (
+    <ResponseTemplateStyled>
+      <Popover
+        placement="left-end"
+        closeAfterSelect={true}
+        trigger={
+          <Tip placement="top" text={__('Response template')}>
+            <Icon icon="file-bookmark-alt" />
+          </Tip>
+        }
+      >
+        {popover}
       </Popover>
-    );
 
-    return (
-      <ResponseTemplateStyled>
-        <OverlayTrigger
-          trigger="click"
-          placement="top"
-          overlay={popover}
-          rootClose={true}
-          ref={overlayTrigger => {
-            this.overlayRef = overlayTrigger;
-          }}
-        >
-          <Button btnStyle="link">
-            <Tip text={__('Response template')}>
-              <Icon icon="file-bookmark-alt" />
-            </Tip>
-          </Button>
-        </OverlayTrigger>
-
-        <Modal
-          trigger={strip(content) ? saveTrigger : <span />}
-          content={content}
-          files={attachments}
-          brands={brands}
-          brandId={brandId}
-        />
-      </ResponseTemplateStyled>
-    );
-  }
-}
+      <Modal
+        trigger={strip(content) ? saveTrigger : <span />}
+        content={content}
+        files={attachments}
+        brands={brands}
+        brandId={brandId}
+      />
+    </ResponseTemplateStyled>
+  );
+};
 
 export default ResponseTemplate;

@@ -1,14 +1,12 @@
-import { IBrowserInfo } from '@erxes/api-utils/src/definitions/common';
-import { debug } from './configs';
+import { IBrowserInfo } from "@erxes/api-utils/src/definitions/common";
+import { debugInfo, debugError } from "@erxes/api-utils/src/debuggers";
 
 import {
-  sendContactsMessage,
   sendCoreMessage,
-  sendEngagesMessage,
-  sendLogsMessage
-} from './messageBroker';
-import { IModels } from './connectionResolver';
-import { client, getIndexPrefix } from '@erxes/api-utils/src/elasticsearch';
+  sendEngagesMessage
+} from "./messageBroker";
+import { IModels } from "./connectionResolver";
+import { client, getIndexPrefix } from "@erxes/api-utils/src/elasticsearch";
 
 export const getOrCreateEngageMessage = async (
   models: IModels,
@@ -21,9 +19,9 @@ export const getOrCreateEngageMessage = async (
   let customer;
 
   if (customerId) {
-    customer = await sendContactsMessage({
+    customer = await sendCoreMessage({
       subdomain,
-      action: 'customers.findOne',
+      action: "customers.findOne",
       data: {
         _id: customerId
       },
@@ -37,12 +35,12 @@ export const getOrCreateEngageMessage = async (
 
   const integration = await models.Integrations.getIntegration({
     _id: integrationId,
-    kind: 'messenger'
+    kind: "messenger"
   });
 
   const brand = await sendCoreMessage({
     subdomain,
-    action: 'brands.findOne',
+    action: "brands.findOne",
     data: {
       query: {
         _id: integration.brandId
@@ -55,7 +53,7 @@ export const getOrCreateEngageMessage = async (
   // try to create engage chat auto messages
   await sendEngagesMessage({
     subdomain,
-    action: 'createVisitorOrCustomerMessages',
+    action: "createVisitorOrCustomerMessages",
     data: {
       brandId: brand._id,
       integrationId: integration._id,
@@ -84,9 +82,9 @@ export const receiveVisitorDetail = async (subdomain: string, visitor) => {
   delete visitor.visitorId;
   delete visitor._id;
 
-  const customer = await sendContactsMessage({
+  const customer = await sendCoreMessage({
     subdomain,
-    action: 'customers.updateOne',
+    action: "customers.updateOne",
     data: {
       selector: { visitorId },
       modifier: { $set: visitor }
@@ -101,9 +99,9 @@ export const receiveVisitorDetail = async (subdomain: string, visitor) => {
       index,
       body: {
         script: {
-          lang: 'painless',
+          lang: "painless",
           source:
-            'ctx._source.visitorId = null; ctx._source.customerId = params.customerId',
+            "ctx._source.visitorId = null; ctx._source.customerId = params.customerId",
           params: {
             customerId: customer._id
           }
@@ -116,73 +114,18 @@ export const receiveVisitorDetail = async (subdomain: string, visitor) => {
       }
     });
 
-    debug.info(`Response ${JSON.stringify(response)}`);
+    debugInfo(`Response ${JSON.stringify(response)}`);
   } catch (e) {
-    debug.error(`Update event error ${e.message}`);
+    debugError(`Update event error ${e.message}`);
   }
 
-  await sendLogsMessage({
+  await sendCoreMessage({
     subdomain,
-    action: 'visitor.removeEntry',
+    action: "visitor.removeEntry",
     data: {
       visitorId
     }
   });
 
   return customer;
-};
-
-const groupSubmissions = (submissions: any[]) => {
-  const submissionsGrouped: { [key: string]: any[] } = {};
-
-  submissions.forEach(submission => {
-    if (submission.groupId) {
-      if (submissionsGrouped[submission.groupId]) {
-        submissionsGrouped[submission.groupId].push(submission);
-      } else {
-        submissionsGrouped[submission.groupId] = [submission];
-      }
-    } else {
-      if (submissionsGrouped.default) {
-        submissionsGrouped.default.push(submission);
-      } else {
-        submissionsGrouped.default = [submission];
-      }
-    }
-  });
-  return submissionsGrouped;
-};
-
-export const solveSubmissions = async (
-  models: IModels,
-  subdomain: string,
-  args: {
-    integrationId: string;
-    formId: string;
-    submissions;
-    browserInfo: any;
-    cachedCustomerId?: string;
-  }
-) => {
-  const { cachedCustomerId } = args;
-  const { integrationId, browserInfo } = args;
-  const integration: any = await models.Integrations.findOne({
-    _id: integrationId
-  });
-
-  const submissionsGrouped = groupSubmissions(args.submissions);
-
-  return sendContactsMessage({
-    subdomain,
-    action: 'updateContactsField',
-    data: {
-      cachedCustomerId,
-      browserInfo,
-      integration,
-      submissionsGrouped,
-      prepareCustomFieldsData: true
-    },
-    isRPC: true,
-    defaultValue: {}
-  });
 };

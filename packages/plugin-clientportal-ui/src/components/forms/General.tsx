@@ -4,13 +4,17 @@ import {
   BlockRowTitle,
   Features,
   IconWrap,
-  ToggleWrap
+  ToggleWrap,
 } from '../../styles';
-import { IBoard, IPipeline } from '@erxes/ui-cards/src/boards/types';
+import { IBoard, IPipeline } from '@erxes/ui-sales/src/boards/types';
 import React, { useState } from 'react';
 import { __, isEnabled } from '@erxes/ui/src/utils/core';
 
-import BoardSelect from '@erxes/ui-cards/src/boards/containers/BoardSelect';
+import SalesBoardSelect from '@erxes/ui-sales/src/boards/containers/BoardSelect';
+import TicketsBoardSelect from '@erxes/ui-tickets/src/boards/containers/BoardSelect';
+import TasksBoardSelect from '@erxes/ui-tasks/src/boards/containers/BoardSelect';
+import PurchasesBoardSelect from '@erxes/ui-purchases/src/boards/containers/BoardSelect';
+
 import { ClientPortalConfig } from '../../types';
 import ControlLabel from '@erxes/ui/src/components/form/Label';
 import { FlexContent } from '@erxes/ui/src/layout/styles';
@@ -19,14 +23,20 @@ import FormGroup from '@erxes/ui/src/components/form/Group';
 import { ISelectedOption } from '@erxes/ui/src/types';
 import { ITopic } from '@erxes/ui-knowledgeBase/src/types';
 import Icon from '@erxes/ui/src/components/Icon';
-import { OverlayTrigger } from 'react-bootstrap';
-import Select from 'react-select-plus';
+import Popover from '@erxes/ui/src/components/Popover';
+import Select from 'react-select';
 import Toggle from '@erxes/ui/src/components/Toggle';
+import CategoryForm from '@erxes/ui-products/src/containers/CategoryForm';
+import SelectProductCategory from '@erxes/ui-products/src/containers/SelectProductCategory';
+import Button from '@erxes/ui/src/components/Button';
+import ModalTrigger from '@erxes/ui/src/components/ModalTrigger';
+import { LANGUAGES } from '@erxes/ui-settings/src/general/constants';
 
 type Props = {
   topics: ITopic[];
   boards: IBoard[];
   pipelines: IPipeline[];
+  kind?: 'client' | 'vendor';
   fetchPipelines: (boardId: string) => void;
   handleFormChange: (name: string, value: string | boolean) => void;
 } & ClientPortalConfig;
@@ -83,7 +93,10 @@ function General({
   taskToggle,
   dealToggle,
   purchaseToggle,
-  ticketToggle
+  ticketToggle,
+  vendorParentProductCategoryId,
+  kind,
+  language = 'en',
 }: Props) {
   const [show, setShow] = useState<boolean>(false);
 
@@ -102,9 +115,9 @@ function General({
       return [];
     }
 
-    return options.map(option => ({
+    return options.map((option) => ({
       value: option[valueKey],
-      label: option[labelKey]
+      label: option[labelKey],
     }));
   }
 
@@ -112,31 +125,85 @@ function General({
     type,
     stageId,
     boardId,
-    pipelineId
+    pipelineId,
+    toggle,
   }: {
     type: string;
     stageId?: string;
     boardId?: string;
     pipelineId?: string;
+    toggle?: boolean;
   }) {
-    const onChangeStage = stgId => handleFormChange(`${type}StageId`, stgId);
-    const onChangePipeline = plId =>
+    const onChangeStage = (stgId) => handleFormChange(`${type}StageId`, stgId);
+    const onChangePipeline = (plId) =>
       handleFormChange(`${type}PipelineId`, plId);
-    const onChangeBoard = brId => handleFormChange(`${type}BoardId`, brId);
+    const onChangeBoard = (brId) => handleFormChange(`${type}BoardId`, brId);
 
-    return isEnabled('cards') ? (
-      <BoardSelect
-        type={type}
-        stageId={stageId}
-        boardId={boardId || ''}
-        pipelineId={pipelineId || ''}
-        onChangeStage={onChangeStage}
-        onChangePipeline={onChangePipeline}
-        onChangeBoard={onChangeBoard}
-        autoSelectStage={false}
-        callback={handleToggleBoardSelect}
-      />
-    ) : null;
+    switch (type) {
+      case 'deal':
+        return (
+          <SalesBoardSelect
+            isRequired={toggle}
+            type={type}
+            stageId={stageId}
+            boardId={boardId || ''}
+            pipelineId={pipelineId || ''}
+            onChangeStage={onChangeStage}
+            onChangePipeline={onChangePipeline}
+            onChangeBoard={onChangeBoard}
+            autoSelectStage={false}
+            callback={handleToggleBoardSelect}
+          />
+        );
+
+      case 'ticket':
+        return (
+          <TicketsBoardSelect
+            isRequired={toggle}
+            type={type}
+            stageId={stageId}
+            boardId={boardId || ''}
+            pipelineId={pipelineId || ''}
+            onChangeStage={onChangeStage}
+            onChangePipeline={onChangePipeline}
+            onChangeBoard={onChangeBoard}
+            autoSelectStage={false}
+            callback={handleToggleBoardSelect}
+          />
+        );
+
+      case 'purchase':
+        return (
+          <PurchasesBoardSelect
+            isRequired={toggle}
+            type={type}
+            stageId={stageId}
+            boardId={boardId || ''}
+            pipelineId={pipelineId || ''}
+            onChangeStage={onChangeStage}
+            onChangePipeline={onChangePipeline}
+            onChangeBoard={onChangeBoard}
+            autoSelectStage={false}
+            callback={handleToggleBoardSelect}
+          />
+        );
+
+      case 'task':
+        return (
+          <TasksBoardSelect
+            isRequired={toggle}
+            type={type}
+            stageId={stageId}
+            boardId={boardId || ''}
+            pipelineId={pipelineId || ''}
+            onChangeStage={onChangeStage}
+            onChangePipeline={onChangePipeline}
+            onChangeBoard={onChangeBoard}
+            autoSelectStage={false}
+            callback={handleToggleBoardSelect}
+          />
+        );
+    }
   }
 
   function renderControl({
@@ -151,7 +218,7 @@ function General({
     stageId,
     pipelineId,
     boardId,
-    className
+    className,
   }: ControlItem) {
     const handleChange = (e: React.FormEvent) => {
       const value = (e.target as HTMLInputElement).value;
@@ -173,21 +240,21 @@ function General({
               onChange={handleChange}
             />
             {boardType && (
-              <OverlayTrigger
-                trigger="click"
-                placement="bottom-end"
-                overlay={renderBoardSelect({
+              <Popover
+                placement='bottom-end'
+                trigger={
+                  <IconWrap>
+                    <Icon icon='cog' size={24} />
+                  </IconWrap>
+                }
+              >
+                {renderBoardSelect({
                   type: boardType,
                   stageId,
                   boardId,
-                  pipelineId
+                  pipelineId,
                 })}
-                rootClose={true}
-              >
-                <IconWrap>
-                  <Icon icon="cog" size={24} />
-                </IconWrap>
-              </OverlayTrigger>
+              </Popover>
             )}
           </FlexContent>
         </FormGroup>
@@ -203,7 +270,10 @@ function General({
     ) => {
       return (
         <Select
-          value={value}
+          value={generateOptions(options, '_id', 'name').find(
+            (o) => o.value === value
+          )}
+          isClearable={true}
           onChange={handleSelect}
           options={generateOptions(options, '_id', 'name')}
         />
@@ -233,7 +303,7 @@ function General({
           subtitle: 'Shown name on menu',
           formValueName: 'taskPublicLabel',
           formValue: taskPublicLabel,
-          placeholder: 'Please enter a label for Public Task'
+          placeholder: 'Please enter a label for Public Task',
         })}
         <div>
           <FormGroup>
@@ -254,17 +324,17 @@ function General({
   const renderMain = () => {
     return (
       <Block>
-        <h4>{__('Client portal')}</h4>
+        <h4>{__('Business portal')}</h4>
         <BlockRow>
           {renderControl({
             required: true,
-            label: 'Client Portal Name',
+            label: `${kind} portal name`,
             subtitle: 'Displayed in the header area',
             formValueName: 'name',
             formValue: name,
             formProps: {
-              autoFocus: true
-            }
+              autoFocus: true,
+            },
           })}
 
           {renderControl({
@@ -272,15 +342,28 @@ function General({
             subtitle: 'Displayed in the header area',
             className: 'description',
             formValueName: 'description',
-            formValue: description
+            formValue: description,
           })}
 
           {renderControl({
             label: 'Website',
             subtitle: 'Redirect URL to the main website',
             formValueName: 'url',
-            formValue: url
+            formValue: url,
           })}
+
+          <FormGroup>
+            <ControlLabel>Language</ControlLabel>
+            <Select
+              id='languageCode'
+              value={LANGUAGES.find((o) => o.value === language )}
+              options={LANGUAGES}
+              onChange={(e:any) => {
+                handleFormChange('language', e.value)
+              }}
+              isClearable={false}
+            />
+          </FormGroup>
         </BlockRow>
       </Block>
     );
@@ -298,13 +381,13 @@ function General({
         <ToggleWrap>
           <FormGroup>
             <ControlLabel>Show {title}</ControlLabel>
-            <p>{__('Show in Client Portal')}</p>
+            <p>{__('Show in Business Portal')}</p>
             <Toggle
               checked={toggle}
               onChange={() => onChangeToggle(toggleName, !toggle)}
               icons={{
                 checked: <span>Yes</span>,
-                unchecked: <span>No</span>
+                unchecked: <span>No</span>,
               }}
             />
           </FormGroup>
@@ -316,10 +399,54 @@ function General({
     );
   };
 
+  const renderSelectCategory = () => {
+    const trigger = (
+      <Button btnStyle='primary' icon='plus-circle'>
+        Create Category
+      </Button>
+    );
+
+    const renderTrigger = () => {
+      const content = (props) => <CategoryForm {...props} categories={[]} />;
+      return (
+        <ModalTrigger
+          title='Manage category'
+          trigger={trigger}
+          size='lg'
+          content={content}
+        />
+      );
+    };
+
+    return (
+      <>
+        <ControlLabel>Parent Product Category for Vendors</ControlLabel>
+        <div style={{ display: 'flex' }}>
+          <SelectProductCategory
+            label='Choose product category'
+            name='productCategoryId'
+            initialValue={vendorParentProductCategoryId || ''}
+            onSelect={(categoryId) =>
+              handleFormChange(
+                'vendorParentProductCategoryId',
+                categoryId as string
+              )
+            }
+            multi={false}
+          />
+          {renderTrigger()}
+        </div>
+      </>
+    );
+  };
+
   const renderFeatures = () => {
     if (
       !isEnabled('knowledgebase') &&
-      !isEnabled('cards') &&
+      !isEnabled('sales') &&
+      !isEnabled('purchases') &&
+      !isEnabled('tickets') &&
+      !isEnabled('tasks') &&
       !isEnabled('inbox')
     ) {
       return null;
@@ -336,16 +463,19 @@ function General({
                 subtitle: 'Shown name on menu',
                 formValueName: 'knowledgeBaseLabel',
                 formValue: knowledgeBaseLabel,
-                placeholder: 'Please enter a label for Knowledge base'
+                placeholder: 'Please enter a label for Knowledge base',
               })}
               <FormGroup>
                 <ControlLabel required={true}>
                   Knowledge base topic
                 </ControlLabel>
-                <p>{__('Knowledge base topic in Client Portal')}</p>
+                <p>{__('Knowledge base topic in Business Portal')}</p>
                 <Select
-                  placeholder="Select a knowledge base topic"
-                  value={knowledgeBaseTopicId}
+                  placeholder='Select a knowledge base topic'
+                  value={generateOptions(topics, '_id', 'title').find(
+                    (o) => o.value === knowledgeBaseTopicId
+                  )}
+                  isClearable={true}
                   options={generateOptions(topics, '_id', 'title')}
                   onChange={handleSelectChange}
                 />
@@ -354,7 +484,7 @@ function General({
             'kbToggle',
             kbToggle || false
           )}
-        {isEnabled('cards') &&
+        {isEnabled('tasks') &&
           renderFeatureBlock(
             'publicTask',
             renderTaskPipelines(),
@@ -362,7 +492,7 @@ function General({
             publicTaskToggle || false
           )}
 
-        {isEnabled('cards') &&
+        {isEnabled('tickets') &&
           renderFeatureBlock(
             'tickets',
             <>
@@ -371,20 +501,21 @@ function General({
                 subtitle: 'Shown name on menu',
                 formValueName: 'ticketLabel',
                 formValue: ticketLabel,
-                placeholder: 'Please enter a label for Ticket'
+                placeholder: 'Please enter a label for Ticket',
               })}
               {renderBoardSelect({
                 type: 'ticket',
                 stageId: ticketStageId,
                 pipelineId: ticketPipelineId,
-                boardId: ticketBoardId
+                boardId: ticketBoardId,
+                toggle: ticketToggle || false,
               })}
             </>,
             'ticketToggle',
             ticketToggle || false
           )}
 
-        {isEnabled('cards') &&
+        {isEnabled('sales') &&
           renderFeatureBlock(
             'deals',
             <>
@@ -393,20 +524,20 @@ function General({
                 subtitle: 'Shown name on menu',
                 formValueName: 'dealLabel',
                 formValue: dealLabel,
-                placeholder: 'Please enter a label for Deal'
+                placeholder: 'Please enter a label for Deal',
               })}
               {renderBoardSelect({
                 type: 'deal',
                 stageId: dealStageId,
                 pipelineId: dealPipelineId,
-                boardId: dealBoardId
+                boardId: dealBoardId,
               })}
             </>,
             'dealToggle',
             dealToggle || false
           )}
 
-        {isEnabled('cards') &&
+        {isEnabled('purchases') &&
           renderFeatureBlock(
             'purchases',
             <>
@@ -415,20 +546,20 @@ function General({
                 subtitle: 'Shown name on menu',
                 formValueName: 'purchaseLabel',
                 formValue: purchaseLabel,
-                placeholder: 'Please enter a label for Purchase'
+                placeholder: 'Please enter a label for Purchase',
               })}
               {renderBoardSelect({
                 type: 'purchase',
                 stageId: purchaseStageId,
                 pipelineId: purchasePipelineId,
-                boardId: purchaseBoardId
+                boardId: purchaseBoardId,
               })}
             </>,
             'purchaseToggle',
             purchaseToggle || false
           )}
 
-        {isEnabled('cards') &&
+        {isEnabled('tasks') &&
           renderFeatureBlock(
             'tasks',
             <>
@@ -437,13 +568,13 @@ function General({
                 subtitle: 'Shown name on menu',
                 formValueName: 'taskLabel',
                 formValue: taskLabel,
-                placeholder: 'Please enter a label for Task'
+                placeholder: 'Please enter a label for Task',
               })}
               {renderBoardSelect({
                 type: 'task',
                 stageId: taskStageId,
                 pipelineId: taskPipelineId,
-                boardId: taskBoardId
+                boardId: taskBoardId,
               })}
             </>,
             'taskToggle',
@@ -454,8 +585,10 @@ function General({
             label: 'Messenger brand code',
             subtitle: 'Brand code in messenger install script',
             formValueName: 'messengerBrandCode',
-            formValue: messengerBrandCode
+            formValue: messengerBrandCode,
           })}
+
+        {kind === 'vendor' && renderSelectCategory()}
       </Block>
     );
   };

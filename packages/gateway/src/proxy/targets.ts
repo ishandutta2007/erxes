@@ -1,4 +1,4 @@
-import { getService, getServices } from '../redis';
+import { getService, getServices } from '@erxes/api-utils/src/serviceDiscovery';
 import retry from '../util/retry';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -23,7 +23,7 @@ async function getProxyTarget(name: string): Promise<ErxesProxyTarget> {
   return {
     name,
     address: service.address,
-    config: service.config
+    config: service.config,
   };
 }
 
@@ -35,53 +35,63 @@ async function retryGetProxyTarget(name: string): Promise<ErxesProxyTarget> {
     maxTries: maxPluginRetry,
     retryExhaustedLog: `Plugin ${name} still hasn't joined the service discovery after checking for ${maxPluginRetry} time(s) with ${intervalSeconds} second(s) interval. Retry exhausted.`,
     retryLog: `Waiting for plugin ${name} to join service discovery`,
-    successLog: `Plugin ${name} joined service discovery.`
+    successLog: `Plugin ${name} joined service discovery.`,
   });
 }
 
 async function ensureGraphqlEndpointIsUp({
   address,
-  name
+  name,
 }: ErxesProxyTarget): Promise<void> {
   if (!address) return;
 
   const endponit = `${address}/graphql`;
 
+  /*
+    query: 'query SubgraphIntrospectQuery {\n' +
+      '    # eslint-disable-next-line\n' +
+      '    _service {\n' +
+      '        sdl\n' +
+      '    }\n' +
+      '}',
+
+  */
   const res = await fetch(endponit, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      variables: null,
       query: `
-          query _ErxesGatewaySubgraphCheck_ {
+          query SubgraphIntrospectQuery {
             _service {
               sdl
             }
           }
-          `
-    })
+          `,
+      operationName: 'SubgraphIntrospectQuery',
+    }),
   });
-  if (res.status === 200) {
+  if (res.ok) {
     return;
   }
 
   throw new Error(
-    `Plugin ${name}'s graphql endpoint ${endponit} is not ready yet`
+    `Plugin ${name}'s graphql endpoint ${endponit} is not ready yet`,
   );
 }
 
 async function retryEnsureGraphqlEndpointIsUp(target: ErxesProxyTarget) {
   const { name, address } = target;
   const endpoint = `${address}/graphql`;
-  const intervalSeconds = 1;
   await retry({
     fn: () => ensureGraphqlEndpointIsUp(target),
-    intervalMs: intervalSeconds * 1000,
+    intervalMs: 5 * 1000,
     maxTries: maxPluginRetry,
-    retryExhaustedLog: `Plugin ${name}'s graphql endpoint ${endpoint} is still not ready after checking for ${maxPluginRetry} times with ${intervalSeconds} second(s) interval. Retry exhausted.`,
-    retryLog: `Waiting for service ${name}'s graphql endpoint ${endpoint} to be up.`,
-    successLog: `Plugin ${name}'s graphql endpoint ${endpoint} is up.`
+    retryExhaustedLog: `ERROR: ${name} graphql endpoint ${endpoint} isn't running.`,
+    retryLog: `WAITING FOR: ${name} graphql endpoint ${endpoint}`,
+    successLog: `UP: ${name} graphql endpoint ${endpoint}`,
   });
 }
 
@@ -89,16 +99,11 @@ export async function retryGetProxyTargets(): Promise<ErxesProxyTarget[]> {
   try {
     const serviceNames = await getServices();
 
-    const proxyTargets: ErxesProxyTarget[] = [];
+    const proxyTargets: ErxesProxyTarget[] = await Promise.all(
+      serviceNames.map(retryGetProxyTarget),
+    );
 
-    for (const name of serviceNames) {
-      const target = await retryGetProxyTarget(name);
-      proxyTargets.push(target);
-    }
-
-    for (const target of proxyTargets) {
-      await retryEnsureGraphqlEndpointIsUp(target);
-    }
+    await Promise.all(proxyTargets.map(retryEnsureGraphqlEndpointIsUp));
 
     return proxyTargets;
   } catch (e) {

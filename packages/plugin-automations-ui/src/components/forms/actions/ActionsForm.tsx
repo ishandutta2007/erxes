@@ -1,13 +1,14 @@
-import { __ } from '@erxes/ui/src/utils/core';
-import React from 'react';
-import { TriggerTabs } from '../../../styles';
-import { ScrolledContent } from '@erxes/ui-automations/src/styles';
-import Icon from '@erxes/ui/src/components/Icon';
-import { IAction } from '@erxes/ui-automations/src/types';
 import { TabTitle, Tabs } from '@erxes/ui/src/components/tabs';
-import Tip from '@erxes/ui/src/components/Tip';
-import EmptyState from '@erxes/ui/src/components/EmptyState';
+
 import { ActionBox } from './styles';
+import EmptyState from '@erxes/ui/src/components/EmptyState';
+import { IAction } from '@erxes/ui-automations/src/types';
+import Icon from '@erxes/ui/src/components/Icon';
+import React from 'react';
+import { ScrolledContent } from '@erxes/ui-automations/src/styles';
+import Tip from '@erxes/ui/src/components/Tip';
+import { TriggerTabs } from '../../../styles';
+import { __ } from '@erxes/ui/src/utils/core';
 
 type Props = {
   onClickAction: (action: IAction) => void;
@@ -43,8 +44,8 @@ class ActionsForm extends React.Component<Props, State> {
 
     let actions = JSON.parse(actionsLocalStorage);
 
-    if (actions.find(item => item.type === action.type)) {
-      actions = actions.filter(item => item.type !== action.type);
+    if (actions.find((item) => item.type === action.type)) {
+      actions = actions.filter((item) => item.type !== action.type);
     } else {
       actions.push(action);
     }
@@ -62,14 +63,16 @@ class ActionsForm extends React.Component<Props, State> {
       <ActionBox
         key={index}
         onClick={onClickAction.bind(this, action)}
-        isFavourite={isFavourite}
-        isAvailable={action.isAvailable}
+        $isFavourite={isFavourite}
+        $isAvailable={action.isAvailable}
       >
-        <Icon icon={action.icon} size={30} />
-        <div>
-          <b>{__(action.label)}</b>
-          {!action.isAvailable && <span>{__('Coming soon')}</span>}
-          <p>{__(action.description)}</p>
+        <div className="action-row">
+          <Icon icon={action.icon} size={30} />
+          <div>
+            <b>{__(action.label)}</b>
+            {!action.isAvailable && <span>{__('Coming soon')}</span>}
+            <p>{__(action.description)}</p>
+          </div>
         </div>
         <Tip
           text={isFavourite ? __('Unfavourite') : __('Favourite')}
@@ -108,7 +111,7 @@ class ActionsForm extends React.Component<Props, State> {
 
     return actions.map((action, index) => {
       const isFavourite = localStorageActions.some(
-        item => item.type === action.type
+        (item) => item.type === action.type
       );
 
       return (

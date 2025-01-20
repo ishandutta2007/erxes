@@ -12,6 +12,7 @@ export const CUSTOMER_BASIC_INFO = {
   avatar: 'Avatar',
   firstName: 'First Name',
   lastName: 'Last Name',
+  middleName: 'middleName',
   primaryEmail: 'Primary E-mail',
   primaryPhone: 'Primary Phone',
   position: 'Position',
@@ -19,6 +20,10 @@ export const CUSTOMER_BASIC_INFO = {
   hasAuthority: 'Has Authority',
   description: 'Description',
   isSubscribed: 'Subscribed',
+  birthDate: 'birthDate',
+  code: 'code',
+  score: 'score',
+  phoneValidationStatus: 'phoneValidationStatus',
 
   ALL: [
     { field: 'avatar', label: 'Avatar' },
@@ -31,7 +36,11 @@ export const CUSTOMER_BASIC_INFO = {
     { field: 'department', label: 'Department' },
     { field: 'hasAuthority', label: 'Has Authority' },
     { field: 'description', label: 'Description' },
-    { field: 'isSubscribed', label: 'Subscribed' }
+    { field: 'isSubscribed', label: 'Subscribed' },
+    { field: 'birthDate', label: 'Birthday' },
+    { field: 'code', label: 'Code' },
+    { field: 'score', label: 'Score' },
+    { field: 'phoneValidationStatus', label: 'PhoneValidationStatus' }
   ]
 };
 
@@ -51,6 +60,7 @@ export const CUSTOMER_LINKS = {
   linkedIn: 'LinkedIn',
   twitter: 'Twitter',
   facebook: 'Facebook',
+  instagram: 'Instagram',
   youtube: 'Youtube',
   github: 'Github',
   website: 'Website',
@@ -59,6 +69,7 @@ export const CUSTOMER_LINKS = {
     { field: 'linkedIn', label: 'LinkedIn' },
     { field: 'twitter', label: 'Twitter' },
     { field: 'facebook', label: 'Facebook' },
+    { field: 'instagram', label: 'Instagram' },
     { field: 'youtube', label: 'Youtube' },
     { field: 'github', label: 'Github' },
     { field: 'website', label: 'Website' }

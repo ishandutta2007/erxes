@@ -22,6 +22,7 @@ const commonFields = `
   
   canHide
   validation
+  regexValidation
   options
   isVisibleToCreate
   locationOptions{
@@ -54,6 +55,7 @@ const commonFields = `
   }
 
   relationType
+  isDisabled
 `;
 
 const commonFieldsGroups = `
@@ -126,7 +128,7 @@ const fields = `
         logicOperator
         logicValue
       }
-      groupName
+      
       objectListConfigs{
         key
         label
@@ -146,9 +148,27 @@ const inboxFields = `
   }
 `;
 
-const cardsFields = `
-  query cardsFields {
-    cardsFields
+const salesCardsFields = `
+  query salesCardsFields {
+    salesCardsFields
+  }
+`;
+
+const ticketsCardsFields = `
+  query ticketsCardsFields {
+    ticketsCardsFields
+  }
+`;
+
+const tasksCardsFields = `
+  query tasksCardsFields {
+    tasksCardsFields
+  }
+`;
+
+const purchasesCardsFields = `
+  query purchasesCardsFields {
+    purchasesCardsFields
   }
 `;
 
@@ -185,7 +205,10 @@ export default {
   fields,
   getSystemFieldsGroup,
   inboxFields,
-  cardsFields,
+  salesCardsFields,
+  ticketsCardsFields,
+  tasksCardsFields,
+  purchasesCardsFields,
   configs,
   productCategories,
   fieldsCombinedByContentType

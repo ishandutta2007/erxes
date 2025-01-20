@@ -1,4 +1,4 @@
-import { IButtonMutateProps, IRouterProps } from '@erxes/ui/src/types';
+import { IButtonMutateProps } from '@erxes/ui/src/types';
 
 import ButtonMutate from '@erxes/ui/src/components/ButtonMutate';
 import CallPro from '../../components/callpro/Form';
@@ -9,10 +9,9 @@ import Telegram from '../../components/telegram/Telegram';
 import TelnyxForm from '../../components/telnyx/TelnyxForm';
 import Viber from '../../components/viber/Viber';
 import WebHookForm from '../../components/webhook/Form';
-import Whatsapp from '../../components/whatsapp/Whatsapp';
+import whatsapp from '../../components/whatsapp/Whatsapp';
 import { getRefetchQueries } from '../utils';
 import { mutations } from '../../graphql';
-import { withRouter } from 'react-router-dom';
 
 type Props = {
   type: string;
@@ -23,14 +22,14 @@ type State = {
   channelIds: string[];
 };
 
-type FinalProps = {} & IRouterProps & Props;
+type FinalProps = {} & Props;
 
 const INTEGRATION_FORM = {
   callpro: CallPro,
   chatfuel: Chatfuel,
   'smooch-viber': Viber,
   'smooch-telegram': Telegram,
-  whatsapp: Whatsapp,
+  whatsapp: whatsapp,
   telnyx: TelnyxForm,
   webhook: WebHookForm,
   'outgoing-webhook': OutgoingWebHookFrom
@@ -62,7 +61,7 @@ class IntegrationFormContainer extends React.Component<FinalProps, State> {
         callback={callback}
         isSubmitted={isSubmitted}
         refetchQueries={getRefetchQueries(type)}
-        type="submit"
+        type='submit'
         successMessage={`You successfully added a ${type} ${name}`}
       />
     );
@@ -85,4 +84,4 @@ class IntegrationFormContainer extends React.Component<FinalProps, State> {
   }
 }
 
-export default withRouter<FinalProps>(IntegrationFormContainer);
+export default IntegrationFormContainer;

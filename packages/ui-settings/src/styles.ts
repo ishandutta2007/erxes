@@ -115,10 +115,15 @@ const ActionButtons = styled.div`
   }
 `;
 
-const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
+const SidebarListItem = styledTS<{
+  $isActive: boolean;
+  backgroundColor?: string;
+}>(styled.li)`
   position: relative;
-  background: ${props => props.isActive && rgba(colors.colorPrimary, 0.2)};
-  overflow: hidden;
+  background: ${(props) =>
+    (props.$isActive && rgba(colors.colorPrimary, 0.2)) ||
+    props.backgroundColor ||
+    colors.colorWhite};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -126,8 +131,8 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
   a {
     white-space: normal;
     flex: 1;
-    color: ${props => props.isActive && colors.colorPrimary} !important;
-    font-weight: ${props => (props.isActive ? 600 : 500)};
+    color: ${(props) => props.$isActive && colors.colorPrimary} !important;
+    font-weight: ${(props) => (props.$isActive ? 600 : 500)};
 
     border-bottom: 1px solid ${colors.borderPrimary};
 
@@ -136,7 +141,7 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
 
     &:hover {
       background: none;
-      color: ${props => !props.isActive && lighten(colors.textPrimary, 40)};
+      color: ${(props) => !props.$isActive && lighten(colors.textPrimary, 40)};
     }
 
     &:focus {
@@ -155,7 +160,7 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
   
   &:hover {
     cursor: pointer;
-    background: ${props => !props.isActive && colors.bgLight};
+    background: ${(props) => !props.$isActive && colors.bgLight};
     
     ${ActionButtons} {
       width: 60px;
@@ -197,19 +202,34 @@ const ExpandWrapper = styled.div`
   }
 `;
 
-const Description = styled.div`
+const Description = styledTS<{ $noMargin?: boolean; $halfWidth?: boolean }>(
+  styled.div,
+)`
   color: ${colors.colorCoreGray};
   font-size: 12px;
-  margin-bottom: ${dimensions.coreSpacing}px;
+  max-width: ${(props) => props.$halfWidth && '500px'};
+  margin-bottom: ${(props) => !props.$noMargin && '20px'};
 `;
 
-const FlexRow = styled.div`
+const FlexRow = styledTS<{ $alignItems?: string; $justifyContent?: string }>(
+  styled.div,
+)`
   display: flex;
   flex-wrap: wrap;
   flex-direction: row;
-  align-items: center;
+  align-items: ${(props) => (props.$alignItems ? props.$alignItems : 'center')};
+  justify-content: ${(props) =>
+    props.$justifyContent ? props.$justifyContent : 'flex-start'};
   flex: 1;
-  margin-right: ${dimensions.coreSpacing}px;
+
+  > div {
+    flex: 1;
+    margin-right: ${dimensions.coreSpacing}px;
+
+    &:last-child {
+      margin: 0;
+    }
+  }
 `;
 
 const SubHeading = styled.h4`
@@ -233,6 +253,24 @@ const WidgetBackgrounds = styled.div`
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+
+  .dropdown-btn {
+    width: 100%;
+    margin-bottom: 20px;
+
+    &:last-child {
+      margin-bottom: 0px;
+    }
+
+    > button {
+      width: 100%;
+
+      div {
+        flex-direction: row;
+        gap: 8px;
+      }
+    }
+  }
 `;
 
 const FlexItem = styled(DateContainer)`
@@ -241,6 +279,11 @@ const FlexItem = styled(DateContainer)`
   margin-left: ${dimensions.coreSpacing}px;
   &:first-child {
     margin-left: 0;
+  }
+
+  .css-13cymwt-control, .css-t3ipsp-control { 
+    background: transparent !important;
+    border-width: 0 !important;
   }
 `;
 
@@ -312,9 +355,10 @@ const SubItem = styled.div`
   }
 `;
 
-const FilterContainer = styled.div`
+const FilterContainer = styledTS<{ $marginRight?: boolean }>(styled.div)`
   position: relative;
   z-index: 2;
+  margin-right: ${(props) => props.$marginRight && '10px'};
 `;
 
 const SidebarList = styled.div`
@@ -323,7 +367,6 @@ const SidebarList = styled.div`
 
 const ContentBox = styled.div`
   padding: ${dimensions.coreSpacing}px;
-  max-width: 640px;
   margin: 0 auto;
 `;
 
@@ -384,16 +427,15 @@ const InputBar = styledTS<{ type?: string }>(styled.div)`
   align-items: center;
   display: flex;
   flex: 1;
-  max-width: ${props =>
+  max-width: ${(props) =>
     props.type === 'active' && `${dimensions.headerSpacingWide * 2 + 20}px`};
-  padding: 5px 5px 0 20px;
+  padding: 0 5px 0 ${dimensions.coreSpacing}px;
   border-radius: 8px;
-  margin-left: ${props => props.type === 'active' && '10px'};
-  height: 41px;
-  padding-left: ${props =>
+  margin-left: ${(props) => props.type === 'active' && '10px'};
+  padding-left: ${(props) =>
     props.type === 'searchBar' && `${dimensions.unitSpacing * 2}px`};
 
-  input {
+  input, .Select-control {
     border-bottom: 0;
   }
 `;
@@ -404,17 +446,26 @@ const Header = styled.div`
   border-bottom: 1px solid ${colors.borderPrimary};
 `;
 
-const Title = styledTS<{ capitalize?: boolean }>(styled.div)`
+const Title = styledTS<{ $capitalize?: boolean }>(styled.div)`
   font-size: 24px;
   display: flex;
   line-height: 30px;
-  text-transform: ${props => props.capitalize && 'capitalize'};
+  text-transform: ${(props) => props.$capitalize && 'capitalize'};
 
   > span {
     font-size: 75%;
     color: #666;
   }
   `;
+
+const LeftActionBar = styled.div`
+  display: flex;
+  align-items: center;
+
+  > div {
+    margin-right: ${dimensions.unitSpacing}px;
+  }
+`;
 
 const CreatedDate = styled.div`
   float: left;
@@ -447,9 +498,30 @@ const Row = styled.div`
   }
 `;
 
+const FlexBetween = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const ItemCount = styled.span`
+  color: ${colors.colorLightGray};
+  font-weight: 500;
+`;
+
+const ImageWrapper = styled.div`
+  margin-bottom: ${dimensions.unitSpacing}px;
+
+  img {
+    max-width: 300px;
+    max-height: 300px;
+  }
+`;
+
 export {
   MarkdownWrapper,
   FlexItem,
+  ImageWrapper,
   ActionButtons,
   ExpandWrapper,
   Description,
@@ -469,9 +541,12 @@ export {
   CreatedDate,
   LeftContent,
   Row,
+  FlexBetween,
+  ItemCount,
   SpaceFormsWrapper,
   CommentWrapper,
   TicketComment,
   CommentContent,
-  CreatedUser
+  CreatedUser,
+  LeftActionBar,
 };

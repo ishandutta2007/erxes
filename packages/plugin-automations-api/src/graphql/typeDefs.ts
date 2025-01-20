@@ -1,19 +1,12 @@
-import { gql } from 'apollo-server-express';
+import gql from "graphql-tag";
+import { types, queries, mutations } from "./schema/automation";
 
-import { types, queries, mutations } from './schema/automation';
-
-const typeDefs = async _serviceDiscovery => {
-  const isTagsEnabled = await _serviceDiscovery.isEnabled('tags');
-
-  const isEnabled = {
-    tags: isTagsEnabled
-  };
-
+const typeDefs = async () => {
   return gql`
     scalar JSON
     scalar Date
 
-    ${types(isEnabled)}
+    ${types()}
 
     extend type Query {
       ${queries}

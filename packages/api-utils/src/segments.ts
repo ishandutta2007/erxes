@@ -20,7 +20,7 @@ export const getServiceName = (type: string) => type.split(':')[0];
 export const getEsIndexByContentType = async (contentType: string) => {
   const [serviceName, type] = contentType.split(':');
 
-  const service = await getService(serviceName, true);
+  const service = await getService(serviceName);
 
   const segmentMeta = (service.config.meta || {}).segments;
 
@@ -48,7 +48,7 @@ export const gatherDependentServicesType = async (
   const serviceNames = await getServices();
 
   for (const sName of serviceNames) {
-    const service = await getService(sName, true);
+    const service = await getService(sName);
     const segmentMeta = (service.config.meta || {}).segments;
 
     if (!segmentMeta) {
@@ -58,12 +58,18 @@ export const gatherDependentServicesType = async (
     const dependentServices = segmentMeta.dependentServices || [];
     const contentTypes = segmentMeta.contentTypes || [];
 
+
     for (const dService of dependentServices) {
       if (dService.name !== serviceName || !dService.twoWay) {
         continue;
       }
 
+      
       for (const contentType of contentTypes) {
+        if(!!dService?.types?.length && !(dService?.types || []).includes(contentType?.type)){
+          continue
+        }
+        
         gatherTypes(contentType, sName, dService);
       }
     }
@@ -72,7 +78,7 @@ export const gatherDependentServicesType = async (
 
 export const gatherAssociatedTypes = async (contentType: string) => {
   const [serviceName, currentType] = contentType.split(':');
-  const service = await getService(serviceName, true);
+  const service = await getService(serviceName);
   const segmentMeta = (service.config.meta || {}).segments;
 
   const associatedTypes: string[] = [];
@@ -123,7 +129,7 @@ const gatherServicesAssociatedTypes = async (
   serviceName: string,
   associatedTypes: string[]
 ) => {
-  const service = await getService(serviceName, true);
+  const service = await getService(serviceName);
   const segmentMeta = (service.config.meta || {}).segments;
 
   if (!segmentMeta) {
@@ -137,6 +143,6 @@ const gatherServicesAssociatedTypes = async (
       continue;
     }
 
-    associatedTypes.push(`${serviceName}:${contentType.type}`);
+    associatedTypes.push(`${serviceName}:${contentType.type}`); 
   }
 };

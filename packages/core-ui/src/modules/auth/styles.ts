@@ -1,10 +1,9 @@
-import { getThemeItem } from '@erxes/ui/src/utils/core';
 import { colors, dimensions, typography } from 'modules/common/styles';
+
 import styled from 'styled-components';
+import styledTS from 'styled-components-ts';
 
-const thBackground = getThemeItem('background');
-
-const AuthBox = styled.div`
+const AuthBox = styledTS<{ backgroundColor?: string }>(styled.div)`
   width: 100%;
   background-color: ${colors.colorWhite};
   padding: 30px 40px;
@@ -12,18 +11,25 @@ const AuthBox = styled.div`
   max-height: 700px;
   overflow: auto;
 
-  img {
+  > img {
     width: 100px;
-    margin-bottom: 56px;
+    margin-bottom: ${dimensions.unitSpacing + dimensions.coreSpacing}px;
   }
 
   h2 {
-    color: ${thBackground || colors.colorPrimary};
+    color: ${(props) => props.backgroundColor || colors.colorPrimary};
     font-size: 24px;
     font-weight: 800;
     margin: 0 0 10px;
   }
   
+  > span {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: ${dimensions.unitSpacing}px;
+    display: block;
+  }
+
   p {
     color: #666;
     font-size: 16px;
@@ -32,21 +38,17 @@ const AuthBox = styled.div`
   input {
     padding: 1.75em 1em;
     color: ${colors.colorCoreBlack};
-    font-size: 16px;
+    font-size: 14px;
     outline: 0;
     border-radius: 8px;
-    background-color: ${colors.bgLight}
-    border: 1.5px solid ${colors.bgLight}
+    background-color: ${colors.bgLight};
+    border: 1.1px solid ${colors.bgLight};
 
     &:focus {
       outline: 0;
       box-shadow: none;
-      border: 1.5px solid ${colors.borderDarker}
+      border: 1.1px solid ${colors.borderDarker}
     }
-  }
-
-  form {
-    margin-top: ${dimensions.unitSpacing + dimensions.coreSpacing}px;
   }
 
   button {
@@ -61,18 +63,17 @@ const AuthBox = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: ${thBackground || colors.colorPrimaryDark}
 
-    &:hover {
-      background-color: ${thBackground || colors.colorPrimaryDark}
-    }
-  }
-  
-  a {
+  > a {
     display: block;
     text-align: center;
     color: ${colors.colorCoreSunYellow}
-    font-size: 16px;
+    font-size: 13px;
+    transition: all ease .3s;
+
+    &:hover {
+      font-weight: 500;
+    }
   }
 
   @media (max-width: 768px) {
@@ -143,4 +144,37 @@ const ColumnTitle = styled.h4`
   margin: ${dimensions.coreSpacing}px 0;
 `;
 
-export { AuthBox, SignUpBox, Seperator, ColumnTitle };
+const AuthButton = styled.div`
+  height: 50px;
+  width: 100%;
+  line-height: 30px;
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid ${colors.borderPrimary};
+  cursor: pointer;
+  transition: all ease 0.3s;
+  border-radius: ${dimensions.unitSpacing - 2}px;
+  padding: 5px 25px;
+
+  &.google {
+    background-color: ${colors.colorWhite};
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    > img {
+      width: ${dimensions.coreSpacing}px;
+      margin-right: ${dimensions.unitSpacing}px;
+    }
+  }
+
+  a {
+    color: ${colors.textPrimary};
+  }
+
+  &:hover {
+    border-color: #dcdcdc;
+  }
+`;
+
+export { AuthBox, SignUpBox, Seperator, ColumnTitle, AuthButton };

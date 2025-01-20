@@ -1,7 +1,14 @@
 import { colors, dimensions, typography } from '../styles';
+import styled, { css, keyframes } from 'styled-components';
+
+import { Popover } from '@headlessui/react';
 import { rgba } from '../styles/ecolor';
-import styled, { css } from 'styled-components';
 import styledTS from 'styled-components-ts';
+
+const placeHolderShimmer = keyframes`
+  0% { background-position: -468px 0 }
+  100% { background-position: 468px 0 }
+`;
 
 const Flex = styled.div`
   display: flex;
@@ -18,11 +25,11 @@ const FlexCenter = styled(Flex)`
 const Actions = styledTS<{ isSmall?: boolean }>(styled.div)`
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 0 ${dimensions.coreSpacing}px ${dimensions.unitSpacing}px;
 
-  > a, button {
+  a, button {
     flex: 1;
-    padding: 4px 15px;
 
     i {
       font-size: 12px;
@@ -31,15 +38,16 @@ const Actions = styledTS<{ isSmall?: boolean }>(styled.div)`
   }
 
   > div {
-    margin-left: 10px;
+    margin-left: ${dimensions.unitSpacing}px;
+    position: relative;
   }
 
-  > button {
-    margin-left: 10px;
+  [id^="headlessui-menu-items-"] {
+    display: ${(props) => (props.isSmall ? 'inline-block' : 'block')};
   }
 
-  .dropdown {
-    display: ${props => (props.isSmall ? 'inline-block' : 'block')};
+  > div:first-child {
+    margin: 0;
   }
 `;
 
@@ -63,24 +71,59 @@ const PopoverButton = styled.div`
   }
 `;
 
-const FullContent = styledTS<{ center: boolean; align?: boolean }>(styled.div)`
+const PopoverHeader = styled.h3`
+  display: block;
+  border-bottom: 1px solid ${colors.borderPrimary};
+  padding: 10px 20px;
+  background: ${colors.colorWhite};
+  font-size: 13px;
+  text-transform: capitalize;
+  border-radius: 4px 4px 0 0;
+  margin: 0;
+  font-weight: 600;
+
+  > a {
+    color: ${colors.colorCoreGray};
+    float: right;
+  }
+`;
+
+const PopoverPanel = styled(Popover.Panel)`
+  max-width: fit-content;
+`;
+
+const TipContent = styled.div`
+  white-space: nowrap;
+  z-index: 99;
+  background: #fff;
+  box-shadow:
+    rgba(50, 50, 93, 0.25) 0px 2px 5px -1px,
+    rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
+  padding: 4px 7px !important;
+  font-weight: 400 !important;
+  border-radius: 4px;
+  color: #000 !important;
+`;
+
+const FullContent = styledTS<{ $center: boolean; $align?: boolean }>(
+  styled.div,
+)`
   flex: 1;
   display: flex;
   min-height: 100%;
-  justify-content: ${props => props.center && 'center'};
-  align-items: ${props => (props.align ? 'flex-start' : 'center')};
+  justify-content: ${(props) => props.$center && 'center'};
+  align-items: ${(props) => (props.$align ? 'flex-start' : 'center')};
 `;
 
-const MiddleContent = styledTS<{ transparent?: boolean; shrink?: boolean }>(
-  styled.div
+const MiddleContent = styledTS<{ $transparent?: boolean; $shrink?: boolean }>(
+  styled.div,
 )`
   width: 900px;
-
-  background: ${props => !props.transparent && colors.colorWhite};
+  background: ${(props) => !props.$transparent && colors.colorWhite};
   margin: 10px 0;
 
-  ${props =>
-    !props.shrink &&
+  ${(props) =>
+    !props.$shrink &&
     css`
       height: 100%;
       height: calc(100% - 20px);
@@ -91,21 +134,21 @@ const MiddleContent = styledTS<{ transparent?: boolean; shrink?: boolean }>(
   }
 `;
 
-const BoxRoot = styledTS<{ selected?: boolean }>(styled.div)`
+const BoxRoot = styledTS<{ $selected?: boolean }>(styled.div)`
   text-align: center;
   float: left;
   background: ${colors.colorLightBlue};
-  box-shadow: ${props =>
-    props.selected
+  box-shadow: ${(props) =>
+    props.$selected
       ? `0 10px 20px ${rgba(colors.colorCoreDarkGray, 0.12)}`
       : `0 6px 10px 1px ${rgba(colors.colorCoreDarkGray, 0.08)}`} ;
   margin-right: ${dimensions.coreSpacing}px;
   margin-bottom: ${dimensions.coreSpacing}px;
   border-radius: ${dimensions.unitSpacing / 2 - 1}px;
   transition: all 0.25s ease;
-  border: 1px ${props => (props.selected ? 'solid' : 'dashed')}
-    ${props =>
-      props.selected ? colors.colorSecondary : 'rgba(0, 0, 0, 0.12)'};
+  border: 1px ${(props) => (props.$selected ? 'solid' : 'dashed')}
+    ${(props) =>
+      props.$selected ? colors.colorSecondary : 'rgba(0, 0, 0, 0.12)'};
 
   > a {
     display: block;
@@ -192,6 +235,7 @@ const Links = styled.div`
 
 const FormWrapper = styled.div`
   display: flex;
+  flex-wrap: wrap;
 
   img {
     display: block;
@@ -202,9 +246,10 @@ const FormWrapper = styled.div`
   }
 `;
 
-const FormColumn = styled.div`
+const FormColumn = styledTS<{ maxwidth?: string }>(styled.div)`
   flex: 1;
   padding-right: 40px;
+  max-width: ${(props) => props.maxwidth};
 
   &:last-of-type {
     padding: 0;
@@ -221,12 +266,12 @@ const CenterContent = styled.div`
   margin-top: 10px;
 `;
 
-const ActivityContent = styledTS<{ isEmpty: boolean }>(styled.div)`
+const ActivityContent = styledTS<{ $isEmpty: boolean }>(styled.div)`
   position: relative;
-  height: ${props => props.isEmpty && '360px'};
+  height: ${(props) => props.$isEmpty && '360px'};
 `;
 
-const DropIcon = styledTS<{ isOpen: boolean }>(styled.span)`
+const DropIcon = styledTS<{ $isOpen: boolean }>(styled.span)`
   font-size: 18px;
   line-height: 22px;
 
@@ -237,7 +282,7 @@ const DropIcon = styledTS<{ isOpen: boolean }>(styled.span)`
     float: right;
     transition: all ease 0.3s;
     margin-left: ${dimensions.unitSpacing - 2}px;
-    transform: ${props => props.isOpen && `rotate(180deg)`};
+    transform: ${(props) => props.$isOpen && `rotate(180deg)`};
   }
 `;
 
@@ -273,7 +318,7 @@ const DateWrapper = styled.time`
 
 const ScrollWrapper = styledTS<{ calcHeight?: string }>(styled.div)`
   height: 50vh;
-  height: ${props =>
+  height: ${(props) =>
     props.calcHeight
       ? `calc(100vh - ${props.calcHeight}px)`
       : 'calc(100vh - 280px)'};
@@ -325,9 +370,9 @@ const ButtonRelated = styled.div`
   }
 `;
 
-const SimpleButton = styledTS<{ isActive?: boolean }>(styled.div)`
+const SimpleButton = styledTS<{ $isActive?: boolean }>(styled.div)`
   font-size: 15px;
-  background: ${props => props.isActive && colors.bgGray};
+  background: ${(props) => props.$isActive && colors.bgGray};
   width: 24px;
   height: 24px;
   line-height: 24px;
@@ -350,7 +395,7 @@ const Title = styledTS<{ capitalize?: boolean }>(styled.div)`
   margin: 20px 0;
   display: flex;
   line-height: 30px;
-  text-transform: ${props => props.capitalize && 'capitalize'};
+  text-transform: ${(props) => props.capitalize && 'capitalize'};
 
   > span {
     font-size: 75%;
@@ -468,7 +513,7 @@ const Pin = styled.div`
 
 const MapContainer = styled.div<{ fullHeight?: boolean }>`
   width: 100%;
-  height: ${props => (props.fullHeight ? '100%' : '250px')};
+  height: ${(props) => (props.fullHeight ? '100%' : '250px')};
 `;
 
 const ImageWrapper = styled.div`
@@ -501,9 +546,101 @@ const TextWrapper = styled.div`
   }
 `;
 
+const Loader = styledTS<{
+  height?: string;
+  width?: string;
+  color?: string;
+  $round?: boolean;
+  margin?: string;
+  marginRight?: string;
+  isBox?: boolean;
+  withImage?: boolean;
+}>(styled.div)`
+  animation-duration: 1.25s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: ${placeHolderShimmer};
+  animation-timing-function: linear;
+  background: linear-gradient(to right, 
+    ${(props) => (props.color ? props.color : colors.borderPrimary)} 8%, 
+    ${(props) => (props.color ? colors.bgLight : colors.borderDarker)} 18%, 
+    ${(props) => (props.color ? props.color : colors.borderPrimary)} 33%);
+  background-size: 800px 200px;
+  width: ${(props) => (props.width ? props.width : '100%')};
+  height: ${(props) => (props.height ? props.height : '100%')};
+  border-radius: ${(props) => (props.$round ? '50%' : '2px')};
+  margin-right: ${(props) => props.marginRight};
+  margin: ${(props) => props.margin};
+  position: relative;
+  float: left;
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1050;
+  width: 100%;
+  height: 100%;
+  background: rgba(48, 67, 92, 0.5);
+`;
+
+const DialogContent = styled.div`
+  display: flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  .dialog-description {
+    padding: 20px 30px 30px;
+    margin: 0;
+  }
+`;
+
+const DialogWrapper = styled.div`
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  z-index: 1050;
+`;
+
+const MenuDivider = styled.div`
+  height: 0;
+  margin: 0.5rem 0;
+  overflow: hidden;
+  border-top: 1px solid #e9ecef;
+`;
+
+const UploadBtn = styled.div`
+  position: relative;
+  min-height: 30px;
+  margin-top: 10px;
+  label {
+    padding: 7px 15px;
+    background: ${rgba(colors.colorCoreDarkBlue, 0.05)};
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+    display: inline-block;
+    &:hover {
+      background: ${rgba(colors.colorCoreDarkBlue, 0.1)};
+      cursor: pointer;
+    }
+  }
+  input[type='file'] {
+    display: none;
+  }
+`;
+
+const AttachmentContainer = styled.div`
+  margin-top: 20px;
+`;
+
 export {
   Actions,
   PopoverButton,
+  PopoverHeader,
   BoxRoot,
   ColorPick,
   ColorPicker,
@@ -518,6 +655,7 @@ export {
   CenterContent,
   ActivityContent,
   DropIcon,
+  MenuDivider,
   MiddleContent,
   HomeContainer,
   DateWrapper,
@@ -526,6 +664,7 @@ export {
   DateContainer,
   TabContent,
   ButtonRelated,
+  Loader,
   SimpleButton,
   TopHeader,
   Title,
@@ -541,7 +680,14 @@ export {
   Column,
   Wrapper,
   Pin,
+  ModalOverlay,
   MapContainer,
   ImageWrapper,
-  TextWrapper
+  TextWrapper,
+  DialogWrapper,
+  DialogContent,
+  PopoverPanel,
+  TipContent,
+  UploadBtn,
+  AttachmentContainer,
 };

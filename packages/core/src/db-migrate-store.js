@@ -5,15 +5,16 @@ dotenv.config();
 
 class dbStore {
   constructor() {
+    if(!process.env.MONGO_URL) {
+      throw new Error(`MONGO_URL environment variable is "${process.env.MONGO_URL}"`)
+    }
 
     this.url = process.env.MONGO_URL
     this.db = null
   }
 
-  connect() {
-    return mongoose.createConnection(this.url, { useNewUrlParser: true }).then(client => {
-      return client.db;
-    })
+  async connect() {
+    return mongoose.createConnection(this.url, {}).db;
   }
 
   load(fn) {

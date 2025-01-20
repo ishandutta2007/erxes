@@ -1,23 +1,26 @@
-import FormControl from '@erxes/ui/src/components/form/Control';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { FlexItem, FlexPad } from '@erxes/ui/src/components/step/styles';
-import { __, Alert } from 'coreui/utils';
-import { MESSENGER_KINDS, SENT_AS_CHOICES } from '@erxes/ui-engage/src/constants';
-import React from 'react';
-import EditorCK from '../containers/EditorCK';
-import MessengerPreview from '../containers/MessengerPreview';
-import { IEngageMessenger, IEngageScheduleDate } from '@erxes/ui-engage/src/types';
-import Scheduler from './Scheduler';
-import { MAIL_TOOLBARS_CONFIG } from '@erxes/ui/src/constants/integrations';
-import { IBrand } from '@erxes/ui/src/brands/types';
-import { IUser } from '@erxes/ui/src/auth/types';
+import { Alert, __ } from "coreui/utils";
+import { FlexItem, FlexPad } from "@erxes/ui/src/components/step/styles";
+import {
+  MESSENGER_KINDS,
+  SENT_AS_CHOICES,
+} from "@erxes/ui-engage/src/constants";
+
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import FormControl from "@erxes/ui/src/components/form/Control";
+import FormGroup from "@erxes/ui/src/components/form/Group";
+import { IBrand } from "@erxes/ui/src/brands/types";
+import { IEngageMessenger } from "@erxes/ui-engage/src/types";
+import { IUser } from "@erxes/ui/src/auth/types";
+import { MAIL_TOOLBARS_CONFIG } from "@erxes/ui/src/constants/integrations";
+import MessengerPreview from "../containers/MessengerPreview";
+import React from "react";
+import RichTextEditor from "../containers/RichTextEditor";
 
 type Props = {
   brands: IBrand[];
   onChange: (
-    name: 'messenger' | 'content' | 'scheduleDate' | 'fromUserId',
-    value?: IEngageMessenger | IEngageScheduleDate | string
+    name: "messenger" | "content" | "fromUserId",
+    value?: IEngageMessenger | string
   ) => void;
   users: IUser[];
   hasKind: boolean;
@@ -25,14 +28,12 @@ type Props = {
   messenger: IEngageMessenger;
   fromUserId: string;
   content: string;
-  scheduleDate: IEngageScheduleDate;
   isSaved?: boolean;
 };
 
 type State = {
   fromUserId: string;
   messenger: IEngageMessenger;
-  scheduleDate: IEngageScheduleDate;
 };
 
 class MessengerForm extends React.Component<Props, State> {
@@ -42,25 +43,24 @@ class MessengerForm extends React.Component<Props, State> {
     this.state = {
       fromUserId: props.fromUserId,
       messenger: props.messenger,
-      scheduleDate: props.scheduleDate
     };
   }
 
   changeContent = (key, value) => {
     const messenger = {
-      ...this.state.messenger
+      ...this.state.messenger,
     };
 
     messenger[key] = value;
 
     this.setState({ messenger });
 
-    this.props.onChange('messenger', messenger);
+    this.props.onChange("messenger", messenger);
   };
 
-  changeFromUserId = fromUserId => {
+  changeFromUserId = (fromUserId) => {
     this.setState({ fromUserId });
-    this.props.onChange('fromUserId', fromUserId);
+    this.props.onChange("fromUserId", fromUserId);
   };
 
   renderKind(hasKind) {
@@ -68,20 +68,20 @@ class MessengerForm extends React.Component<Props, State> {
       return null;
     }
 
-    const onChange = e =>
-      this.changeContent('kind', (e.target as HTMLInputElement).value);
+    const onChange = (e) =>
+      this.changeContent("kind", (e.target as HTMLInputElement).value);
 
     return (
       <FormGroup>
         <ControlLabel>Message type:</ControlLabel>
 
         <FormControl
-          componentClass="select"
+          componentclass="select"
           onChange={onChange}
           defaultValue={this.state.messenger.kind}
         >
-          <option />{' '}
-          {MESSENGER_KINDS.SELECT_OPTIONS.map(k => (
+          <option />{" "}
+          {(MESSENGER_KINDS.SELECT_OPTIONS || []).map((k) => (
             <option key={k.value} value={k.value}>
               {k.text}
             </option>
@@ -91,38 +91,23 @@ class MessengerForm extends React.Component<Props, State> {
     );
   }
 
-  renderScheduler() {
-    const { messageKind, onChange } = this.props;
-
-    if (messageKind === 'manual') {
-      return null;
-    }
-
-    return (
-      <Scheduler
-        scheduleDate={this.state.scheduleDate || ({} as IEngageScheduleDate)}
-        onChange={onChange}
-      />
-    );
-  }
-
-  onEditorChange = e => {
-    this.props.onChange('content', e.editor.getData());
+  onEditorChange = (content: string) => {
+    this.props.onChange("content", content);
   };
 
   render() {
-    const onChangeFrom = e =>
+    const onChangeFrom = (e) =>
       this.changeFromUserId((e.target as HTMLInputElement).value);
 
-    const onChangeContent = e => {
+    const onChangeContent = (e) => {
       Alert.warning(
-        'Please carefully select the brand, it will appear in the selected brand messenger.'
+        "Please carefully select the brand, it will appear in the selected brand messenger."
       );
-      this.changeContent('brandId', (e.target as HTMLInputElement).value);
+      this.changeContent("brandId", (e.target as HTMLInputElement).value);
     };
 
-    const onChangeSentAs = e =>
-      this.changeContent('sentAs', (e.target as HTMLInputElement).value);
+    const onChangeSentAs = (e) =>
+      this.changeContent("sentAs", (e.target as HTMLInputElement).value);
 
     const { messenger, messageKind } = this.props;
 
@@ -130,15 +115,11 @@ class MessengerForm extends React.Component<Props, State> {
       <FlexItem>
         <FlexPad overflow="auto" direction="column" count="3">
           <FormGroup>
-            <ControlLabel>{__('Message:')}</ControlLabel>
-
-            <EditorCK
+            <ControlLabel>{__("Message:")}</ControlLabel>
+            <RichTextEditor
               content={this.props.content}
               onChange={this.onEditorChange}
-              toolbar={[
-                { name: 'insert', items: ['strinsert'] },
-                ...MAIL_TOOLBARS_CONFIG
-              ]}
+              toolbar={MAIL_TOOLBARS_CONFIG}
               height={300}
               name={`engage_${messageKind}_${messenger.brandId}`}
               isSubmitted={this.props.isSaved}
@@ -148,12 +129,12 @@ class MessengerForm extends React.Component<Props, State> {
           <FormGroup>
             <ControlLabel>From:</ControlLabel>
             <FormControl
-              componentClass="select"
+              componentclass="select"
               onChange={onChangeFrom}
               value={this.state.fromUserId}
             >
-              <option />{' '}
-              {this.props.users.map(user => (
+              <option />{" "}
+              {(this.props.users || []).map((user) => (
                 <option key={user._id} value={user._id}>
                   {user.details ? user.details.fullName : user.username}
                 </option>
@@ -164,12 +145,12 @@ class MessengerForm extends React.Component<Props, State> {
           <FormGroup>
             <ControlLabel>Brand:</ControlLabel>
             <FormControl
-              componentClass="select"
+              componentclass="select"
               onChange={onChangeContent}
               defaultValue={this.state.messenger.brandId}
             >
-              <option />{' '}
-              {this.props.brands.map(b => (
+              <option />{" "}
+              {(this.props.brands || []).map((b) => (
                 <option key={b._id} value={b._id}>
                   {b.name}
                 </option>
@@ -180,14 +161,14 @@ class MessengerForm extends React.Component<Props, State> {
           {this.renderKind(this.props.hasKind)}
 
           <FormGroup>
-            <ControlLabel>{__('Sent as:')}</ControlLabel>
+            <ControlLabel>{__("Sent as:")}</ControlLabel>
             <FormControl
-              componentClass="select"
+              componentclass="select"
               onChange={onChangeSentAs}
               defaultValue={this.state.messenger.sentAs}
             >
-              <option />{' '}
-              {SENT_AS_CHOICES.SELECT_OPTIONS.map(s => (
+              <option />{" "}
+              {(SENT_AS_CHOICES.SELECT_OPTIONS || []).map((s) => (
                 <option key={s.value} value={s.value}>
                   {__(s.text)}
                 </option>
@@ -195,7 +176,6 @@ class MessengerForm extends React.Component<Props, State> {
             </FormControl>
           </FormGroup>
           {/* TODO enable after engage update */}
-          {/* {this.renderScheduler()} */}
         </FlexPad>
 
         <FlexItem overflow="auto" count="2">

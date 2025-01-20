@@ -1,17 +1,20 @@
-import AppRoutes from './apps/routes';
-import BrandsRoutes from './brands/routes';
-import General from './general/routes';
-import ImportHistory from './importExport/routes';
-import MainRoutes from './main/routes';
-import MarketplaceRoutes from './marketplace/routes';
-import PermissionRoutes from './permissions/routes';
-import ProfileRoutes from './profile/routes';
-import React from 'react';
-import { Route } from 'react-router-dom';
-import TeamRoutes from './team/routes';
+import AppRoutes from "./apps/routes";
+import BrandsRoutes from "./brands/routes";
+import General from "./general/routes";
+import ImportHistory from "./importExport/routes";
+import MainRoutes from "./main/routes";
+import MarketplaceRoutes from "./marketplace/routes";
+import PermissionRoutes from "./permissions/routes";
+import PlanRoutes from "../saas/settings/plans/routes";
+import ProfileRoutes from "./profile/routes";
+import React from "react";
+import TeamRoutes from "./team/routes";
+import LogsRoutes from "./logs/routes";
+import EmailDeliveriesRoutes from "./emailDelivery/routes";
+import EmailTemplatesRoutes from "../emailtemplates/routes";
 
-const routes = () => (
-  <React.Fragment>
+const SettingsRoute = () => (
+  <>
     <MainRoutes key="MainRoutes" />
     <BrandsRoutes key="BrandsRoutes" />
     <ProfileRoutes key="profile" />
@@ -20,10 +23,12 @@ const routes = () => (
     <ImportHistory key="ImportHistory" />
     <PermissionRoutes key="PermissionRoutes" />
     <AppRoutes key="AppRoutes" />
+    <PlanRoutes key="Plan" />
     <MarketplaceRoutes key="Store" />
-  </React.Fragment>
+    <LogsRoutes key="Logs" />
+    <EmailDeliveriesRoutes key="EmailDeliveries" />
+    <EmailTemplatesRoutes key="EmailTemplates" />
+  </>
 );
 
-const settingsRoute = () => <Route component={routes} />;
-
-export default settingsRoute;
+export default SettingsRoute;

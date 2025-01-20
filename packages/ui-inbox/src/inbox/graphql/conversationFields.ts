@@ -31,9 +31,6 @@ export default `
     }
   }
   customerId
-  ${
-    isEnabled('contacts')
-      ? `
   customer {
     _id
     visitorContactInfo
@@ -44,9 +41,6 @@ export default `
     middleName
     lastName
     emails
-  }
-  `
-      : ``
   }
   messageCount
   participatorCount
@@ -61,24 +55,55 @@ export default `
     }
   }
   tagIds
-  ${
-    isEnabled('tags')
-      ? `
+
   tags {
     _id
     name
     colorCode
   }
-  `
-      : ``
-  }
+
+  ${
+    isEnabled('dailyco')
+      ? `
   videoCallData {
     url
     name
+  }`
+      : ''
   }
+
+    ${
+      isEnabled('calls')
+        ? `
+  callHistory {
+    customerPhone
+    operatorPhone
+    callDuration
+    callStartTime
+    callEndTime
+    callType
+    callStatus
+    sessionId
+    modifiedAt
+    createdAt
+    createdBy
+    modifiedBy
+    recordUrl
+  }`
+        : ''
+    }
+
+
   readUserIds
+  readUsers {
+    _id
+    username
+    details {
+      avatar
+      fullName
+      position
+    }
+  }
   callProAudio
   customFieldsData
-  
-  bookingProductId
 `;

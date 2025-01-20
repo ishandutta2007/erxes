@@ -9,6 +9,7 @@ export interface ICPNotification {
   notifType?: 'engage' | 'system';
   clientPortalId: string;
   eventData?: any | null;
+  groupId?: string;
 }
 
 export interface ICPNotificationDocument extends ICPNotification, Document {
@@ -44,6 +45,10 @@ export const cpNotificationSchema = new Schema({
   }),
   eventData: field({
     type: Schema.Types.Mixed,
+    optional: true
+  }),
+  groupId: field({
+    type: String,
     optional: true
   })
 });

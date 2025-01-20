@@ -1,28 +1,36 @@
 module.exports = {
+  srcDir: __dirname,
   name: 'clientportal',
   port: 3015,
   scope: 'clientportal',
   exposes: {
     './routes': './src/routes.tsx',
     './cardDetailAction': './src/containers/comments/CardDetailAction.tsx',
-    './fieldConfig': './src/containers/FieldConfigForm.tsx'
+    './fieldConfig': './src/containers/FieldConfigForm.tsx',
+    './Section': './src/containers/cardsRightSidebarSection/Section.tsx',
+    "./automation": "./src/automations/index.tsx"
   },
   cardDetailAction: './cardDetailAction',
   fieldConfig: './fieldConfig',
   routes: {
     url: 'http://localhost:3015/remoteEntry.js',
     scope: 'clientportal',
-    module: './routes'
+    module: './routes',
   },
+  automation: "./automation",
   menus: [
     {
-      text: 'Client Portal',
-      to: '/settings/client-portal',
+      text: 'Business Portal',
+      to: '/settings/business-portal',
       image: '/images/icons/erxes-32.png',
       location: 'settings',
-      scope: 'clientportal',
+      scope: 'businessportal',
       action: '',
-      permissions: []
-    }
-  ]
+      permissions: [],
+    },
+  ],
+
+  taskRightSidebarSection: './Section',
+  ticketRightSidebarSection: './Section',
+  dealRightSidebarSection: './Section',
 };

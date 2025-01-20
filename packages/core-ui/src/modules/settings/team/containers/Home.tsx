@@ -1,27 +1,27 @@
-import React from 'react';
-import { useQuery } from '@apollo/client';
-import { gql } from '@apollo/client';
-import { queries as generalQueries } from '@erxes/ui-settings/src/general/graphql';
-import Home from '../components/Home';
-import { options } from './UserList';
-import { queries, mutations } from '@erxes/ui/src/team/graphql';
-import { IButtonMutateProps } from '@erxes/ui/src/types';
+import { mutations, queries } from '@erxes/ui/src/team/graphql';
+
 import ButtonMutate from '@erxes/ui/src/components/ButtonMutate';
+import Home from '../components/Home';
+import { IButtonMutateProps } from '@erxes/ui/src/types';
+import React from 'react';
+import { queries as generalQueries } from '@erxes/ui-settings/src/general/graphql';
+import { gql } from '@apollo/client';
+import { options } from './UserList';
 import { queries as permissionQueries } from '@erxes/ui-settings/src/permissions/graphql';
+import { useQuery } from '@apollo/client';
 
 type Props = {
-  queryParams: any;
-  history: any;
+  queryParams: Record<string, string>;
 };
 
 function HomeContainer(props: Props) {
   const usersGroupQuery = useQuery(gql(permissionQueries.usersGroups), {
-    fetchPolicy: 'network-only'
+    fetchPolicy: 'network-only',
   });
   const configsEnvQuery = useQuery(gql(generalQueries.configsGetEnv));
   const totalCountQuery = useQuery(
     gql(queries.usersTotalCount),
-    options({ queryParams: props.queryParams || {} })
+    options({ queryParams: props.queryParams || {} }),
   );
 
   const getRefetchQueries = () => {
@@ -33,7 +33,8 @@ function HomeContainer(props: Props) {
     values,
     isSubmitted,
     callback,
-    object
+    object,
+    beforeSubmit,
   }: IButtonMutateProps) => {
     return (
       <ButtonMutate
@@ -43,6 +44,7 @@ function HomeContainer(props: Props) {
         refetchQueries={getRefetchQueries()}
         isSubmitted={isSubmitted}
         type="submit"
+        beforeSubmit={beforeSubmit}
         successMessage={`You successfully ${
           object ? 'updated' : 'added'
         } a ${name}`}
@@ -56,7 +58,7 @@ function HomeContainer(props: Props) {
 
   const totalCount = totalCountQuery.loading
     ? 0
-    : totalCountQuery.data.usersTotalCount || 0;
+    : totalCountQuery.data?.usersTotalCount || 0;
 
   return (
     <Home

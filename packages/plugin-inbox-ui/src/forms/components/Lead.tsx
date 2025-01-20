@@ -4,7 +4,7 @@ import {
   FormStep,
   FullPreview,
   OptionStep,
-  SuccessStep
+  SuccessStep,
 } from './step';
 import { IAttachment, IConditionsRule } from '@erxes/ui/src/types';
 import { ILeadData, ILeadIntegration } from '@erxes/ui-leads/src/types';
@@ -88,6 +88,7 @@ type State = {
   templateId?: string;
   carousel: string;
   attachments?: IAttachment[];
+  verifyEmail?: boolean;
 
   currentMode: 'create' | 'update' | undefined;
   currentField?: IField;
@@ -126,9 +127,10 @@ class Lead extends React.Component<Props, State> {
       redirectUrl: leadData.redirectUrl || '',
       rules: leadData.rules || [],
       isStepActive: false,
+      verifyEmail: leadData.verifyEmail || false,
 
       brand: integration.brandId,
-      channelIds: channels.map(item => item._id) || [],
+      channelIds: channels.map((item) => item._id) || [],
       language: integration.languageCode,
       title: integration.name || 'Create Form',
       calloutTitle: callout.title || 'Call Out Title',
@@ -139,17 +141,19 @@ class Lead extends React.Component<Props, State> {
       defaultValue: {},
       formData: {
         title: form.title || 'Form Title',
-        description: form.description || 'Form Description',
+        description: form.hasOwnProperty('description')
+          ? form.description
+          : 'Form Description',
         buttonText: form.buttonText || 'Send',
         fields: form.fields || [],
         type: form.type || '',
-        numberOfPages: form.numberOfPages || 1
+        numberOfPages: form.numberOfPages || 1,
       },
       theme: leadData.themeColor || '#6569DF',
       isRequireOnce: leadData.isRequireOnce,
       saveAsCustomer: leadData.saveAsCustomer,
       logo: callout.featuredImage,
-      calloutImgSize: callout.imgSize || '50%',
+      calloutImgSize: callout.calloutImgSize || '50%',
       isSkip: callout.skip && true,
       carousel: callout.skip ? 'form' : 'callout',
 
@@ -161,7 +165,7 @@ class Lead extends React.Component<Props, State> {
       successImageSize: leadData.successImageSize || '',
       successPreviewStyle: {},
       departmentIds: integration.departmentIds || [],
-      visibility: integration.visibility || 'public'
+      visibility: integration.visibility || 'public',
     };
   }
 
@@ -182,7 +186,7 @@ class Lead extends React.Component<Props, State> {
       formData,
       channelIds,
       departmentIds,
-      visibility
+      visibility,
     } = this.state;
 
     if (!title) {
@@ -225,15 +229,16 @@ class Lead extends React.Component<Props, State> {
           buttonText: this.state.calloutBtnText,
           featuredImage: this.state.logo,
           calloutImgSize: this.state.calloutImgSize,
-          skip: this.state.isSkip
+          skip: this.state.isSkip,
         },
-        rules: (rules || []).filter(rule => rule.condition && rule.value),
+        rules: (rules || []).filter((rule) => rule.condition && rule.value),
         isRequireOnce: this.state.isRequireOnce,
         saveAsCustomer: this.state.saveAsCustomer,
         css: this.state.css,
         successImage: this.state.successImage,
-        successImageSize: this.state.successImageSize
-      }
+        successImageSize: this.state.successImageSize,
+        verifyEmail: this.state.verifyEmail,
+      },
     };
 
     this.props.save(doc);
@@ -243,7 +248,7 @@ class Lead extends React.Component<Props, State> {
     this.setState({ [key]: value } as any);
   };
 
-  onFormDocChange = formData => {
+  onFormDocChange = (formData) => {
     this.setState({ formData });
   };
 
@@ -258,7 +263,7 @@ class Lead extends React.Component<Props, State> {
     this.setState({ currentMode: 'update', currentField: field });
   };
 
-  onStepClick = currentStepNumber => {
+  onStepClick = (currentStepNumber) => {
     const { isSkip } = this.state;
 
     let carousel = 'form';
@@ -280,8 +285,8 @@ class Lead extends React.Component<Props, State> {
     const { isActionLoading } = this.props;
 
     const cancelButton = (
-      <Link to="/forms">
-        <Button btnStyle="simple" icon="times-circle">
+      <Link to='/forms'>
+        <Button btnStyle='simple' icon='times-circle'>
           Cancel
         </Button>
       </Link>
@@ -293,7 +298,7 @@ class Lead extends React.Component<Props, State> {
 
         <Button
           disabled={isActionLoading}
-          btnStyle="success"
+          btnStyle='success'
           icon={isActionLoading ? undefined : 'check-circle'}
           onClick={this.handleSubmit}
         >
@@ -331,7 +336,7 @@ class Lead extends React.Component<Props, State> {
       successImageSize,
       successPreviewStyle,
       departmentIds,
-      visibility
+      visibility,
     } = this.state;
 
     const { integration = {} as any, emailTemplates, configs } = this.props;
@@ -346,8 +351,8 @@ class Lead extends React.Component<Props, State> {
           <LeftContent>
             <Steps>
               <Step
-                img="/images/icons/erxes-04.svg"
-                title="Style"
+                img='/images/icons/erxes-04.svg'
+                title='Style'
                 onClick={this.onStepClick}
               >
                 <ChooseType
@@ -360,8 +365,8 @@ class Lead extends React.Component<Props, State> {
                 />
               </Step>
               <Step
-                img="/images/icons/erxes-03.svg"
-                title="CallOut"
+                img='/images/icons/erxes-03.svg'
+                title='CallOut'
                 onClick={this.onStepClick}
               >
                 <CallOut
@@ -378,7 +383,7 @@ class Lead extends React.Component<Props, State> {
                 />
               </Step>
               <Step
-                img="/images/icons/erxes-12.svg"
+                img='/images/icons/erxes-12.svg'
                 title={'Content'}
                 onClick={this.onStepClick}
               >
@@ -397,15 +402,15 @@ class Lead extends React.Component<Props, State> {
                 />
               </Step>
               <Step
-                img="/images/icons/erxes-02.svg"
-                title="Rule"
+                img='/images/icons/erxes-02.svg'
+                title='Rule'
                 onClick={this.onStepClick}
               >
                 <ConditionsRule rules={rules || []} onChange={this.onChange} />
               </Step>
               <Step
-                img="/images/icons/erxes-06.svg"
-                title="Options"
+                img='/images/icons/erxes-06.svg'
+                title='Options'
                 onClick={this.onStepClick}
               >
                 <OptionStep
@@ -430,16 +435,16 @@ class Lead extends React.Component<Props, State> {
               </Step>
 
               <Step
-                img="/images/icons/erxes-05.svg"
-                title="Advanced styling"
+                img='/images/icons/erxes-05.svg'
+                title='Advanced styling'
                 onClick={this.onStepClick}
               >
                 <StyleSheetStep css={css} onChange={this.onChange} />
               </Step>
 
               <Step
-                img="/images/icons/erxes-13.svg"
-                title="Confirmation"
+                img='/images/icons/erxes-13.svg'
+                title='Confirmation'
                 onClick={this.onStepClick}
                 noButton={true}
               >
@@ -458,6 +463,7 @@ class Lead extends React.Component<Props, State> {
                   successPreviewStyle={successPreviewStyle}
                   successImageSize={successImageSize}
                   formData={formData}
+                  verifyEmail={this.state.verifyEmail}
                 />
               </Step>
             </Steps>

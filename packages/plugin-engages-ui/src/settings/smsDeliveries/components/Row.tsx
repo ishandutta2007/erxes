@@ -12,7 +12,7 @@ type Props = {
 
 const DIRECTIONS = {
   INBOUND: 'inbound',
-  OUTBOUND: 'outbound'
+  OUTBOUND: 'outbound',
 };
 
 export default class Row extends React.PureComponent<Props> {
@@ -37,7 +37,7 @@ export default class Row extends React.PureComponent<Props> {
     return (
       <td>
         <Link to={`/campaigns/show/${campaignId}`} target="_blank">
-          Go to campaign
+          Go to broadcast
         </Link>
       </td>
     );
@@ -50,7 +50,7 @@ export default class Row extends React.PureComponent<Props> {
       return (
         <td>
           <TextInfo
-            textStyle={direction === DIRECTIONS.INBOUND ? 'primary' : 'simple'}
+            $textStyle={direction === DIRECTIONS.INBOUND ? 'primary' : 'simple'}
           >
             {direction}
           </TextInfo>
@@ -61,7 +61,7 @@ export default class Row extends React.PureComponent<Props> {
     if (engageMessageId) {
       return (
         <td>
-          <TextInfo textStyle="simple">{DIRECTIONS.OUTBOUND}</TextInfo>
+          <TextInfo $textStyle="simple">{DIRECTIONS.OUTBOUND}</TextInfo>
         </td>
       );
     }

@@ -1,23 +1,25 @@
-import { gql } from '@apollo/client';
-import * as compose from 'lodash.flowright';
-import { IUser } from '@erxes/ui/src/auth/types';
-import {
-  router as routerUtils,
-  withProps,
-  getSubdomain
-} from '@erxes/ui/src/utils';
-import ConversationList from '../../components/leftSidebar/ConversationList';
-import { queries, subscriptions } from '@erxes/ui-inbox/src/inbox/graphql';
-import { generateParams } from '@erxes/ui-inbox/src/inbox/utils';
-import React from 'react';
-import { graphql } from '@apollo/client/react/hoc';
+import * as compose from "lodash.flowright";
+
 import {
   ConversationsQueryResponse,
   ConvesationsQueryVariables,
-  IConversation
-} from '@erxes/ui-inbox/src/inbox/types';
-import { ConversationsTotalCountQueryResponse } from '@erxes/ui-inbox/src/inbox/types';
-import { InboxManagementActionConsumer } from '../InboxCore';
+  IConversation,
+} from "@erxes/ui-inbox/src/inbox/types";
+import {
+  getSubdomain,
+  router as routerUtils,
+  withProps,
+} from "@erxes/ui/src/utils";
+import { queries, subscriptions } from "@erxes/ui-inbox/src/inbox/graphql";
+
+import ConversationList from "../../components/leftSidebar/ConversationList";
+import { ConversationsTotalCountQueryResponse } from "@erxes/ui-inbox/src/inbox/types";
+import { IUser } from "@erxes/ui/src/auth/types";
+import { InboxManagementActionConsumer } from "../InboxCore";
+import React from "react";
+import { generateParams } from "@erxes/ui-inbox/src/inbox/utils";
+import { gql } from "@apollo/client";
+import { graphql } from "@apollo/client/react/hoc";
 
 type Props = {
   currentUser?: IUser;
@@ -27,6 +29,8 @@ type Props = {
   selectedConversations: IConversation[];
   queryParams: any;
   counts?: any;
+  location: any;
+  navigate: any;
 };
 
 type FinalProps = {
@@ -35,35 +39,38 @@ type FinalProps = {
   updateCountsForNewMessage: () => void;
 } & Props;
 
-class ConversationListContainer extends React.PureComponent<FinalProps> {
-  componentWillMount() {
-    const {
-      currentUser,
-      conversationsQuery,
-      totalCountQuery,
-      updateCountsForNewMessage
-    } = this.props;
+const ConversationListContainer: React.FC<FinalProps> = (props) => {
+  const {
+    currentUser,
+    queryParams,
+    counts,
+    navigate,
+    location,
+    conversationsQuery,
+    totalCountQuery,
+    updateCountsForNewMessage,
+  } = props;
 
-    conversationsQuery.subscribeToMore({
-      document: gql(subscriptions.conversationClientMessageInserted),
-      variables: {
-        subdomain: getSubdomain(),
-        userId: currentUser ? currentUser._id : null
-      },
-      updateQuery: () => {
-        if (updateCountsForNewMessage) {
-          updateCountsForNewMessage();
-        }
+  React.useEffect(() => {
+    if (!queryParams.isModalOpen) {
+      return conversationsQuery.subscribeToMore({
+        document: gql(subscriptions.conversationClientMessageInserted),
+        variables: {
+          userId: currentUser ? currentUser._id : null,
+        },
+        updateQuery: () => {
+          if (updateCountsForNewMessage) {
+            updateCountsForNewMessage();
+          }
 
-        conversationsQuery.refetch();
-        totalCountQuery.refetch();
-      }
-    });
-  }
+          conversationsQuery.refetch();
+          totalCountQuery.refetch();
+        },
+      });
+    }
+  });
 
-  getTotalCount() {
-    const { queryParams, counts, totalCountQuery } = this.props;
-
+  const getTotalCount = () => {
     let totalCount = totalCountQuery.conversationsTotalCount || 0;
 
     if (queryParams && counts) {
@@ -78,7 +85,7 @@ class ConversationListContainer extends React.PureComponent<FinalProps> {
           counts.byIntegrationTypes[queryParams.integrationType] || 0;
       }
       if (queryParams.tag && counts.byTags) {
-        const tags = queryParams.tag.split(',');
+        const tags = queryParams.tag.split(",");
 
         for (const tag of tags) {
           totalCount += counts.byTags[tag] || 0;
@@ -87,31 +94,62 @@ class ConversationListContainer extends React.PureComponent<FinalProps> {
     }
 
     return totalCount;
-  }
+  };
 
-  render() {
-    const { history, conversationsQuery } = this.props;
+  const conversations = conversationsQuery.conversations || [];
 
-    const conversations = conversationsQuery.conversations || [];
+  // on change conversation
+  const onChangeConversation = (conversation: IConversation) => {
+    routerUtils.setParams(navigate, location, { _id: conversation._id });
+  };
 
-    // on change conversation
-    const onChangeConversation = conversation => {
-      routerUtils.setParams(history, { _id: conversation._id });
-    };
+  const onLoadMore = () => {
+    return (
+      conversationsQuery &&
+      conversationsQuery.fetchMore({
+        variables: {
+          skip: conversations.length,
+        },
+        updateQuery: (prevResult, { fetchMoreResult }) => {
+          if (!fetchMoreResult || fetchMoreResult.conversations.length === 0) {
+            return prevResult;
+          }
 
-    const updatedProps = {
-      ...this.props,
-      conversations,
-      onChangeConversation,
-      loading: conversationsQuery.loading,
-      totalCount: this.getTotalCount()
-    };
+          const prevConversations = prevResult.conversations || [];
+          const prevConversationIds = prevConversations.map(
+            (conversation: IConversation) => conversation._id
+          );
 
-    return <ConversationList {...updatedProps} />;
-  }
-}
+          const fetchedConversations: IConversation[] = [];
 
-const ConversationListContainerWithRefetch = props => (
+          for (const conversation of fetchMoreResult.conversations) {
+            if (!prevConversationIds.includes(conversation._id)) {
+              fetchedConversations.push(conversation);
+            }
+          }
+
+          return {
+            ...prevResult,
+            conversations: [...prevConversations, ...fetchedConversations],
+          };
+        },
+      })
+    );
+  };
+
+  const updatedProps = {
+    ...props,
+    onLoadMore,
+    conversations,
+    onChangeConversation,
+    loading: conversationsQuery.loading,
+    totalCount: getTotalCount(),
+  };
+
+  return <ConversationList {...updatedProps} />;
+};
+
+const ConversationListContainerWithRefetch = (props) => (
   <InboxManagementActionConsumer>
     {({ notifyConsumersOfManagementAction }) => (
       <ConversationListContainer
@@ -122,9 +160,9 @@ const ConversationListContainerWithRefetch = props => (
   </InboxManagementActionConsumer>
 );
 
-const generateOptions = queryParams => ({
+const generateOptions = (queryParams) => ({
   ...queryParams,
-  limit: queryParams.limit ? parseInt(queryParams.limit, 10) : 10
+  limit: queryParams.limit ? parseInt(queryParams.limit, 10) : 10,
 });
 
 export default withProps<Props>(
@@ -132,24 +170,25 @@ export default withProps<Props>(
     graphql<Props, ConversationsQueryResponse, ConvesationsQueryVariables>(
       gql(queries.sidebarConversations),
       {
-        name: 'conversationsQuery',
+        name: "conversationsQuery",
         options: ({ queryParams }) => ({
           variables: generateParams(queryParams),
           notifyOnNetworkStatusChange: true,
-          fetchPolicy: 'network-only',
+          fetchPolicy: "network-only",
           // every minute
-          pollInterval: 60000
-        })
+          // commented this line because it was causing the page to refresh every minute and it was glitchy
+          // pollInterval: 60000
+        }),
       }
     ),
     graphql<Props, ConversationsTotalCountQueryResponse>(
       gql(queries.totalConversationsCount),
       {
-        name: 'totalCountQuery',
+        name: "totalCountQuery",
         options: ({ queryParams }) => ({
           notifyOnNetworkStatusChange: true,
-          variables: generateOptions(queryParams)
-        })
+          variables: generateOptions(queryParams),
+        }),
       }
     )
   )(ConversationListContainerWithRefetch)

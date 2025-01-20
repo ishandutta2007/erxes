@@ -1,7 +1,7 @@
 import * as mongoose from 'mongoose';
 
-import { IContext as IMainContext } from '@erxes/api-utils/src';
 import { createGenerateModels } from '@erxes/api-utils/src/core';
+import { IContext as IMainContext } from '@erxes/api-utils/src';
 import {
   IAbsenceModel,
   ITimeModel,
@@ -23,8 +23,6 @@ import {
   loadTimeLogClass,
   IReportCheckModel,
   loadReportCheckClass,
-  IScheduleConfigOrderModel,
-  loadScheduleConfigOrderClass
 } from './models/Timeclock';
 import {
   IAbsenceDocument,
@@ -33,11 +31,10 @@ import {
   IPayDateDocument,
   IReportCheckDocument,
   IScheduleConfigDocument,
-  IScheduleConfigOrderDocument,
   IScheduleDocument,
   IShiftDocument,
   ITimeClockDocument,
-  ITimeLogDocument
+  ITimeLogDocument,
 } from './models/definitions/timeclock';
 
 export interface IModels {
@@ -49,7 +46,6 @@ export interface IModels {
   Shifts: IShiftModel;
   PayDates: IPayDateModel;
   ScheduleConfigs: IScheduleConfigModel;
-  ScheduleConfigOrder: IScheduleConfigOrderModel;
   DeviceConfigs: IDeviceConfigModel;
   ReportChecks: IReportCheckModel;
 }
@@ -59,10 +55,8 @@ export interface IContext extends IMainContext {
   models: IModels;
 }
 
-export let models: IModels | null = null;
-
 export const loadClasses = (db: mongoose.Connection): IModels => {
-  models = {} as IModels;
+  const models = {} as IModels;
 
   models.Timeclocks = db.model<ITimeClockDocument, ITimeModel>(
     'timeclock',
@@ -99,11 +93,6 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IScheduleConfigModel
   >('timeclock_schedule_config', loadScheduleConfigClass(models));
 
-  models.ScheduleConfigOrder = db.model<
-    IScheduleConfigOrderDocument,
-    IScheduleConfigOrderModel
-  >('timeclock_schedule_config_order', loadScheduleConfigOrderClass(models));
-
   models.DeviceConfigs = db.model<IDeviceConfigDocument, IDeviceConfigModel>(
     'timeclock_device_config',
     loadDeviceConfigClass(models)
@@ -122,7 +111,4 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
   return models;
 };
 
-export const generateModels = createGenerateModels<IModels>(
-  models,
-  loadClasses
-);
+export const generateModels = createGenerateModels<IModels>(loadClasses);

@@ -1,14 +1,13 @@
 import * as csv from 'csv-writer';
 import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-import * as request from 'request-promise';
 import { PHONE_VALIDATION_STATUSES, Phones } from './models';
-import { getArray, setArray } from './redisClient';
-import { debugBase, debugError, getEnv, sendRequest } from './utils';
+import { debugBase, debugError, getEnv, sendFile, sendRequest } from './utils';
+import fetch from 'node-fetch';
 
 dotenv.config();
 
 const CLEAR_OUT_PHONE_API_KEY = getEnv({ name: 'CLEAR_OUT_PHONE_API_KEY' });
+const CLEAR_OUT_PHONE_API_URL = 'https://api.clearoutphone.io/v1';
 
 const savePhone = async (doc: {
   phone: string;
@@ -27,13 +26,13 @@ const savePhone = async (doc: {
 const singleClearOut = async (phone: string): Promise<any> => {
   try {
     const response = await sendRequest({
-      url: 'https://api.clearoutphone.io/v1/phonenumber/validate',
+      url: `${CLEAR_OUT_PHONE_API_URL}/phonenumber/validate`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`
+        Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`,
       },
-      body: { number: phone }
+      body: { number: phone },
     });
 
     if (typeof response === 'string') {
@@ -49,112 +48,67 @@ const singleClearOut = async (phone: string): Promise<any> => {
 
 const bulkClearOut = async (unverifiedPhones: string[], hostname: string) => {
   const fileName =
-    Math.random()
-      .toString(36)
-      .substring(2, 15) +
-    Math.random()
-      .toString(36)
-      .substring(2, 15);
+    Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15);
 
   const csvWriter = csv.createObjectCsvWriter({
     path: `./${fileName}.csv`,
-    header: [{ id: 'number', title: 'Phone' }]
+    header: [{ id: 'number', title: 'Phone' }],
   });
 
   await csvWriter.writeRecords(
-    unverifiedPhones.map(phone => ({ number: phone }))
+    unverifiedPhones.map((phone) => ({ number: phone }))
   );
 
   try {
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       setTimeout(resolve, 1000);
     });
 
-    await sendFile(fileName, hostname);
+    const url = `${CLEAR_OUT_PHONE_API_URL}/phonenumber/bulk`;
+    const redisKey = 'erxes_phone_verifier_list_ids';
+
+    await sendFile(url, CLEAR_OUT_PHONE_API_KEY, fileName, hostname, redisKey);
   } catch (e) {
     debugBase(`Error occured during bulk phone validation ${e.message}`);
     throw e;
   }
 };
 
-export const sendFile = async (fileName: string, hostname: string) => {
-  try {
-    const result = await request({
-      method: 'POST',
-      url: 'https://api.clearoutphone.io/v1/phonenumber/bulk',
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`
-      },
-      formData: {
-        file: fs.createReadStream(`./${fileName}.csv`)
-      }
-    });
-
-    let data;
-    let error;
-
-    if (typeof result === 'string') {
-      data = JSON.parse(result).data;
-      error = JSON.parse(result).error;
-    } else {
-      data = result.data;
-      error = result.error;
-    }
-
-    if (data) {
-      const listIds = await getArray('erxes_phone_verifier_list_ids');
-
-      listIds.push({ listId: data.list_id, hostname });
-
-      setArray('erxes_phone_verifier_list_ids', listIds);
-
-      await fs.unlinkSync(`./${fileName}.csv`);
-    } else if (error) {
-      throw new Error(error.message);
-    }
-  } catch (e) {
-    // request may fail
-    throw e;
-  }
-};
-
 export const getStatus = async (listId: string) => {
-  const url = `https://api.clearoutphone.io/v1/phonenumber/bulk/progress_status?list_id=${listId}`;
+  const url = `${CLEAR_OUT_PHONE_API_URL}/phonenumber/bulk/progress_status?list_id=${listId}`;
   try {
-    const result = await request({
+    const res = await fetch(url, {
       method: 'GET',
-      url,
       headers: {
         'Content-Type': 'multipart/form-data',
-        Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`
-      }
-    });
+        Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`,
+      },
+    }).then((r) => r.json());
 
-    if (typeof result === 'string') {
-      return JSON.parse(result);
-    }
-
-    return result;
+    return res;
   } catch (e) {
-    // request may fail
     throw e;
   }
 };
 
 export const validateSinglePhone = async (phone: string, hostname: string) => {
+  phone = phone.toString();
   const phoneOnDb = await Phones.findOne({ phone }).lean();
 
   if (phoneOnDb) {
     debugBase(`This phone number is already verified`);
-
-    return sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        phone: { phone, status: phoneOnDb.status }
-      }
-    });
+    try {
+      return sendRequest({
+        url: `${hostname}/verifier/webhook`,
+        method: 'POST',
+        body: {
+          phone: { phone, status: phoneOnDb.status },
+        },
+      });
+    } catch (e) {
+      throw e;
+    }
   }
 
   if (!phone.includes('+')) {
@@ -173,36 +127,39 @@ export const validateSinglePhone = async (phone: string, hostname: string) => {
   } catch (e) {
     return { phone, status: PHONE_VALIDATION_STATUSES.UNKNOWN };
   }
+  try {
+    if (response.status === 'success') {
+      const data = response.data;
+      await savePhone({
+        phone,
+        status: data.status,
+        lineType: data.lineType,
+        carrier: data.carrier,
+        internationalFormat: data.internationalFormat,
+        localFormat: data.localFormat,
+      });
 
-  if (response.status === 'success') {
-    const data = response.data;
-    await savePhone({
-      phone,
-      status: data.status,
-      lineType: data.lineType,
-      carrier: data.carrier,
-      internationalFormat: data.internationalFormat,
-      localFormat: data.localFormat
-    });
+      debugBase(`Sending single phone validation status to erxes-api`);
 
-    debugBase(`Sending single phone validation status to erxes-api`);
-
-    await sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        phone: { phone, status: data.status }
-      }
-    });
-  } else {
-    // if status is not success
-    await sendRequest({
-      url: `${hostname}/verifier/webhook`,
-      method: 'POST',
-      body: {
-        phone: { phone, status: PHONE_VALIDATION_STATUSES.UNKNOWN }
-      }
-    });
+      await sendRequest({
+        url: `${hostname}/verifier/webhook`,
+        method: 'POST',
+        body: {
+          phone: { phone, status: data.status },
+        },
+      });
+    } else {
+      // if status is not success
+      await sendRequest({
+        url: `${hostname}/verifier/webhook`,
+        method: 'POST',
+        body: {
+          phone: { phone, status: PHONE_VALIDATION_STATUSES.UNKNOWN },
+        },
+      });
+    }
+  } catch (e) {
+    throw e;
   }
 };
 
@@ -210,22 +167,23 @@ export const validateBulkPhones = async (
   phones: string[],
   hostname: string
 ) => {
+  phones = phones.map((phone) => phone.toString());
   const phonesOnDb = await Phones.find({ phone: { $in: phones } });
 
   const phonesMap: Array<{ phone: string; status: string }> = phonesOnDb.map(
     ({ phone, status }) => ({
       phone,
-      status
+      status,
     })
   );
 
-  const verifiedPhones = phonesMap.map(verified => ({
+  const verifiedPhones = phonesMap.map((verified) => ({
     phone: verified.phone,
-    status: verified.status
+    status: verified.status,
   }));
 
   const unverifiedPhones: string[] = phones.filter(
-    phone => !verifiedPhones.some(p => p.phone === phone)
+    (phone) => !verifiedPhones.some((p) => p.phone === phone)
   );
 
   if (verifiedPhones.length > 0) {
@@ -236,11 +194,10 @@ export const validateBulkPhones = async (
         url: `${hostname}/verifier/webhook`,
         method: 'POST',
         body: {
-          phones: verifiedPhones
-        }
+          phones: verifiedPhones,
+        },
       });
     } catch (e) {
-      // request may fail
       throw e;
     }
   }
@@ -250,33 +207,30 @@ export const validateBulkPhones = async (
       debugBase(`Sending  unverified phones to clearoutphone`);
       await bulkClearOut(unverifiedPhones, hostname);
     } catch (e) {
-      // request may fail
       throw e;
     }
   }
 };
 
 export const getBulkResult = async (listId: string, hostname: string) => {
-  const url = 'https://api.clearoutphone.io/v1/download/result';
+  const url = `${CLEAR_OUT_PHONE_API_URL}/download/result`;
   const headers = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`
+    Authorization: `Bearer:${CLEAR_OUT_PHONE_API_KEY}`,
   };
 
   try {
     debugBase(`Downloading bulk phone validation result`);
-    const response = await sendRequest({
-      url,
+    const response: any = await fetch(url, {
       method: 'POST',
       headers,
-      body: { list_id: listId }
-    });
+      body: JSON.stringify({ list_id: listId }),
+    }).then((r) => r.json());
 
     try {
-      const resp = await sendRequest({
-        url: response.data.url,
-        method: 'GET'
-      });
+      const resp = await fetch(response.data.url, {
+        method: 'GET',
+      }).then((r) => r.text());
 
       const rows = resp.split('\n');
       const phones: Array<{ phone: string; status: string }> = [];
@@ -299,7 +253,7 @@ export const getBulkResult = async (listId: string, hostname: string) => {
 
             phones.push({
               phone,
-              status
+              status,
             });
 
             const found = await Phones.findOne({ phone });
@@ -312,7 +266,7 @@ export const getBulkResult = async (listId: string, hostname: string) => {
                 lineType,
                 carrier,
                 internationalFormat,
-                localFormat
+                localFormat,
               };
 
               await savePhone(doc);
@@ -327,15 +281,13 @@ export const getBulkResult = async (listId: string, hostname: string) => {
         url: `${hostname}/verifier/webhook`,
         method: 'POST',
         body: {
-          phones
-        }
+          phones,
+        },
       });
     } catch (e) {
-      // request may fail
       throw e;
     }
   } catch (e) {
-    // request may fail
     throw e;
   }
 };

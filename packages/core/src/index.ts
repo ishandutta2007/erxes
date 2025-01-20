@@ -1,20 +1,21 @@
-import * as dotenv from 'dotenv';
-import * as Sentry from '@sentry/node';
+import * as dotenv from "dotenv";
 
 // load environment variables
 dotenv.config();
 
-import * as cookieParser from 'cookie-parser';
-import * as cors from 'cors';
-import * as telemetry from 'erxes-telemetry';
-import * as express from 'express';
-import * as helmet from 'helmet';
-import { createServer } from 'http';
-import * as mongoose from 'mongoose';
-import * as path from 'path';
-import { initApolloServer } from './apolloClient';
-import { templateExport } from './data/modules/fileExporter/templateExport';
-import * as fs from 'fs';
+import * as cookieParser from "cookie-parser";
+import * as cors from "cors";
+import * as telemetry from "erxes-telemetry";
+import * as express from "express";
+import * as helmet from "helmet";
+import { createServer } from "http";
+import * as mongoose from "mongoose";
+import * as path from "path";
+import { initApolloServer } from "./apolloClient";
+import { templateExport } from "./data/modules/fileExporter/templateExport";
+import { buildChartFile } from "./data/modules/insight/export";
+
+import * as fs from "fs";
 
 import {
   deleteFile,
@@ -24,80 +25,62 @@ import {
   registerOnboardHistory,
   routeErrorHandling,
   uploadsFolderPath
-} from './data/utils';
+} from "./data/utils";
 
-import { debugBase, debugError, debugInit } from './debuggers';
-import { initMemoryStorage } from './inmemoryStorage';
-import { initBroker, sendCommonMessage } from './messageBroker';
-import { uploader } from './middlewares/fileMiddleware';
+import { debugBase, debugError, debugInit } from "./debuggers";
+import { initBroker, sendCommonMessage } from "./messageBroker";
+import { uploader } from "./middlewares/fileMiddleware";
 import {
   getService,
   getServices,
   isEnabled,
   join,
-  leave,
-  redis
-} from './serviceDiscovery';
-import logs from './logUtils';
+  leave
+} from "@erxes/api-utils/src/serviceDiscovery";
+import logs from "./logUtils";
 
-import init from './startup';
-import forms from './forms';
-import { generateModels } from './connectionResolver';
-import { authCookieOptions, getSubdomain } from '@erxes/api-utils/src/core';
-import segments from './segments';
-import automations from './automations';
-import imports from './imports';
-import exporter from './exporter';
-import { moduleObjects } from './data/permissions/actions/permission';
-import dashboards from './dashboards';
-import { getEnabledServices } from '@erxes/api-utils/src/serviceDiscovery';
+import init from "./startup";
+import forms from "./forms";
+import { generateModels } from "./connectionResolver";
+import { authCookieOptions, getSubdomain } from "@erxes/api-utils/src/core";
+import segments from "./segments";
+import automations from "./automations";
+import templates from "./templates";
+import imports from "./imports";
+import exporter from "./exporter";
+import { moduleObjects } from "./data/permissions/actions/permission";
+import { getEnabledServices } from "@erxes/api-utils/src/serviceDiscovery";
+import { applyInspectorEndpoints } from "@erxes/api-utils/src/inspect";
+import { handleCoreLogin, handleMagiclink, ssocallback } from "./saas";
+import app from "@erxes/api-utils/src/app";
+import sanitizeFilename from "@erxes/api-utils/src/sanitize-filename";
+import search from "./search";
+import tags from "./tags";
+import {
+  updateContactsValidationStatus,
+  updateContactValidationStatus
+} from "./data/modules/coc/verifierUtils";
+import { buildFile } from "./exporterByUrl";
+import reports from "./reports/reports";
 
 const {
   JWT_TOKEN_SECRET,
   WIDGETS_DOMAIN,
   DOMAIN,
   CLIENT_PORTAL_DOMAINS,
-  SENTRY_DSN
+  VERSION
 } = process.env;
 
 if (!JWT_TOKEN_SECRET) {
-  throw new Error('Please configure JWT_TOKEN_SECRET environment variable.');
+  throw new Error("Please configure JWT_TOKEN_SECRET environment variable.");
 }
-
-export const app = express();
-
-if (SENTRY_DSN) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    integrations: [
-      // enable HTTP calls tracing
-      new Sentry.Integrations.Http({ tracing: true }),
-      // Automatically instrument Node.js libraries and frameworks
-      ...Sentry.autoDiscoverNodePerformanceMonitoringIntegrations()
-    ],
-
-    // Set tracesSampleRate to 1.0 to capture 100%
-    // of transactions for performance monitoring.
-    // We recommend adjusting this value in production
-    tracesSampleRate: 1.0,
-    profilesSampleRate: 1.0 // Profiling sample rate is relative to tracesSampleRate
-  });
-}
-
-// RequestHandler creates a separate execution context, so that all
-// transactions/spans/breadcrumbs are isolated across requests
-app.use(Sentry.Handlers.requestHandler());
-// TracingHandler creates a trace for every incoming request
-app.use(Sentry.Handlers.tracingHandler());
-
-app.disable('x-powered-by');
 
 // don't move it above telnyx controllers
-app.use(express.urlencoded({ limit: '15mb', extended: true }));
+app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
 app.use(
   express.json({
-    limit: '15mb'
+    limit: "15mb"
   })
 );
 
@@ -106,40 +89,43 @@ app.use(cookieParser());
 const corsOptions = {
   credentials: true,
   origin: [
-    DOMAIN ? DOMAIN : 'http://localhost:3000',
-    WIDGETS_DOMAIN ? WIDGETS_DOMAIN : 'http://localhost:3200',
-    ...(CLIENT_PORTAL_DOMAINS || '').split(','),
-    ...(process.env.ALLOWED_ORIGINS || '').split(',').map(c => c && RegExp(c))
+    DOMAIN ? DOMAIN : "http://localhost:3000",
+    WIDGETS_DOMAIN ? WIDGETS_DOMAIN : "http://localhost:3200",
+    ...(CLIENT_PORTAL_DOMAINS || "").split(","),
+    ...(process.env.ALLOWED_ORIGINS || "").split(",").map(c => c && RegExp(c))
   ]
 };
 
 app.use(cors(corsOptions));
 
-app.use(helmet({ frameguard: { action: 'sameorigin' } }));
+app.use(helmet({ frameguard: { action: "sameorigin" } }));
 
 app.get(
-  '/initial-setup',
+  "/initial-setup",
   routeErrorHandling(async (req: any, res) => {
+    console.log("initial setup");
     const subdomain = getSubdomain(req);
     const models = await generateModels(subdomain);
 
     const userCount = await models.Users.countDocuments();
 
     if (userCount === 0) {
-      return res.send('no owner');
+      return res.send("no owner");
     }
+
+    await models.FieldsGroups.createSystemGroupsFields();
 
     if (req.query && req.query.update) {
       const services = await getServices();
 
       for (const serviceName of services) {
-        const service = await getService(serviceName, true);
+        const service = await getService(serviceName);
         const meta = service.config?.meta || {};
 
         if (meta && meta.initialSetup && meta.initialSetup.generateAvailable) {
           await sendCommonMessage({
             subdomain,
-            action: 'initialSetup',
+            action: "initialSetup",
             serviceName,
             data: {}
           });
@@ -147,15 +133,17 @@ app.get(
       }
     }
 
-    const envMaps = JSON.parse(req.query.envs || '{}');
+    const envMaps = JSON.parse(req.query.envs || "{}");
 
     for (const key of Object.keys(envMaps)) {
       res.cookie(key, envMaps[key], authCookieOptions({ secure: req.secure }));
     }
 
     const configs = await models.Configs.find({
-      code: new RegExp(`.*THEME_.*`, 'i')
+      code: new RegExp(`.*THEME_.*`, "i")
     }).lean();
+
+    await models.FieldsGroups.createSystemGroupsFields();
 
     return res.json(configs);
   })
@@ -163,10 +151,25 @@ app.get(
 
 // app.post('/webhooks/:id', webhookMiddleware);
 
-app.use('/static', express.static(path.join(__dirname, 'private')));
+app.use("/static", express.static(path.join(__dirname, "private")));
 
 app.get(
-  '/download-template',
+  "/chart-table-export",
+  routeErrorHandling(async (req: any, res) => {
+    const { query } = req;
+
+    const subdomain = getSubdomain(req);
+
+    const result = await buildChartFile(subdomain, query);
+
+    res.attachment(`${result.name}.xlsx`);
+
+    return res.send(result.response);
+  })
+);
+
+app.get(
+  "/download-template",
   routeErrorHandling(async (req: any, res) => {
     const name = req.query.name;
 
@@ -181,13 +184,8 @@ app.get(
   })
 );
 
-// for health check
-app.get('/health', async (_req, res) => {
-  res.end('ok');
-});
-
 app.get(
-  '/template-export',
+  "/template-export",
   routeErrorHandling(async (req: any, res) => {
     const { importType } = req.query;
 
@@ -208,17 +206,15 @@ app.get(
 );
 
 // read file
-app.get('/read-file', async (req: any, res, next) => {
+app.get("/read-file", async (req: any, res, next) => {
   const subdomain = getSubdomain(req);
   const models = await generateModels(subdomain);
 
   try {
-    const key = req.query.key;
-    const name = req.query.name;
-    const width = req.query.width;
+    const { key, inline, name, width } = req.query;
 
     if (!key) {
-      return res.send('Invalid key');
+      return res.send("Invalid key");
     }
 
     const response = await readFileRequest({
@@ -229,12 +225,20 @@ app.get('/read-file', async (req: any, res, next) => {
       width
     });
 
+    if (inline && inline === "true") {
+      const extension = key.split(".").pop();
+      res.setHeader("Content-disposition", 'inline; filename="' + key + '"');
+      res.setHeader("Content-type", `application/${extension}`);
+
+      return res.send(response);
+    }
+
     res.attachment(name || key);
 
     return res.send(response);
   } catch (e) {
-    if ((e as Error).message.includes('key does not exist')) {
-      return res.status(404).send('Not found');
+    if ((e as Error).message.includes("key does not exist")) {
+      return res.status(404).send("Not found");
     }
 
     debugError(e);
@@ -243,13 +247,90 @@ app.get('/read-file', async (req: any, res, next) => {
   }
 });
 
+app.get(
+  "/file-export",
+  routeErrorHandling(async (req: any, res) => {
+    const { query } = req;
+    const { segment } = query;
+    const subdomain = getSubdomain(req);
+    const models = await generateModels(subdomain);
+
+    const result = await buildFile(models, subdomain, query);
+
+    res.attachment(`${result.name}.xlsx`);
+
+    if (segment) {
+      try {
+        models.Segments.removeSegment(segment);
+      } catch (e) {
+        console.log((e as Error).message);
+      }
+    }
+
+    return res.send(result.response);
+  })
+);
+
+app.post(
+  `/verifier/webhook`,
+  routeErrorHandling(async (req, res) => {
+    const { emails, phones, email, phone } = req.body;
+    const subdomain = getSubdomain(req);
+    const models = await generateModels(subdomain);
+
+    if (email) {
+      await updateContactValidationStatus(models, email);
+    } else if (emails) {
+      await updateContactsValidationStatus(models, "email", emails);
+    } else if (phone) {
+      await updateContactValidationStatus(models, phone);
+    } else if (phones) {
+      await updateContactsValidationStatus(models, "phone", phones);
+    }
+
+    return res.send("success");
+  })
+);
+
+app.get("/verify", async (req, res) => {
+  const { p } = req.query;
+
+  const data = JSON.parse(Buffer.from(p as string, "base64").toString("utf8"));
+
+  const { email, customerId } = data;
+
+  const subdomain = getSubdomain(req);
+  const models = await generateModels(subdomain);
+
+  const customer = await models.Customers.findOne({ _id: customerId });
+
+  if (!customer) {
+    return res.send("Can not find customer");
+  }
+
+  if (customer.primaryEmail !== email) {
+    return res.send("Customer email does not match");
+  }
+
+  if (customer.emails?.findIndex(e => e === email) === -1) {
+    return res.send("Customer email does not match");
+  }
+
+  await models.Customers.updateOne(
+    { _id: customerId },
+    { $set: { primaryEmail: email, emailValidationStatus: "valid" } }
+  );
+
+  return res.send("Successfully verified, you can close this tab now");
+});
+
 // delete file
 app.post(
-  '/delete-file',
+  "/delete-file",
   routeErrorHandling(async (req: any, res) => {
     // require login
     if (!req.headers.userid) {
-      return res.end('forbidden');
+      return res.end("forbidden");
     }
 
     const subdomain = getSubdomain(req);
@@ -257,7 +338,7 @@ app.post(
 
     const status = await deleteFile(models, req.body.fileName);
 
-    if (status === 'ok') {
+    if (status === "ok") {
       return res.send(status);
     }
 
@@ -267,26 +348,30 @@ app.post(
 
 // unsubscribe
 app.get(
-  '/unsubscribe',
+  "/unsubscribe",
   routeErrorHandling(async (req: any, res) => {
     const subdomain = getSubdomain(req);
     const models = await generateModels(subdomain);
 
     await handleUnsubscription(models, subdomain, req.query);
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
 
     const template = fs.readFileSync(
-      __dirname + '/private/emailTemplates/unsubscribe.html'
+      __dirname + "/private/emailTemplates/unsubscribe.html"
     );
 
     return res.send(template);
   })
 );
 
-app.post('/upload-file', uploader);
+app.post("/upload-file", uploader);
 
-app.post('/upload-file&responseType=json', uploader);
+app.post("/upload-file&responseType=json", uploader);
+
+app.get("/ml-callback", (req: any, res) => handleMagiclink(req, res));
+app.get("/core-login", (req: any, res) => handleCoreLogin(req, res));
+app.get("/sso-callback", ssocallback);
 
 // Error handling middleware
 app.use((error, _req, res, _next) => {
@@ -294,84 +379,70 @@ app.use((error, _req, res, _next) => {
   res.status(500).send(error.message);
 });
 
-app.get('/dashboard', async (req, res) => {
-  const headers = req.rawHeaders;
+app.get("/get-import-file/:fileName", async (req, res) => {
+  const fileName = req.params.fileName;
 
-  const index = headers.indexOf('schemaName') + 1;
+  const sanitizeFileName = sanitizeFilename(fileName);
 
-  const schemaName = headers[index];
+  const filePath = path.join(uploadsFolderPath, sanitizeFileName);
 
-  res.sendFile(path.join(__dirname, `./dashboardSchemas/${schemaName}.js`));
+  res.sendFile(filePath);
 });
 
-app.get('/get-import-file', async (req, res) => {
-  const headers = req.rawHeaders;
-
-  const index = headers.indexOf('fileName') + 1;
-
-  const fileName = headers[index];
-
-  res.sendFile(`${uploadsFolderPath}/${fileName}`);
-});
-
-app.get('/plugins/enabled/:name', async (req, res) => {
+app.get("/plugins/enabled/:name", async (req, res) => {
   const result = await isEnabled(req.params.name);
   res.json(result);
 });
 
-app.get('/plugins/enabled', async (_req, res) => {
+app.get("/plugins/enabled", async (_req, res) => {
   const result = (await getEnabledServices()) || [];
   res.json(result);
 });
 
-// The error handler must be before any other error middleware and after all controllers
-app.use(Sentry.Handlers.errorHandler());
+applyInspectorEndpoints("core");
 
 // Wrap the Express server
 const httpServer = createServer(app);
 
-const PORT = getEnv({ name: 'PORT' });
-const MONGO_URL = getEnv({ name: 'MONGO_URL' });
-const RABBITMQ_HOST = getEnv({ name: 'RABBITMQ_HOST' });
-const MESSAGE_BROKER_PREFIX = getEnv({ name: 'MESSAGE_BROKER_PREFIX' });
+const PORT = getEnv({ name: "PORT" });
+const MONGO_URL = getEnv({ name: "MONGO_URL" });
 
 httpServer.listen(PORT, async () => {
-  initApolloServer(app, httpServer).then(apolloServer => {
-    apolloServer.applyMiddleware({ app, path: '/graphql', cors: corsOptions });
-  });
+  await initApolloServer(app, httpServer);
 
-  initBroker({ RABBITMQ_HOST, MESSAGE_BROKER_PREFIX, redis, app }).catch(e => {
-    debugError(`Error ocurred during message broker init ${e.message}`);
-  });
-
-  initMemoryStorage();
+  await initBroker();
 
   init()
     .then(() => {
-      telemetry.trackCli('server_started');
+      telemetry.trackCli("server_started");
       telemetry.startBackgroundUpdate();
 
-      debugBase('Startup successfully started');
+      debugBase("Startup successfully started");
     })
     .catch(e => {
       debugError(`Error occured while starting init: ${e.message}`);
     });
 
   await join({
-    name: 'core',
+    name: "core",
     port: PORT,
-    dbConnectionString: MONGO_URL,
     hasSubscriptions: false,
-    hasDashboard: true,
     meta: {
+      isSearchable: true,
       logs: { providesActivityLog: true, consumers: logs },
       forms,
       segments,
       automations,
+      templates,
+      search,
       permissions: moduleObjects,
+      tags,
       imports,
       exporter,
-      dashboards
+      cronjobs: {
+        handle10MinutelyJobAvailable: VERSION === "saas" ? true : false
+      },
+      reports
     }
   });
 
@@ -384,7 +455,7 @@ process.stdin.resume(); // so the program will not close instantly
 async function closeMongooose() {
   try {
     await mongoose.connection.close();
-    console.log('Mongoose connection disconnected ');
+    console.log("Mongoose connection disconnected ");
   } catch (e) {
     console.error(e);
   }
@@ -392,8 +463,8 @@ async function closeMongooose() {
 
 async function leaveServiceDiscovery() {
   try {
-    await leave('core', PORT);
-    console.log('Left from service discovery');
+    await leave("core", PORT);
+    console.log("Left from service discovery");
   } catch (e) {
     console.error(e);
   }
@@ -416,7 +487,7 @@ async function closeHttpServer() {
 }
 
 // If the Node process ends, close the http-server and mongoose.connection and leave service discovery.
-(['SIGINT', 'SIGTERM'] as NodeJS.Signals[]).forEach(sig => {
+(["SIGINT", "SIGTERM"] as NodeJS.Signals[]).forEach(sig => {
   process.on(sig, async () => {
     await closeHttpServer();
     await closeMongooose();

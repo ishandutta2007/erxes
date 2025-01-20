@@ -6,30 +6,31 @@ import { generateModels } from './connectionResolver';
 import forms from './forms';
 import resolvers from './graphql/resolvers';
 import typeDefs from './graphql/typeDefs';
-import { initBroker } from './messageBroker';
-import cpUserMiddleware from './middlewares/cpUserMiddleware';
+import { setupMessageConsumers } from './messageBroker';
+import cpUserMiddleware from "@erxes/api-utils/src/middlewares/clientportal";
 import * as permissions from './permissions';
-
-export let graphqlPubsub;
-export let mainDb;
-export let serviceDiscovery;
-export let debug;
-
+import automations from "./automations";
 export default {
   name: 'clientportal',
   permissions,
-  graphql: async sd => {
-    serviceDiscovery = sd;
+  graphql: async () => {
     return {
-      typeDefs: await typeDefs(sd),
-      resolvers
+      typeDefs: await typeDefs(),
+      resolvers,
     };
   },
   hasSubscriptions: true,
+  subscriptionPluginPath: require('path').resolve(
+    __dirname,
+    'graphql',
+    'subscriptionPlugin.js'
+  ),
+
   meta: {
     forms,
     permissions,
-    afterMutations
+    afterMutations,
+    automations
   },
 
   apolloServerContext: async (context, req, res) => {
@@ -38,7 +39,7 @@ export default {
     const requestInfo = {
       secure: req.secure,
       cookies: req.cookies,
-      headers: req.headers
+      headers: req.headers,
     };
 
     const models = await generateModels(subdomain);
@@ -47,7 +48,7 @@ export default {
     context.models = models;
     context.requestInfo = requestInfo;
     context.res = res;
-
+    context.isPassed2FA = req?.isPassed2FA;
     if (req.cpUser) {
       context.cpUser = req.cpUser;
     }
@@ -55,13 +56,6 @@ export default {
     return context;
   },
   middlewares: [cookieParser(), cpUserMiddleware],
-  onServerInit: async options => {
-    const app = options.app;
-    mainDb = options.db;
-
-    initBroker(options.messageBrokerClient);
-
-    debug = options.debug;
-    graphqlPubsub = options.pubsubClient;
-  }
+  onServerInit: async () => {},
+  setupMessageConsumers,
 };

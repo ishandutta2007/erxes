@@ -6,22 +6,18 @@ import {
   IDescriptions,
   gatherNames,
   getSchemaLabels
-} from '@erxes/api-utils/src/logUtils';
-import messageBroker, {
-  sendCoreMessage,
-  sendFormsMessage,
-  sendTagsMessage
-} from './messageBroker';
-import { LOG_MAPPINGS, MODULE_NAMES } from './constants';
-import { IModels } from './connectionResolver';
-import { collectConversations } from './receiveMessage';
-import { IChannelDocument } from './models/definitions/channels';
-import { IIntegrationDocument } from './models/definitions/integrations';
+} from "@erxes/api-utils/src/logUtils";
+import { sendCoreMessage } from "./messageBroker";
+import { LOG_MAPPINGS, MODULE_NAMES } from "./constants";
+import { IModels } from "./connectionResolver";
+import { collectConversations } from "./receiveMessage";
+import { IChannelDocument } from "./models/definitions/channels";
+import { IIntegrationDocument } from "./models/definitions/integrations";
 
 const LOG_ACTIONS = {
-  CREATE: 'create',
-  UPDATE: 'update',
-  DELETE: 'delete'
+  CREATE: "create",
+  UPDATE: "update",
+  DELETE: "delete"
 };
 
 const findFromCore = async (
@@ -41,9 +37,9 @@ const findFromCore = async (
 };
 
 const findTags = async (subdomain: string, ids: string[]) => {
-  return sendTagsMessage({
+  return sendCoreMessage({
     subdomain,
-    action: 'find',
+    action: "tagFind",
     data: {
       _id: { $in: ids }
     },
@@ -52,10 +48,10 @@ const findTags = async (subdomain: string, ids: string[]) => {
   });
 };
 
-const findForms = async (subdomain: string, ids: string[]) => {
-  return sendFormsMessage({
+const formsFind = async (subdomain: string, ids: string[]) => {
+  return sendCoreMessage({
     subdomain,
-    action: 'find',
+    action: "formsFind",
     data: {
       query: { _id: { $in: ids } }
     },
@@ -77,37 +73,37 @@ export const gatherIntegrationFieldNames = async (
 
   if (doc.createdUserId) {
     options = await gatherNames({
-      nameFields: ['email', 'username'],
-      foreignKey: 'createdUserId',
+      nameFields: ["email", "username"],
+      foreignKey: "createdUserId",
       prevList: options,
-      items: await findFromCore(subdomain, [doc.createdUserId], 'users')
+      items: await findFromCore(subdomain, [doc.createdUserId], "users")
     });
   }
 
   if (doc.brandId) {
     options = await gatherNames({
-      foreignKey: 'brandId',
+      foreignKey: "brandId",
       prevList: options,
-      nameFields: ['name'],
-      items: await findFromCore(subdomain, [doc.brandId], 'brands')
+      nameFields: ["name"],
+      items: await findFromCore(subdomain, [doc.brandId], "brands")
     });
   }
 
   if (doc.tagIds && doc.tagIds.length > 0) {
     options = await gatherNames({
-      foreignKey: 'tagIds',
+      foreignKey: "tagIds",
       prevList: options,
-      nameFields: ['name'],
+      nameFields: ["name"],
       items: await findTags(subdomain, doc.tagIds)
     });
   }
 
   if (doc.formId) {
     options = await gatherNames({
-      foreignKey: 'formId',
+      foreignKey: "formId",
       prevList: options,
-      nameFields: ['title'],
-      items: await findForms(subdomain, [doc.formId])
+      nameFields: ["title"],
+      items: await formsFind(subdomain, [doc.formId])
     });
   }
 
@@ -128,27 +124,27 @@ export const gatherChannelFieldNames = async (
 
   if (doc.userId) {
     options = await gatherNames({
-      nameFields: ['userId'],
-      foreignKey: 'userId',
+      nameFields: ["userId"],
+      foreignKey: "userId",
       prevList: options,
-      items: await findFromCore(subdomain, [doc.userId], 'users')
+      items: await findFromCore(subdomain, [doc.userId], "users")
     });
   }
 
   if (doc.memberIds && doc.memberIds.length > 0) {
     options = await gatherNames({
-      nameFields: ['memberIds'],
-      foreignKey: 'memberIds',
+      nameFields: ["memberIds"],
+      foreignKey: "memberIds",
       prevList: options,
-      items: await findFromCore(subdomain, doc.memberIds, 'users')
+      items: await findFromCore(subdomain, doc.memberIds, "users")
     });
   }
 
   if (doc.integrationIds && doc.integrationIds.length > 0) {
     options = await gatherNames({
-      foreignKey: 'integrationIds',
+      foreignKey: "integrationIds",
       prevList: options,
-      nameFields: ['name'],
+      nameFields: ["name"],
       items: await models.Integrations.findIntegrations({
         _id: { $in: doc.integrationIds }
       })
@@ -211,9 +207,9 @@ const gatherDescriptions = async (
 
       if (brandIds.length > 0) {
         extraDesc = await gatherNames({
-          nameFields: ['name'],
-          foreignKey: 'brandId',
-          items: await findFromCore(subdomain, brandIds, 'brands')
+          nameFields: ["name"],
+          foreignKey: "brandId",
+          items: await findFromCore(subdomain, brandIds, "brands")
         });
       }
 
@@ -242,7 +238,6 @@ export const putDeleteLog = async (
 
   await commonPutDeleteLog(
     subdomain,
-    messageBroker(),
     { ...logDoc, description, extraDesc, type: `inbox:${logDoc.type}` },
     user
   );
@@ -265,7 +260,6 @@ export const putUpdateLog = async (
 
   await commonPutUpdateLog(
     subdomain,
-    messageBroker(),
     { ...logDoc, description, extraDesc, type: `inbox:${logDoc.type}` },
     user
   );
@@ -288,7 +282,6 @@ export const putCreateLog = async (
 
   await commonPutCreateLog(
     subdomain,
-    messageBroker(),
     { ...logDoc, description, extraDesc, type: `inbox:${logDoc.type}` },
     user
   );
@@ -297,10 +290,10 @@ export const putCreateLog = async (
 export default {
   collectItems: async ({ subdomain, data }) => ({
     data: await collectConversations(subdomain, data),
-    status: 'success'
+    status: "success"
   }),
   getSchemaLabels: ({ data: { type } }) => ({
-    status: 'success',
+    status: "success",
     data: getSchemaLabels(type, LOG_MAPPINGS)
   })
 };

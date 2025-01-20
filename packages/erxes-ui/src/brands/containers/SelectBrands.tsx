@@ -4,7 +4,7 @@ import * as React from 'react';
 import { queries } from '../graphql';
 import { IBrand } from '../types';
 
-// get config options for react-select-plus
+// get config options for react-select
 export function generateBrandOptions(array: IBrand[] = []): IOption[] {
   return array.map(item => {
     const brand = item || ({} as IBrand);
@@ -22,6 +22,7 @@ export default ({
   initialValue,
   multi = true,
   label,
+  customOption,
   name
 }: {
   queryParams?: IQueryParams;
@@ -46,6 +47,7 @@ export default ({
       generateOptions={generateBrandOptions}
       onSelect={onSelect}
       multi={multi}
+      customOption={customOption}
     />
   );
 };

@@ -1,42 +1,38 @@
-import React from 'react';
-import { ICategory } from '@erxes/ui-knowledgeBase/src/types';
-import CategoryRow from './CategoryRow';
 import { Categories } from './styles';
+import CategoryRow from './CategoryRow';
+import { ICategory } from '@erxes/ui-knowledgebase/src/types';
+import React from 'react';
 
 type Props = {
   currentCategoryId: string;
   topicId: string;
   categories: ICategory[];
-  articlesCount: number;
   remove: (categoryId: string) => void;
   queryParams?: any;
 };
 
-class CategoryList extends React.Component<Props> {
-  groupByParent = (array: any[]) => {
-    const key = 'parentCategoryId';
+const getParents = (array: any[]) => {
+  const key = 'parentCategoryId';
 
-    return array.reduce((rv, x) => {
-      (rv[x[key]] = rv[x[key]] || []).push(x);
+  return array.reduce((rv, x) => {
+    (rv[x[key]] = rv[x[key]] || []).push(x);
 
-      return rv;
-    }, {});
-  };
+    return rv;
+  }, {});
+};
 
-  renderRow(category, isChild, isParent?) {
-    const {
-      remove,
-      currentCategoryId,
-      topicId,
-      articlesCount,
-      queryParams
-    } = this.props;
+const CategoryList = (props: Props) => {
+  const { categories, remove, currentCategoryId, topicId, queryParams } = props;
 
+  const subFields = categories.filter((f) => f.parentCategoryId);
+  const parents = categories.filter((f) => !f.parentCategoryId);
+  const groupByParent = getParents(subFields);
+
+  const renderRow = (category, isChild, isParent?) => {
     return (
       <CategoryRow
         key={category._id}
         isActive={currentCategoryId === category._id}
-        articlesCount={articlesCount}
         topicId={topicId}
         category={category}
         queryParams={queryParams}
@@ -45,31 +41,22 @@ class CategoryList extends React.Component<Props> {
         isParent={isParent}
       />
     );
-  }
+  };
 
-  render() {
-    const { categories } = this.props;
+  return (
+    <Categories>
+      {parents.map((category) => {
+        const childrens = groupByParent[category._id] || [];
 
-    const subFields = categories.filter(f => f.parentCategoryId);
-    const parents = categories.filter(f => !f.parentCategoryId);
-
-    const groupByParent = this.groupByParent(subFields);
-
-    return (
-      <Categories>
-        {parents.map(category => {
-          const childrens = groupByParent[category._id] || [];
-
-          return (
-            <React.Fragment key={category._id}>
-              {this.renderRow(category, false, childrens.length !== 0)}
-              {childrens.map(child => this.renderRow(child, true))}
-            </React.Fragment>
-          );
-        })}
-      </Categories>
-    );
-  }
-}
+        return (
+          <React.Fragment key={category._id}>
+            {renderRow(category, false, childrens.length !== 0)}
+            {childrens.map((child) => renderRow(child, true))}
+          </React.Fragment>
+        );
+      })}
+    </Categories>
+  );
+};
 
 export default CategoryList;

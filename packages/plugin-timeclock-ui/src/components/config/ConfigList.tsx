@@ -1,25 +1,33 @@
-import Button from '@erxes/ui/src/components/Button';
-import { __ } from '@erxes/ui/src/utils';
-import React, { useState } from 'react';
-import Select from 'react-select-plus';
-import ModalTrigger from '@erxes/ui/src/components/ModalTrigger';
-import Wrapper from '@erxes/ui/src/layout/components/Wrapper';
-import FormGroup from '@erxes/ui/src/components/form/Group';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { Row, FilterItem, TextAlignCenter } from '../../styles';
+import Button from "@erxes/ui/src/components/Button";
+import { __ } from "@erxes/ui/src/utils";
+import React, { useState } from "react";
+import Select from "react-select";
+import ModalTrigger from "@erxes/ui/src/components/ModalTrigger";
+import Wrapper from "@erxes/ui/src/layout/components/Wrapper";
+import FormGroup from "@erxes/ui/src/components/form/Group";
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import {
+  Row,
+  FilterItem,
+  TextAlignCenter,
+  SearchInput,
+  FlexRow,
+} from "../../styles";
 import {
   IAbsence,
   IAbsenceType,
+  IDeviceConfig,
   IPayDates,
-  IScheduleConfig
-} from '../../types';
-import { IButtonMutateProps } from '@erxes/ui/src/types';
-import Table from '@erxes/ui/src/components/table';
-import Icon from '@erxes/ui/src/components/Icon';
-import Tip from '@erxes/ui/src/components/Tip';
+  IScheduleConfig,
+} from "../../types";
+import { IButtonMutateProps } from "@erxes/ui/src/types";
+import Table from "@erxes/ui/src/components/table";
+import Icon from "@erxes/ui/src/components/Icon";
+import Tip from "@erxes/ui/src/components/Tip";
 
-import ConfigForm from './ConfigForm';
-import Pagination from '@erxes/ui/src/components/pagination/Pagination';
+import ConfigForm from "./ConfigForm";
+import Pagination from "@erxes/ui/src/components/pagination/Pagination";
+import { FormControl } from "@erxes/ui/src/components/form";
 
 type Props = {
   getActionBar: (actionBar: any) => void;
@@ -34,6 +42,8 @@ type Props = {
 
   scheduleConfigs?: IScheduleConfig[];
 
+  deviceConfigs?: IDeviceConfig[];
+
   deviceConfigsTotalCount?: number;
 
   loading?: boolean;
@@ -43,6 +53,7 @@ type Props = {
   removePayDate: (payDateId: string) => void;
   removeScheduleConfig: (scheduleConfigId: string) => void;
   removeDeviceConfig: (deviceConfig: string) => void;
+  refetchDeviceConfigsQuery: (params: any) => void;
 };
 
 function ConfigList(props: Props) {
@@ -51,6 +62,7 @@ function ConfigList(props: Props) {
     payDates,
     holidays,
     scheduleConfigs,
+    deviceConfigs,
     deviceConfigsTotalCount,
     removeAbsenceType,
     removeHoliday,
@@ -59,18 +71,31 @@ function ConfigList(props: Props) {
     removeScheduleConfig,
     removeDeviceConfig,
     showSideBar,
-    getPagination
+    getPagination,
+
+    refetchDeviceConfigsQuery,
   } = props;
 
   const [selectedType, setType] = useState(
-    localStorage.getItem('contentType') || 'Schedule Configs'
+    localStorage.getItem("contentType") || "Schedule Configs"
   );
 
   const renderSelectionBar = () => {
-    const onTypeSelect = type => {
+    const onTypeSelect = (type) => {
       setType(type.value);
-      localStorage.setItem('contentType', type.value);
+      localStorage.setItem("contentType", type.value);
     };
+
+    const options = [
+      "Schedule Configs",
+      "Absence types",
+      "Pay period",
+      "Holidays",
+      "Terminal Devices",
+    ].map((ipt) => ({
+      value: ipt,
+      label: __(ipt),
+    }));
 
     return (
       <FilterItem>
@@ -78,19 +103,12 @@ function ConfigList(props: Props) {
           <ControlLabel>Select type</ControlLabel>
           <Row>
             <Select
-              value={selectedType}
+              value={options.find((o) => o.value === selectedType)}
               onChange={onTypeSelect}
               placeholder="Select type"
-              multi={false}
-              options={[
-                'Schedule Configs',
-                'Absence types',
-                'Pay period',
-                'Holidays'
-              ].map(ipt => ({
-                value: ipt,
-                label: __(ipt)
-              }))}
+              isMulti={false}
+              isClearable={true}
+              options={options}
             />
           </Row>
         </FormGroup>
@@ -99,29 +117,34 @@ function ConfigList(props: Props) {
   };
 
   const scheduleConfigTrigger = (
-    <Button id="scheduleBtn" btnStyle="primary" icon="plus-circle">
+    <Button id='scheduleBtn' btnStyle='primary' icon='plus-circle'>
       Schedule
     </Button>
   );
 
   const absenceConfigTrigger = (
-    <Button id="configBtn" btnStyle="primary" icon="plus-circle">
+    <Button id='configBtn' btnStyle='primary' icon='plus-circle'>
       Requests
     </Button>
   );
   const payPeriodConfigTrigger = (
     <Button
-      id="configBtn"
-      btnStyle="primary"
-      icon="plus-circle"
-      disabled={payDates.length > 0}
-    >
+      id='configBtn'
+      btnStyle='primary'
+      icon='plus-circle'
+      disabled={payDates.length > 0}>
       Pay period
     </Button>
   );
   const holidayConfigTrigger = (
-    <Button id="configBtn" btnStyle="primary" icon="plus-circle">
+    <Button id='configBtn' btnStyle='primary' icon='plus-circle'>
       Holiday
+    </Button>
+  );
+
+  const devicesConfigTrigger = (
+    <Button id='configBtn' btnStyle='primary' icon='plus-circle'>
+      Terminal devices
     </Button>
   );
 
@@ -130,7 +153,7 @@ function ConfigList(props: Props) {
       <ConfigForm
         {...props}
         scheduleConfig={scheduleConfig}
-        configType="Schedule"
+        configType='Schedule'
         closeModal={closeModal}
       />
     );
@@ -141,7 +164,7 @@ function ConfigList(props: Props) {
       <ConfigForm
         {...props}
         absenceType={absenceType}
-        configType="Absence"
+        configType='Absence'
         closeModal={closeModal}
       />
     );
@@ -153,7 +176,7 @@ function ConfigList(props: Props) {
         {...props}
         closeModal={closeModal}
         payDate={payDate}
-        configType="PayDate"
+        configType='PayDate'
       />
     );
   };
@@ -164,35 +187,69 @@ function ConfigList(props: Props) {
         {...props}
         closeModal={closeModal}
         holiday={holiday}
-        configType="Holiday"
+        configType='Holiday'
       />
     );
   };
 
+  const deviceConfigContent = ({ closeModal }, deviceConfig) => {
+    return (
+      <ConfigForm
+        {...props}
+        closeModal={closeModal}
+        deviceConfig={deviceConfig}
+        configType='Devices'
+      />
+    );
+  };
+
+  const onSearchDeviceConfigs = (e) => {
+    e.preventDefault();
+    refetchDeviceConfigsQuery({ searchValue: e.target.value });
+  };
+
   const actionBarRight = (
-    <>
-      <ModalTrigger
-        size="lg"
-        title={__('Schedule Config')}
-        trigger={scheduleConfigTrigger}
-        content={contentProps => scheduleConfigContent(contentProps, null)}
-      />
-      <ModalTrigger
-        title={__('Requests Config')}
-        trigger={absenceConfigTrigger}
-        content={contentProps => absenceConfigContent(contentProps, null)}
-      />
-      <ModalTrigger
-        title={__('Schedule Config')}
-        trigger={payPeriodConfigTrigger}
-        content={contentProps => payPeriodConfigContent(contentProps, null)}
-      />
-      <ModalTrigger
-        title={__('Holiday Config')}
-        trigger={holidayConfigTrigger}
-        content={contentProps => holidayConfigContent(contentProps, null)}
-      />
-    </>
+    <FlexRow>
+      {selectedType === "Terminal Devices" && (
+        <SearchInput isInPopover={false}>
+          <Icon icon='search-1' />
+          <FormControl
+            type='text'
+            placeholder={__('Type to search for devices')}
+            onChange={onSearchDeviceConfigs}
+          />
+        </SearchInput>
+      )}
+
+      <div>
+        <ModalTrigger
+          size='lg'
+          title={__('Schedule Config')}
+          trigger={scheduleConfigTrigger}
+          content={(contentProps) => scheduleConfigContent(contentProps, null)}
+        />
+        <ModalTrigger
+          title={__("Requests Config")}
+          trigger={absenceConfigTrigger}
+          content={(contentProps) => absenceConfigContent(contentProps, null)}
+        />
+        <ModalTrigger
+          title={__("Schedule Config")}
+          trigger={payPeriodConfigTrigger}
+          content={(contentProps) => payPeriodConfigContent(contentProps, null)}
+        />
+        <ModalTrigger
+          title={__("Holiday Config")}
+          trigger={holidayConfigTrigger}
+          content={(contentProps) => holidayConfigContent(contentProps, null)}
+        />
+        <ModalTrigger
+          title={__("Terminal Device Config")}
+          trigger={devicesConfigTrigger}
+          content={(contentProps) => deviceConfigContent(contentProps, null)}
+        />
+      </div>
+    </FlexRow>
   );
 
   const actionBar = (
@@ -204,20 +261,20 @@ function ConfigList(props: Props) {
     />
   );
   const editTrigger = (
-    <Button btnStyle="link">
-      <Icon icon="edit-3" />
+    <Button btnStyle='link'>
+      <Icon icon='edit-3' />
     </Button>
   );
 
-  const getRemoveFunction = configType => {
+  const getRemoveFunction = (configType) => {
     switch (configType) {
-      case 'absenceType':
+      case "absenceType":
         return removeAbsenceType;
-      case 'holiday':
+      case "holiday":
         return removeHoliday;
-      case 'payDate':
+      case "payDate":
         return removePayDate;
-      case 'deviceConfig':
+      case "deviceConfig":
         return removeDeviceConfig;
       default:
         return removeScheduleConfig;
@@ -226,11 +283,11 @@ function ConfigList(props: Props) {
   const removeTrigger = (_id, configType) => {
     const remove = getRemoveFunction(configType);
     return (
-      <Tip text={__('Delete')} placement="top">
+      <Tip text={__('Delete')} placement='top'>
         <Button
-          btnStyle="link"
+          btnStyle='link'
           onClick={() => remove(_id)}
-          icon="times-circle"
+          icon='times-circle'
         />
       </Tip>
     );
@@ -238,12 +295,14 @@ function ConfigList(props: Props) {
 
   const content = () => {
     switch (selectedType) {
-      case 'Holidays':
+      case "Holidays":
         return renderHolidaysContent();
-      case 'Pay period':
+      case "Pay period":
         return renderpayPeriodConfigContent();
-      case 'Schedule Configs':
+      case "Schedule Configs":
         return renderScheduleConfigContent();
+      case "Terminal Devices":
+        return renderDevicesConfigContent();
       default:
         return renderAbsenceTypesContent();
     }
@@ -268,49 +327,49 @@ function ConfigList(props: Props) {
         </thead>
         <tbody>
           {scheduleConfigs &&
-            scheduleConfigs.map(scheduleConfig => {
+            scheduleConfigs.map((scheduleConfig) => {
               return (
                 <tr key={scheduleConfig.scheduleName}>
                   <td>{scheduleConfig.scheduleName}</td>
                   <td>{scheduleConfig.shiftStart}</td>
                   <td>{scheduleConfig.shiftEnd}</td>
                   <td>{scheduleConfig.lunchBreakInMins}</td>
-                  {scheduleConfig.configDays.map(configDay => {
+                  {scheduleConfig.configDays.map((configDay) => {
                     if (
                       configDay.configName?.toLocaleLowerCase() ===
-                      'validcheckin'
+                      "validcheckin"
                     ) {
                       return (
                         <td>
                           {configDay.configShiftStart +
-                            '\t~\t' +
+                            "\t~\t" +
                             configDay.configShiftEnd}
                         </td>
                       );
                     }
                   })}
-                  {scheduleConfig.configDays.map(configDay => {
+                  {scheduleConfig.configDays.map((configDay) => {
                     if (
                       configDay.configName?.toLocaleLowerCase() ===
-                      'validcheckout'
+                      "validcheckout"
                     ) {
                       return (
                         <td>
                           {configDay.configShiftStart +
-                            '\t~\t' +
+                            "\t~\t" +
                             configDay.configShiftEnd}
                         </td>
                       );
                     }
                   })}
-                  {scheduleConfig.configDays.map(configDay => {
+                  {scheduleConfig.configDays.map((configDay) => {
                     if (
-                      configDay.configName?.toLocaleLowerCase() === 'overtime'
+                      configDay.configName?.toLocaleLowerCase() === "overtime"
                     ) {
                       return (
                         <td>
                           {configDay.configShiftStart +
-                            '\t~\t' +
+                            "\t~\t" +
                             configDay.configShiftEnd}
                         </td>
                       );
@@ -319,14 +378,14 @@ function ConfigList(props: Props) {
                   <td>
                     <TextAlignCenter>
                       <ModalTrigger
-                        size="lg"
-                        title="Edit Schedule Configs"
+                        size='lg'
+                        title={__('Edit Schedule Configs')}
                         trigger={editTrigger}
-                        content={contentProps =>
+                        content={(contentProps) =>
                           scheduleConfigContent(contentProps, scheduleConfig)
                         }
                       />
-                      {removeTrigger(scheduleConfig._id, 'schedule')}
+                      {removeTrigger(scheduleConfig._id, "schedule")}
                     </TextAlignCenter>
                   </td>
                 </tr>
@@ -356,13 +415,13 @@ function ConfigList(props: Props) {
               <td>
                 <TextAlignCenter>
                   <ModalTrigger
-                    title="Edit Pay Dates"
+                    title={__('Edit Pay Dates')}
                     trigger={editTrigger}
-                    content={contentProps =>
+                    content={(contentProps) =>
                       payPeriodConfigContent(contentProps, payDates[0])
                     }
                   />
-                  {removeTrigger(payDates[0]._id, 'payDate')}
+                  {removeTrigger(payDates[0]._id, "payDate")}
                 </TextAlignCenter>
               </td>
             </>
@@ -389,29 +448,29 @@ function ConfigList(props: Props) {
         </thead>
         <tbody>
           {absenceTypes &&
-            absenceTypes.map(absenceType => {
+            absenceTypes.map((absenceType) => {
               return (
                 <tr key={absenceType._id}>
                   <td>{absenceType.name}</td>
                   <td>{absenceType.requestType}</td>
                   <td>{absenceType.requestTimeType}</td>
                   <td>
-                    {absenceType.requestTimeType === 'by day'
+                    {absenceType.requestTimeType === "by day"
                       ? `${absenceType.requestHoursPerDay} hours`
-                      : ''}
+                      : ""}
                   </td>
-                  <td>{absenceType.explRequired ? 'true' : 'false'}</td>
-                  <td>{absenceType.attachRequired ? 'true' : 'false'}</td>
+                  <td>{absenceType.explRequired ? "true" : "false"}</td>
+                  <td>{absenceType.attachRequired ? "true" : "false"}</td>
                   <td>
                     <TextAlignCenter>
                       <ModalTrigger
-                        title="Edit absence type"
+                        title={__('Edit absence type')}
                         trigger={editTrigger}
-                        content={contentProps =>
+                        content={(contentProps) =>
                           absenceConfigContent(contentProps, absenceType)
                         }
                       />
-                      {removeTrigger(absenceType._id, 'absenceType')}
+                      {removeTrigger(absenceType._id, "absenceType")}
                     </TextAlignCenter>
                   </td>
                 </tr>
@@ -437,7 +496,7 @@ function ConfigList(props: Props) {
         </thead>
         <tbody>
           {holidays &&
-            holidays.map(holiday => {
+            holidays.map((holiday) => {
               return (
                 <tr key={holiday._id}>
                   <td>{holiday.holidayName}</td>
@@ -445,35 +504,73 @@ function ConfigList(props: Props) {
                     {(holiday.startTime &&
                       new Date(holiday.startTime)
                         .toDateString()
-                        .split(' ')
+                        .split(" ")
                         .slice(0, 3)
-                        .join(' ')) ||
-                      '-'}
+                        .join(" ")) ||
+                      "-"}
                   </td>
                   <td>
                     {(holiday.endTime &&
                       new Date(holiday.endTime)
                         .toDateString()
-                        .split(' ')
+                        .split(" ")
                         .slice(0, 3)
-                        .join(' ')) ||
-                      '-'}
+                        .join(" ")) ||
+                      "-"}
                   </td>
                   <td>
                     <TextAlignCenter>
                       <ModalTrigger
-                        title="Edit holiday"
+                        title={__('Edit holiday')}
                         trigger={editTrigger}
-                        content={contentProps =>
+                        content={(contentProps) =>
                           holidayConfigContent(contentProps, holiday)
                         }
                       />
-                      {removeTrigger(holiday._id, 'holiday')}
+                      {removeTrigger(holiday._id, "holiday")}
                     </TextAlignCenter>
                   </td>
                 </tr>
               );
             })}
+        </tbody>
+      </Table>
+    );
+  };
+
+  const renderDevicesConfigContent = () => {
+    return (
+      <Table>
+        <thead>
+          <tr>
+            <th>Device Name</th>
+            <th>Serial Number</th>
+            <th>Extract from the device</th>
+            <th>
+              <TextAlignCenter>Action</TextAlignCenter>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {deviceConfigs?.map((deviceConfig) => (
+            <tr key={deviceConfig.serialNo}>
+              <td>{deviceConfig.deviceName}</td>
+              <td>{deviceConfig.serialNo}</td>
+              <td>{deviceConfig.extractRequired ? "True" : "False"}</td>
+              <td>
+                <TextAlignCenter>
+                  <ModalTrigger
+                    title='Edit holiday'
+                    trigger={editTrigger}
+                    content={(contentProps) =>
+                      deviceConfigContent(contentProps, deviceConfig)
+                    }
+                  />
+                  {removeTrigger(deviceConfig._id, "deviceConfig")}
+                </TextAlignCenter>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </Table>
     );

@@ -1,12 +1,13 @@
-import { BoxItem, Content, Reply } from './style';
+import { BoxItem, Content, MailSubject, Reply } from "./style";
 
-import Attachments from './Attachments';
-import Button from '@erxes/ui/src/components/Button';
-import { IMessage } from '../../../../types';
-import MailForm from '@erxes/ui-inbox/src/settings/integrations/containers/mail/MailForm';
-import MailHeader from './MailHeader';
-import React from 'react';
-import { cleanHtml } from '../../../../../settings/integrations/containers/utils';
+import Attachments from "./Attachments";
+import Button from "@erxes/ui/src/components/Button";
+import { IMessage } from "../../../../types";
+import MailForm from "@erxes/ui-inbox/src/settings/integrations/containers/mail/MailForm";
+import MailHeader from "./MailHeader";
+import React from "react";
+import Tip from "@erxes/ui/src/components/Tip";
+import { cleanHtml } from "../../../../../settings/integrations/containers/utils";
 
 type Props = {
   detailQuery?: any;
@@ -15,8 +16,9 @@ type Props = {
   conversationId?: string;
   customerId?: string;
   isLast: boolean;
-  brandId?: string;
   mails: IMessage[];
+  brandId?: string;
+  conversationStatus?: string;
 };
 
 type State = {
@@ -34,7 +36,7 @@ class Mail extends React.PureComponent<Props, State> {
       isReply: false,
       isForward: false,
       replyAll: false,
-      isCollapsed: !props.isLast
+      isCollapsed: !props.isLast,
     };
   }
 
@@ -54,13 +56,13 @@ class Mail extends React.PureComponent<Props, State> {
     if (
       this.state.isReply ||
       !this.props.isLast ||
-      typeof this.props.message._id !== 'string'
+      typeof this.props.message._id !== "string"
     ) {
       return null;
     }
 
-    const toggleReplyAll = e => this.toggleReply(e, true);
-    const toggleForward = e => this.toggleReply(e, false, true);
+    const toggleReplyAll = (e) => this.toggleReply(e, true);
+    const toggleForward = (e) => this.toggleReply(e, false, true);
 
     return (
       <Reply>
@@ -108,7 +110,8 @@ class Mail extends React.PureComponent<Props, State> {
       integrationId,
       customerId,
       brandId,
-      mails
+      mails,
+      conversationStatus,
     } = this.props;
 
     return (
@@ -125,7 +128,8 @@ class Mail extends React.PureComponent<Props, State> {
           customerId={customerId}
           toggleReply={this.toggleReply}
           integrationId={integrationId}
-          refetchQueries={['detailQuery']}
+          refetchQueries={["detailQuery"]}
+          conversationStatus={conversationStatus}
           mailData={mailData}
           brandId={brandId}
           mails={mails}
@@ -140,7 +144,7 @@ class Mail extends React.PureComponent<Props, State> {
       return null;
     }
 
-    const innerHTML = { __html: cleanHtml(mailData.body || '') };
+    const innerHTML = { __html: cleanHtml(mailData.body || "") };
     const { to, cc, bcc } = mailData;
     const addresses = to.concat(cc, bcc);
 
@@ -186,7 +190,18 @@ class Mail extends React.PureComponent<Props, State> {
 
     return (
       <>
-        <BoxItem toggle={this.state.isCollapsed}>
+        <BoxItem $toggle={this.state.isCollapsed}>
+          {message.mailData && (
+            <Tip text={message.mailData.subject || ""} placement="top-start">
+              <MailSubject>
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: message.mailData.subject || "",
+                  }}
+                />
+              </MailSubject>
+            </Tip>
+          )}
           <MailHeader
             message={message}
             isContentCollapsed={this.state.isCollapsed}

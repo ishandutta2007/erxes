@@ -11,11 +11,17 @@ export default `
   }
   mentionedUserIds
   conversationId
-  videoCallData {
+  ${
+    isEnabled("dailyco")
+      ? `  videoCallData {
     url
     status
     recordingLinks
+    name
+  }`
+      : ""
   }
+
   internal
   fromBot
   contentType
@@ -24,7 +30,6 @@ export default `
   createdAt
   isCustomerRead
   formWidgetData
-  bookingWidgetData
   messengerAppData
   botData
   user {
@@ -36,9 +41,6 @@ export default `
       position
     }
   }
-  ${
-    isEnabled("contacts")
-      ? `
       customer {
         _id
         avatar
@@ -57,20 +59,12 @@ export default `
         customFieldsData
 
         tagIds
-        ${
-          isEnabled("tags")
-            ? `
-            getTags {
-              _id
-              name
-              colorCode
-            }
-          ` : `` 
+        getTags {
+          _id
+          name
+          colorCode
         }
       }
-    `
-      : ``
-  }
   mailData {
     messageId
     threadId

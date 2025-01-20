@@ -1,89 +1,83 @@
-import { gql } from 'apollo-server-express';
-
 import {
-  types as ChannelTypes,
+  mutations as ChannelMutations,
   queries as ChannelQueries,
-  mutations as ChannelMutations
-} from './channelTypeDefs';
-
+  types as ChannelTypes
+} from "./channelTypeDefs";
 import {
-  types as ConversationTypes,
+  mutations as ConversationMutations,
   queries as ConversationQueries,
-  mutations as ConversationMutations
-} from './conversationTypeDefs';
-
+  types as ConversationTypes
+} from "./conversationTypeDefs";
 import {
-  types as MessengerAppTypes,
-  queries as MessengerAppQueries,
-  mutations as MessengerAppMutations
-} from './messengerAppTypeDefs';
-
-import {
-  types as integrationTypes,
+  mutations as IntegrationMutations,
   queries as IntegrationQueries,
-  mutations as IntegrationMutations
-} from './integrationTypeDefs';
-
+  types as integrationTypes
+} from "./integrationTypeDefs";
 import {
-  types as ResponseTemplateTypes,
+  mutations as MessengerAppMutations,
+  queries as MessengerAppQueries,
+  types as MessengerAppTypes
+} from "./messengerAppTypeDefs";
+import {
+  mutations as ResponseTemplateMutations,
   queries as ResponseTemplateQueries,
-  mutations as ResponseTemplateMutations
-} from './responseTemplateTypeDefs';
-
+  types as ResponseTemplateTypes
+} from "./responseTemplateTypeDefs";
 import {
-  types as widgetTypes,
-  queries as widgetQueries,
-  mutations as widgetMutations
-} from './widgetTypeDefs';
-
-import {
-  types as SkillTypes,
-  queries as SkillQueries,
-  mutations as SkillMutations
-} from './skillTypeDefs';
-
-import {
-  types as ScriptTypes,
+  mutations as ScriptMutations,
   queries as ScriptQueries,
-  mutations as ScriptMutations
-} from './scriptTypeDefs';
+  types as ScriptTypes
+} from "./scriptTypeDefs";
+import {
+  mutations as SkillMutations,
+  queries as SkillQueries,
+  types as SkillTypes
+} from "./skillTypeDefs";
+import {
+  mutations as widgetMutations,
+  queries as widgetQueries,
+  types as widgetTypes
+} from "./widgetTypeDefs";
 
-const typeDefs = async serviceDiscovery => {
-  const isProductsEnabled = await serviceDiscovery.isEnabled('products');
-  const isTagsEnabled = await serviceDiscovery.isEnabled('tags');
-  const isFormsEnabled = await serviceDiscovery.isEnabled('forms');
-  const isKbEnabled = await serviceDiscovery.isEnabled('knowledgebase');
-  const isContactsEnabled = await serviceDiscovery.isEnabled('contacts');
+import gql from "graphql-tag";
+import { isEnabled } from "@erxes/api-utils/src/serviceDiscovery";
 
-  const isEnabled = {
+const typeDefs = async () => {
+  const isProductsEnabled = true;
+  const isKbEnabled = await isEnabled("knowledgebase");
+  const isContactsEnabled = true;
+  const isDailycoEnabled = await isEnabled("dailyco");
+  const isCallsEnabled = await isEnabled("calls");
+
+  const isEnabledTable = {
     products: isProductsEnabled,
-    tags: isTagsEnabled,
-    forms: isFormsEnabled,
     knowledgeBase: isKbEnabled,
-    contacts: isContactsEnabled
+    contacts: isContactsEnabled,
+    dailyco: isDailycoEnabled,
+    calls: isCallsEnabled
   };
 
   return gql`
     scalar JSON
     scalar Date
 
-    ${ConversationTypes(isEnabled)}
+    ${ConversationTypes(isEnabledTable)}
     ${MessengerAppTypes}
     ${ChannelTypes}
-    ${integrationTypes(isEnabled)}
+    ${integrationTypes}
     ${ResponseTemplateTypes}
-    ${widgetTypes(isEnabled)}
+    ${widgetTypes(isEnabledTable)}
     ${SkillTypes}
-    ${ScriptTypes(isEnabled)}
+    ${ScriptTypes(isEnabledTable)}
     
     
     extend type Query {
-      ${ConversationQueries(isEnabled)}
+      ${ConversationQueries()}
       ${MessengerAppQueries}
       ${ChannelQueries}
       ${IntegrationQueries}
       ${ResponseTemplateQueries}
-      ${widgetQueries(isEnabled)}
+      ${widgetQueries(isEnabledTable)}
       ${SkillQueries}
       ${ScriptQueries}
     }
@@ -94,7 +88,7 @@ const typeDefs = async serviceDiscovery => {
       ${ChannelMutations}
       ${IntegrationMutations}
       ${ResponseTemplateMutations}
-      ${widgetMutations(isEnabled)}
+      ${widgetMutations()}
       ${SkillMutations}
       ${ScriptMutations}
     }

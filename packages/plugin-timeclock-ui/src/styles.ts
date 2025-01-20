@@ -1,8 +1,8 @@
-import styled, { css } from 'styled-components';
-import styledTS from 'styled-components-ts';
 import { DateContainer, SimpleButton } from '@erxes/ui/src/styles/main';
 import { colors, dimensions, typography } from '@erxes/ui/src/styles';
-import { SidebarTitle } from '@erxes/ui/src/layout/styles';
+import styled, { css } from 'styled-components';
+
+import styledTS from 'styled-components-ts';
 
 const FilterWrapper = styled.div`
   margin: 10px 20px 0 20px;
@@ -15,6 +15,48 @@ const FilterWrapper = styled.div`
 
   strong {
     margin-right: 2 0px;
+  }
+`;
+
+export const Trigger = styledTS<{ type: string; $isHoverActionBar?: boolean }>(
+  styled.div
+)`
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+
+  > p {
+    font-size: 13px;
+    text-align: center;
+    margin: 0;
+    padding: ${dimensions.unitSpacing + 5}px ${dimensions.unitSpacing}px;
+    color: ${colors.colorCoreGray};
+  }
+
+  > div {
+    width: 30%;
+    padding: 5px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    transition: all 0.3s ease-in-out;
+
+  }
+
+  .active {
+    background: ${colors.colorSecondary}
+    color: ${colors.colorWhite}
+  }
+  
+  .passive {
+    background: ${colors.bgActive};
+    border: 1px solid ${colors.borderPrimary};
+    &:hover {
+      color: ${colors.colorWhite}
+      background: ${colors.colorSecondary};
+    }
   }
 `;
 
@@ -212,11 +254,25 @@ const ToggleButton = styled(SimpleButton)`
   margin-right: 10px;
 `;
 
-const FlexRow = styled.div`
+const FlexRow = styledTS<{
+  $gapPx?: number;
+}>(styled.div)`
+  gap: ${props => (props.$gapPx ? `${props.$gapPx}px` : 'auto')};
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+`;
+
+const FlexRowJustifyStart = styledTS<{
+  $widthPercent?: number;
+}>(styled.div)`
+  width: ${props =>
+    props.$widthPercent ? `${props.$widthPercent}%` : 'fit-content'};
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
 `;
 
 const FlexRowLeft = styled.div`
@@ -262,28 +318,28 @@ const CustomFlexRow = styled.div`
 `;
 
 const FlexColumn = styledTS<{
-  marginNum: number;
+  $marginNum: number;
 }>(styled.div)`
   display: flex;
   flex-direction: column;
-  gap:${props => props.marginNum}px;
+  gap:${props => props.$marginNum}px;
 `;
 
 const FlexColumnMargined = styledTS<{
-  marginNum: number;
+  $marginNum: number;
 }>(styled.div)`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.marginNum}px
-  margin-top:${props => props.marginNum * 2}px;
+  gap: ${props => props.$marginNum}px;
+  margin-top:${props => props.$marginNum * 2}px;
 `;
 
 const FlexColumnCustom = styledTS<{
-  marginNum: number;
+  $marginNum: number;
 }>(styled.div)`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.marginNum}px
+  gap: ${props => props.$marginNum}px
   margin: 20px 20px
 
   div:first-child {
@@ -460,41 +516,162 @@ const CustomContainer = styled.div`
   }
 `;
 
+const SearchInput = styledTS<{ isInPopover: boolean }>(styled.div)`
+  position: relative;
+
+  margin-right: 10px;
+  input {
+    border: 1px solid ${colors.borderPrimary};
+    padding: 20px 20px 20px 30px;
+    border-radius: 20px;
+    width: ${props => (props.isInPopover ? '250px' : '350px')};
+    margin:  ${props => props.isInPopover && '5px 5px 0'};
+    background: ${colors.colorWhite};
+
+    @media (max-width: 1300px) {
+      min-width: 260px;
+    }
+  }
+
+  i {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 15px;
+    color: ${colors.colorCoreGray};
+  }
+`;
+
+const SchedulesTableWrapper = styled.div`
+  width: 100%;
+  overflow-x: auto;
+
+  table {
+    border-collapse: collapse;
+    width: auto;
+  }
+
+  .fixed-column {
+    position: sticky;
+    left: 0;
+    background-color: #fff;
+    z-index: 99;
+  }
+
+  th {
+    border: 1px solid #eee !important;
+  }
+`;
+
+const BorderedTd = styled.td`
+  background-color: white;
+  border: 2px solid #eeeeee;
+  text-align: center;
+`;
+
+const RequestInfo = styledTS<{
+  backgroundColor: string;
+  borderColor?: string;
+  textColor?: string;
+  hoverContent?: string;
+}>(styled.div)`
+  width: 92px;
+  overflow:hidden; 
+  white-space:nowrap; 
+  text-overflow: ellipsis;
+  border: 2px solid ${props =>
+    props.borderColor ? props.borderColor : props.backgroundColor};
+  border-radius: 20px;
+  padding: 6px;
+  margin: 5px auto;
+  background-color:${props => props.backgroundColor};
+  color: white;
+`;
+
+const TimeclockInfo = styledTS<{
+  activeShift?: boolean;
+  color?: string;
+  disabled?: boolean;
+}>(styled.div)`
+  width: ${props => (props.activeShift ? '92px' : 'max-content')};
+  border: 2px solid ${props =>
+    props.activeShift ? 'rgba(255,88,87,0.2)' : 'rgba(0, 177, 78, 0.1)'};
+  border-radius: 20px;
+  padding: 6px;
+  margin: 5px auto;
+  background-color: ${props =>
+    props.color
+      ? props.color
+      : props.activeShift
+        ? 'rgba(255,88,87,0.2)'
+        : 'rgba(0, 177, 78, 0.1)'};
+
+  pointer-events: ${props => (props.disabled ? 'none' : '')}
+  opacity: ${props => (props.disabled ? '0.7' : '1')};
+  cursor: pointer;
+`;
+
+const TimeclockTableWrapper = styled.div`
+  .fixed-column {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 10;
+  }
+`;
+
+const ColoredSquare = styledTS<{ color: string }>(styled.div)`
+  width: 10px; /* Adjust the size of the colored corner */
+  max-width:10px;
+  height: 10px; /* Adjust the size of the colored corner */
+  max-height:10px;
+  background-color: ${props => props.color}; 
+  }
+`;
+
 export {
+  AlertContainer,
+  ConfigFormWrapper,
+  CustomBoxWrapper,
+  CustomCollapseRow,
+  CustomContainer,
+  CustomFlexRow,
+  CustomLabel,
+  CustomRangeContainer,
+  CustomRow,
+  CustomWidth,
+  CustomWidthDiv,
+  DateName,
+  DropdownWrapper,
   FilterItem,
   FilterWrapper,
-  Row,
   FlexCenter,
-  DropdownWrapper,
-  SidebarActions,
-  Input,
-  FlexRow,
-  FlexRowLeft,
-  CustomFlexRow,
-  CustomWidthDiv,
   FlexColumn,
-  FlexColumnMargined,
   FlexColumnCustom,
-  DateName,
-  CustomRangeContainer,
-  SidebarHeader,
-  CustomRow,
+  FlexColumnMargined,
+  FlexRow,
   FlexRowEven,
-  ToggleDisplay,
-  ConfigFormWrapper,
-  ToggleButton,
+  FlexRowLeft,
   InlineBlock,
+  Input,
   MarginX,
   MarginY,
+  RoundBox,
+  Row,
   RowField,
+  SchedulesTableWrapper,
+  SearchInput,
+  SidebarActions,
+  SidebarHeader,
+  SortItem,
   TextAlignCenter,
   TextAlignRight,
-  CustomCollapseRow,
-  CustomLabel,
-  AlertContainer,
-  CustomWidth,
-  CustomBoxWrapper,
-  RoundBox,
-  SortItem,
-  CustomContainer
+  ToggleButton,
+  ToggleDisplay,
+  BorderedTd,
+  RequestInfo,
+  TimeclockInfo,
+  TimeclockTableWrapper,
+  ColoredSquare,
+  FlexRowJustifyStart
 };

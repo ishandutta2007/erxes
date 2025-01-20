@@ -1,7 +1,17 @@
+import {
+  getService,
+  getServices,
+  isEnabled,
+} from '@erxes/api-utils/src/serviceDiscovery';
 import { IModels } from '../connectionResolver';
-import { SOCIALPAY_TOKEN_URL } from '../constants';
-import messageBroker, { sendContactsMessage } from '../messageBroker';
-import { sendRequest } from '@erxes/api-utils/src/requests';
+import {
+  sendCoreMessage,
+  sendPurchasesMessage,
+  sendSalesMessage,
+  sendTasksMessage,
+  sendTicketsMessage,
+} from '../messageBroker';
+import { sendMessage } from '@erxes/api-utils/src/messageBroker';
 
 export interface IContactsParams {
   subdomain: string;
@@ -31,14 +41,14 @@ export const handleContacts = async (args: IContactsParams) => {
   qry.clientPortalId = clientPortalId;
 
   if (type === 'customer') {
-    let customer = await sendContactsMessage({
+    let customer = await sendCoreMessage({
       subdomain,
       action: 'customers.findOne',
       data: {
         customerPrimaryEmail: trimmedMail,
-        customerPrimaryPhone: document.phone
+        customerPrimaryPhone: document.phone,
       },
-      isRPC: true
+      isRPC: true,
     });
 
     if (customer) {
@@ -56,11 +66,11 @@ export const handleContacts = async (args: IContactsParams) => {
       clientPortalId,
       // hash password
       password:
-        password && (await models.ClientPortalUsers.generatePassword(password))
+        password && (await models.ClientPortalUsers.generatePassword(password)),
     });
 
     if (!customer) {
-      customer = await sendContactsMessage({
+      customer = await sendCoreMessage({
         subdomain,
         action: 'customers.createCustomer',
         data: {
@@ -68,9 +78,9 @@ export const handleContacts = async (args: IContactsParams) => {
           lastName: document.lastName,
           primaryEmail: trimmedMail,
           primaryPhone: document.phone,
-          state: 'lead'
+          state: 'lead',
         },
-        isRPC: true
+        isRPC: true,
       });
     }
 
@@ -80,19 +90,32 @@ export const handleContacts = async (args: IContactsParams) => {
         { _id: user._id },
         { $set: { erxesCustomerId: customer._id } }
       );
+
+      for (const serviceName of await getServices()) {
+        const serviceConfig = await getService(serviceName);
+
+        if (serviceConfig.config?.meta?.hasOwnProperty('cpCustomerHandle')) {
+          if (await isEnabled(serviceName)) {
+            sendMessage(`${serviceName}:cpCustomerHandle`, {
+              subdomain,
+              data: { customer },
+            });
+          }
+        }
+      }
     }
   }
 
   if (type === 'company') {
-    let company = await sendContactsMessage({
+    let company = await sendCoreMessage({
       subdomain,
       action: 'companies.findOne',
       data: {
         companyPrimaryEmail: trimmedMail,
         companyPrimaryPhone: document.phone,
-        companyCode: document.companyRegistrationNumber
+        companyCode: document.companyRegistrationNumber,
       },
-      isRPC: true
+      isRPC: true,
     });
 
     if (company) {
@@ -114,20 +137,20 @@ export const handleContacts = async (args: IContactsParams) => {
       clientPortalId,
       // hash password
       password:
-        password && (await models.ClientPortalUsers.generatePassword(password))
+        password && (await models.ClientPortalUsers.generatePassword(password)),
     });
 
     if (!company) {
-      company = await sendContactsMessage({
+      company = await sendCoreMessage({
         subdomain,
         action: 'companies.createCompany',
         data: {
           primaryName: document.companyName,
           primaryEmail: trimmedMail,
           primaryPhone: document.phone,
-          code: document.companyRegistrationNumber
+          code: document.companyRegistrationNumber,
         },
-        isRPC: true
+        isRPC: true,
       });
     }
 
@@ -137,58 +160,46 @@ export const handleContacts = async (args: IContactsParams) => {
         { _id: user._id },
         { $set: { erxesCompanyId: company._id } }
       );
+
+      for (const serviceName of await getServices()) {
+        const serviceConfig = await getService(serviceName);
+
+        if (serviceConfig.config?.meta?.hasOwnProperty('cpCustomerHandle')) {
+          if (await isEnabled(serviceName)) {
+            sendMessage(`${serviceName}:cpCustomerHandle`, {
+              subdomain,
+              data: { company },
+            });
+          }
+        }
+      }
     }
   }
 
   return user;
 };
 
-export const putActivityLog = async user => {
-  let contentType = 'contacts:customer';
+export const putActivityLog = async (subdomain, user) => {
+  let contentType = 'core:customer';
   let contentId = user.erxesCustomerId;
 
   if (user.type === 'company') {
-    contentType = 'contacts:company';
+    contentType = 'core:company';
     contentId = user.erxesCompanyId;
   }
 
-  await messageBroker().sendMessage('putActivityLog', {
+  await sendMessage('putActivityLog', {
+    subdomain,
     data: {
       action: 'putActivityLog',
       data: {
         contentType,
         contentId,
         createdBy: user.clientPortalId,
-        action: 'create'
-      }
-    }
-  });
-};
-
-export const fetchUserFromSocialpay = async (token: string) => {
-  try {
-    const response = await sendRequest({
-      url: SOCIALPAY_TOKEN_URL,
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json'
+        action: 'create',
       },
-      body: {
-        method: 'checkAdditionalToken',
-        params: [token]
-      }
-    });
-
-    const { result } = response;
-
-    if (!result || result.Result !== 'SUCCESS') {
-      return null;
-    }
-
-    return result;
-  } catch (e) {
-    return null;
-  }
+    },
+  });
 };
 
 export const handleDeviceToken = async (user, deviceToken) => {
@@ -198,7 +209,145 @@ export const handleDeviceToken = async (user, deviceToken) => {
     if (!deviceTokens.includes(deviceToken)) {
       deviceTokens.push(deviceToken);
 
-      await user.update({ $set: { deviceTokens } });
+      await user.updateOne({ $set: { deviceTokens } });
     }
   }
+};
+
+export const createCard = async (subdomain, models, cpUser, doc) => {
+  const customer = await sendCoreMessage({
+    subdomain,
+    action: 'customers.findOne',
+    data: {
+      _id: cpUser.erxesCustomerId,
+    },
+    isRPC: true,
+  });
+
+  if (!customer) {
+    throw new Error('Customer not registered');
+  }
+
+  const {
+    type,
+    subject,
+    description,
+    stageId,
+    parentId,
+    closeDate,
+    startDate,
+    customFieldsData,
+    attachments,
+    labelIds,
+    productsData,
+  } = doc;
+  let priority = doc.priority;
+
+  if (['High', 'Critical'].includes(priority)) {
+    priority = 'Normal';
+  }
+
+  let card = {} as any;
+
+  const data = {
+    userId: cpUser.userId,
+    name: subject,
+    description,
+    priority,
+    stageId,
+    status: 'active',
+    customerId: customer._id,
+    createdAt: new Date(),
+    stageChangedDate: null,
+    parentId,
+    closeDate,
+    startDate,
+    customFieldsData,
+    attachments,
+    labelIds,
+    productsData,
+  };
+
+  switch (type) {
+    case 'deal':
+      card = await sendSalesMessage({
+        subdomain,
+        action: `${type}s.create`,
+        data,
+        isRPC: true,
+      });
+      break;
+
+    case 'ticket':
+      card = await sendTicketsMessage({
+        subdomain,
+        action: `${type}s.create`,
+        data,
+        isRPC: true,
+      });
+      break;
+
+    case 'task':
+      card = await sendTasksMessage({
+        subdomain,
+        action: `${type}s.create`,
+        data,
+        isRPC: true,
+      });
+      break;
+
+    case 'purchase':
+      card = await sendPurchasesMessage({
+        subdomain,
+        action: `${type}s.create`,
+        data,
+        isRPC: true,
+      });
+      break;
+  }
+
+  await models.ClientPortalUserCards.createOrUpdateCard({
+    contentType: type,
+    contentTypeId: card._id,
+    cpUserId: cpUser.userId,
+  });
+
+  return card;
+};
+
+export const participantEditRelation = async (
+  subdomain,
+  models: IModels,
+  type,
+  cardId,
+  oldCpUserIds,
+  cpUserIds
+) => {
+  const userCards = await models.ClientPortalUserCards.find({
+    contentType: type,
+    contentTypeId: cardId,
+  });
+  const newCpUsers = cpUserIds.filter(
+    (x) => userCards.findIndex((m) => m.cpUserId === x) === -1
+  );
+
+  const excludedCpUsers = oldCpUserIds.filter((m) => !cpUserIds.includes(m));
+
+  if (newCpUsers) {
+    const docs = newCpUsers.map((d) => ({
+      contentType: type,
+      contentTypeId: cardId,
+      cpUserId: d,
+    }));
+    await models.ClientPortalUserCards.insertMany(docs);
+  }
+  if (excludedCpUsers) {
+    await models.ClientPortalUserCards.deleteMany({
+      contentType: type,
+      contentTypeId: cardId,
+      cpUserId: { $in: excludedCpUsers },
+    });
+  }
+
+  return 'ok';
 };

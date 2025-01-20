@@ -20,7 +20,6 @@ type Props = {
   timeclocks: ITimeclock[];
   searchValue: string;
   queryParams: any;
-  history: any;
   timeId: string;
   userId: string;
   shiftId: string;
@@ -94,7 +93,7 @@ export default withProps<Props>(
           longitude,
           latitude
         },
-        refetchQueries: ['timeclocksMain']
+        refetchQueries: ['timeclocksMain', 'bichilTimeclockReportByUsers']
       })
     }),
 
@@ -107,7 +106,7 @@ export default withProps<Props>(
           longitude,
           latitude
         },
-        refetchQueries: ['timeclocksMain']
+        refetchQueries: ['timeclocksMain', 'bichilTimeclockReportByUsers']
       })
     })
   )(ListContainer)

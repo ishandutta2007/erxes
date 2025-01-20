@@ -1,54 +1,55 @@
-import * as serverTiming from 'server-timing';
-import * as cors from 'cors';
-import typeDefs from './graphql/typeDefs';
-import resolvers from './graphql/resolvers';
+import * as serverTiming from "server-timing";
+import * as cors from "cors";
+import typeDefs from "./graphql/typeDefs";
+import resolvers from "./graphql/resolvers";
 
-import { generateAllDataLoaders } from './dataLoaders';
-import { initBroker } from './messageBroker';
-import { routeErrorHandling } from '@erxes/api-utils/src/requests';
+import { generateAllDataLoaders } from "./dataLoaders";
+import { setupMessageConsumers } from "./messageBroker";
+import { routeErrorHandling } from "@erxes/api-utils/src/requests";
 import {
   identifyCustomer,
   trackCustomEvent,
   trackViewPageEvent,
   updateCustomerProperties
-} from './events';
-import { generateModels } from './connectionResolver';
-import logs from './logUtils';
-import tags from './tags';
-import segments from './segments';
-import forms from './forms';
-import * as permissions from './permissions';
-import search from './search';
-import widgetsMiddleware from './middlewares/widgetsMiddleware';
-import { getSubdomain } from '@erxes/api-utils/src/core';
-import webhooks from './webhooks';
-import automations from './automations';
-import cronjobs from './cronjobs/conversations';
-import dashboards from './dashboards';
-import webhookMiddleware from './middlewares/webhookMiddleware';
-import { NOTIFICATION_MODULES } from './constants';
-import payment from './payment';
-
-export let mainDb;
-export let graphqlPubsub;
-export let serviceDiscovery;
-
-export let debug;
+} from "./events";
+import { generateModels } from "./connectionResolver";
+import logs from "./logUtils";
+import tags from "./tags";
+import segments from "./segments";
+import forms from "./forms";
+import * as permissions from "./permissions";
+import search from "./search";
+import widgetsMiddleware from "./middlewares/widgetsMiddleware";
+import { getSubdomain } from "@erxes/api-utils/src/core";
+import webhooks from "./webhooks";
+import automations from "./automations";
+import cronjobs from "./cronjobs/conversations";
+import dashboards from "./dashboards";
+import webhookMiddleware from "./middlewares/webhookMiddleware";
+import { NOTIFICATION_MODULES } from "./constants";
+import payment from "./payment";
+import reports from "./reports/reports";
+import app from "@erxes/api-utils/src/app";
+import exporter from "./exporter";
+import formMiddleware from "./middlewares/formMiddleware";
 
 export default {
-  name: 'inbox',
+  name: "inbox",
   permissions,
-  graphql: async sd => {
-    serviceDiscovery = sd;
-
+  graphql: async () => {
     return {
-      typeDefs: await typeDefs(sd),
+      typeDefs: await typeDefs(),
       resolvers
     };
   },
   hasSubscriptions: true,
-  hasDashboard: true,
+  subscriptionPluginPath: require("path").resolve(
+    __dirname,
+    "graphql",
+    "subscriptionPlugin.js"
+  ),
   meta: {
+    reports,
     forms,
     segments,
     tags,
@@ -60,7 +61,8 @@ export default {
     permissions,
     dashboards,
     notificationModules: NOTIFICATION_MODULES,
-    payment
+    payment,
+    exporter
   },
   apolloServerContext: async (context, req, res) => {
     const subdomain = getSubdomain(req);
@@ -80,21 +82,17 @@ export default {
     return context;
   },
   middlewares: [(serverTiming as any)()],
-  onServerInit: async options => {
-    mainDb = options.db;
-
-    const app = options.app;
-
+  onServerInit: async () => {
     // events
     app.post(
-      '/events-receive',
+      "/events-receive",
       routeErrorHandling(
         async (req, res) => {
           const { name, triggerAutomation, customerId, attributes } = req.body;
           const subdomain = getSubdomain(req);
 
           const response =
-            name === 'pageView'
+            name === "pageView"
               ? await trackViewPageEvent(subdomain, { customerId, attributes })
               : await trackCustomEvent(subdomain, {
                   name,
@@ -105,12 +103,12 @@ export default {
 
           return res.json(response);
         },
-        res => res.json({ status: 'success' })
+        res => res.json({ status: "success" })
       )
     );
 
     app.post(
-      '/events-identify-customer',
+      "/events-identify-customer",
       routeErrorHandling(
         async (req, res) => {
           const { args } = req.body;
@@ -124,7 +122,7 @@ export default {
     );
 
     app.post(
-      '/events-update-customer-properties',
+      "/events-update-customer-properties",
       routeErrorHandling(
         async (req, res) => {
           const subdomain = getSubdomain(req);
@@ -136,12 +134,9 @@ export default {
       )
     );
 
-    app.get('/script-manager', cors({ origin: '*' }), widgetsMiddleware);
-    app.post('/webhooks/:id', webhookMiddleware);
-
-    initBroker(options.messageBrokerClient);
-
-    debug = options.debug;
-    graphqlPubsub = options.pubsubClient;
-  }
+    app.get("/script-manager", cors({ origin: "*" }), widgetsMiddleware);
+    app.post("/webhooks/:id", cors({ origin: "*" }), webhookMiddleware);
+    app.post("/forms/:id", cors({ origin: "*" }), formMiddleware);
+  },
+  setupMessageConsumers
 };

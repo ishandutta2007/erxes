@@ -3,6 +3,7 @@ import { paginate } from '@erxes/api-utils/src';
 import { escapeRegExp } from '@erxes/api-utils/src/core';
 
 import { IContext } from '../../../connectionResolver';
+import { sendCommonMessage } from '../../../messageBroker';
 
 const clientPortalUserQueries = {
   /**
@@ -45,27 +46,27 @@ const clientPortalUserQueries = {
       const fields = [
         {
           firstName: {
-            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')]
-          }
+            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')],
+          },
         },
         {
           lastName: {
-            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')]
-          }
+            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')],
+          },
         },
         {
           email: {
-            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')]
-          }
+            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')],
+          },
         },
         {
           phone: {
-            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')]
-          }
+            $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')],
+          },
         },
         {
-          code: { $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')] }
-        }
+          code: { $in: [new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i')] },
+        },
       ];
 
       filter.$or = fields;
@@ -100,13 +101,13 @@ const clientPortalUserQueries = {
         }
       }
 
-      rangeFilters.length && (filter.$and = rangeFilters);
+      if (rangeFilters.length) {
+        filter.$and = rangeFilters;
+      }
     }
 
     return paginate(
-      models.ClientPortalUsers.find(filter)
-        .sort({ createdAt: -1 })
-        .lean(),
+      models.ClientPortalUsers.find(filter).sort({ createdAt: -1 }).lean(),
       pagintationArgs
     );
   },
@@ -114,14 +115,20 @@ const clientPortalUserQueries = {
   async clientPortalUserDetail(
     _root,
     { _id }: { _id: string },
-    { models }: IContext
+    { models, isPassed2FA }: IContext
   ) {
     return models.ClientPortalUsers.findOne({ _id });
   },
 
   async clientPortalCurrentUser(_root, _args, context: IContext) {
-    const { cpUser } = context;
+    const { cpUser, isPassed2FA } = context;
+    if (!cpUser) {
+      throw Error('User is not logged in');
+    }
 
+    if (cpUser && !isPassed2FA) {
+      throw Error('Verify 2FA');
+    }
     return cpUser
       ? context.models.ClientPortalUsers.getUser({ _id: cpUser._id })
       : null;
@@ -139,7 +146,36 @@ const clientPortalUserQueries = {
     }
 
     return models.ClientPortalUsers.find(filter).countDocuments();
-  }
+  },
+
+  async clientPortalCompanies(
+    _root,
+    { clientPortalId }: { clientPortalId: string },
+    { models }: IContext
+  ) {
+    return models.Companies.find({ clientPortalId }).lean();
+  },
+
+  async clientPortalUserPosts(
+    _root,
+    args: any,
+    { cpUser, subdomain }: IContext
+  ) {
+    if (!cpUser) {
+      throw new Error('login required');
+    }
+
+    const query = { ...args, authorId: cpUser._id, clientPortalId: cpUser.clientPortalId };
+
+    return await sendCommonMessage({
+      subdomain,
+      serviceName: 'cms',
+      action: 'getPostsPaginated',
+      data: query,
+      isRPC: true,
+      defaultValue: null,
+    });
+  },
 };
 
 export default clientPortalUserQueries;

@@ -1,25 +1,28 @@
-import Form from '../containers/Form';
-import React from 'react';
-import Row from './Row';
-import Sidebar from '../../general/components/Sidebar';
+import { Alert, __, confirm, router } from "@erxes/ui/src/utils";
 import {
   Button,
   DataWithLoader,
   FormControl,
+  HeaderDescription,
   ModalTrigger,
-  Table
-} from '@erxes/ui/src/components';
-import { BarItems, Wrapper } from '@erxes/ui/src/layout';
-import { MainStyleTitle as Title } from '@erxes/ui/src/styles/eindex';
-import { __, router, confirm, Alert } from '@erxes/ui/src/utils';
-import { IDonateCampaign } from '../types';
+  Pagination,
+  Table,
+} from "@erxes/ui/src/components";
+import { FilterContainer, FlexRow, Title } from "@erxes/ui-settings/src/styles";
+
+import Form from "../containers/Form";
+import { IDonateCampaign } from "../types";
+import React, { useState } from "react";
+import Row from "./Row";
+import Sidebar from "../../general/components/Sidebar";
+import { Wrapper } from "@erxes/ui/src/layout";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type Props = {
   donateCampaigns: IDonateCampaign[];
   loading: boolean;
   isAllSelected: boolean;
   toggleAll: (targets: IDonateCampaign[], containerId: string) => void;
-  history: any;
   queryParams: any;
   bulk: any[];
   emptyBulk: () => void;
@@ -27,60 +30,49 @@ type Props = {
   remove: (doc: { donateCampaignIds: string[] }, emptyBulk: () => void) => void;
   searchValue: string;
   filterStatus: string;
+  totalCount?: number;
 };
 
-type State = {
-  searchValue: string;
-  filterStatus: string;
-};
+const DonateCampaigns = (props: Props) => {
+  let timer;
+  const [searchValue, setSearchValue] = useState(props.searchValue || "");
+  const [filterStatus, setFilterStatus] = useState(props.filterStatus || "");
+  const location = useLocation();
+  const navigate = useNavigate();
 
-class DonateCampaigns extends React.Component<Props, State> {
-  private timer?: NodeJS.Timer;
-
-  constructor(props: Props) {
-    super(props);
-
-    this.state = {
-      searchValue: this.props.searchValue || '',
-      filterStatus: this.props.filterStatus || ''
-    };
-  }
-
-  search = e => {
-    if (this.timer) {
-      clearTimeout(this.timer);
+  const search = (e) => {
+    if (timer) {
+      clearTimeout(timer);
     }
 
-    const { history } = this.props;
     const searchValue = e.target.value;
 
-    this.setState({ searchValue });
+    setSearchValue(searchValue);
 
-    this.timer = setTimeout(() => {
-      router.removeParams(history, 'page');
-      router.setParams(history, { searchValue });
+    timer = setTimeout(() => {
+      router.removeParams(navigate, location, "page");
+      router.setParams(navigate, location, { searchValue });
     }, 500);
   };
 
-  moveCursorAtTheEnd(e) {
+  const moveCursorAtTheEnd = (e) => {
     const tmpValue = e.target.value;
 
-    e.target.value = '';
+    e.target.value = "";
     e.target.value = tmpValue;
-  }
-
-  onChange = () => {
-    const { toggleAll, donateCampaigns } = this.props;
-    toggleAll(donateCampaigns, 'donateCampaigns');
   };
 
-  renderRow = () => {
-    const { donateCampaigns, history, toggleBulk, bulk } = this.props;
+  const onChange = () => {
+    const { toggleAll, donateCampaigns } = props;
+    toggleAll(donateCampaigns, "donateCampaigns");
+  };
 
-    return donateCampaigns.map(donateCampaign => (
+  const renderRow = () => {
+    const { donateCampaigns, toggleBulk, bulk } = props;
+
+    return donateCampaigns.map((donateCampaign) => (
       <Row
         key={donateCampaign._id}
-        history={history}
         donateCampaign={donateCampaign}
         toggleBulk={toggleBulk}
         isChecked={bulk.includes(donateCampaign)}
@@ -88,30 +80,30 @@ class DonateCampaigns extends React.Component<Props, State> {
     ));
   };
 
-  modalContent = props => {
+  const modalContent = (props) => {
     return <Form {...props} />;
   };
 
-  removeDonateCampaigns = donateCampaigns => {
+  const removeDonateCampaigns = (donateCampaigns) => {
     const donateCampaignIds: string[] = [];
 
-    donateCampaigns.forEach(donateCampaign => {
+    donateCampaigns.forEach((donateCampaign) => {
       donateCampaignIds.push(donateCampaign._id);
     });
 
-    this.props.remove({ donateCampaignIds }, this.props.emptyBulk);
+    props.remove({ donateCampaignIds }, props.emptyBulk);
   };
 
-  actionBarRight() {
-    const { bulk } = this.props;
+  const actionBarRight = () => {
+    const { bulk } = props;
 
     if (bulk.length) {
       const onClick = () =>
         confirm()
           .then(() => {
-            this.removeDonateCampaigns(bulk);
+            removeDonateCampaigns(bulk);
           })
-          .catch(error => {
+          .catch((error) => {
             Alert.error(error.message);
           });
 
@@ -129,89 +121,102 @@ class DonateCampaigns extends React.Component<Props, State> {
 
     const trigger = (
       <Button btnStyle="success" icon="plus-circle">
-        Add donate
+        Add donate campaign
       </Button>
     );
 
     return (
-      <BarItems>
-        <FormControl
-          type="text"
-          placeholder={__('Type to search')}
-          onChange={this.search}
-          value={this.state.searchValue}
-          autoFocus={true}
-          onFocus={this.moveCursorAtTheEnd}
+      <FilterContainer>
+        <FlexRow>
+          <FormControl
+            type="text"
+            placeholder={__("Type to search")}
+            onChange={search}
+            value={searchValue}
+            autoFocus={true}
+            onFocus={moveCursorAtTheEnd}
+          />
+          <ModalTrigger
+            size={"lg"}
+            title={__("Add donate campaign")}
+            trigger={trigger}
+            autoOpenKey="showProductModal"
+            content={modalContent}
+          />
+        </FlexRow>
+      </FilterContainer>
+    );
+  };
+
+  const { loading, isAllSelected, totalCount } = props;
+
+  const breadcrumb = [
+    { title: __("Settings"), link: "/settings" },
+    {
+      title: __("Loyalties config"),
+      link: "/erxes-plugin-loyalty/settings/general",
+    },
+    { title: __("Donate Campaign") },
+  ];
+
+  const header = (
+    <HeaderDescription
+      icon="/images/actions/25.svg"
+      title={__("Loyalty configs")}
+      description=""
+    />
+  );
+
+  const content = (
+    <Table $hover={true}>
+      <thead>
+        <tr>
+          <th style={{ width: 60 }}>
+            <FormControl
+              checked={isAllSelected}
+              componentclass="checkbox"
+              onChange={onChange}
+            />
+          </th>
+          <th>{__("Title")}</th>
+          <th>{__("Start Date")}</th>
+          <th>{__("End Date")}</th>
+          <th>{__("Finish Date of Use")}</th>
+          <th>{__("Status")}</th>
+          <th>{__("Actions")}</th>
+        </tr>
+      </thead>
+      <tbody>{renderRow()}</tbody>
+    </Table>
+  );
+
+  return (
+    <Wrapper
+      header={
+        <Wrapper.Header title={__("Donate Campaign")} breadcrumb={breadcrumb} />
+      }
+      actionBar={
+        <Wrapper.ActionBar
+          left={<Title>{__("Donate Campaign")}</Title>}
+          right={actionBarRight()}
         />
-        <ModalTrigger
-          size={'lg'}
-          title="Add donate campaign"
-          trigger={trigger}
-          autoOpenKey="showProductModal"
-          content={this.modalContent}
+      }
+      mainHead={header}
+      content={
+        <DataWithLoader
+          data={content}
+          loading={loading}
+          count={totalCount}
+          emptyText="There is no data"
+          emptyImage="/images/actions/5.svg"
         />
-      </BarItems>
-    );
-  }
-
-  render() {
-    const { loading, isAllSelected } = this.props;
-    const breadcrumb = [
-      { title: __('Settings'), link: '/settings' },
-      { title: __('Donate Campaign') }
-    ];
-
-    const content = (
-      <Table hover={true}>
-        <thead>
-          <tr>
-            <th style={{ width: 60 }}>
-              <FormControl
-                checked={isAllSelected}
-                componentClass="checkbox"
-                onChange={this.onChange}
-              />
-            </th>
-            <th>{__('Title')}</th>
-            <th>{__('Start Date')}</th>
-            <th>{__('End Date')}</th>
-            <th>{__('Finish Date of Use')}</th>
-            <th>{__('Status')}</th>
-            <th>{__('Actions')}</th>
-          </tr>
-        </thead>
-        <tbody>{this.renderRow()}</tbody>
-      </Table>
-    );
-
-    return (
-      <Wrapper
-        header={
-          <Wrapper.Header
-            title={__('Donate Campaign')}
-            breadcrumb={breadcrumb}
-          />
-        }
-        actionBar={
-          <Wrapper.ActionBar
-            left={<Title>{__('Donate Campaign')}</Title>}
-            right={this.actionBarRight()}
-          />
-        }
-        content={
-          <DataWithLoader
-            data={content}
-            loading={loading}
-            emptyText="There is no data"
-            emptyImage="/images/actions/5.svg"
-          />
-        }
-        leftSidebar={<Sidebar />}
-        transparent={true}
-        hasBorder
-      />
-    );
-  }
-}
+      }
+      leftSidebar={<Sidebar />}
+      transparent={true}
+      hasBorder={true}
+      footer={<Pagination count={totalCount && totalCount} />}
+    />
+  );
+};
 
 export default DonateCampaigns;

@@ -1,14 +1,14 @@
-import { sendCommonMessage } from '../../../messageBroker';
-import { IContext } from '../../../connectionResolver';
+import { sendCommonMessage } from "../../../messageBroker";
+import { IContext } from "../../../connectionResolver";
 import {
   getCoreDomain,
   initFirebase,
   registerOnboardHistory,
-  resetConfigsCache,
-  sendRequest
-} from '../../utils';
-import { checkPermission } from '@erxes/api-utils/src/permissions';
-import { putCreateLog, putUpdateLog } from '../../logUtils';
+  resetConfigsCache
+} from "../../utils";
+import { checkPermission } from "@erxes/api-utils/src/permissions";
+import { putCreateLog, putUpdateLog } from "../../logUtils";
+import fetch from "node-fetch";
 
 const configMutations = {
   /**
@@ -27,7 +27,7 @@ const configMutations = {
       }
 
       const prevConfig = (await models.Configs.findOne({ code })) || {
-        code: '',
+        code: "",
         value: []
       };
 
@@ -36,49 +36,49 @@ const configMutations = {
 
       await models.Configs.createOrUpdateConfig(doc);
 
-      resetConfigsCache();
+      await resetConfigsCache();
 
       const updatedConfig = await models.Configs.getConfig(code);
 
-      if (['GOOGLE_APPLICATION_CREDENTIALS_JSON'].includes(code)) {
+      if (["GOOGLE_APPLICATION_CREDENTIALS_JSON"].includes(code)) {
         initFirebase(models);
       }
 
       if (
-        ['dealCurrency'].includes(code) &&
-        (prevConfig.value || '').toString() !==
-          (updatedConfig.value || '').toString()
+        ["dealCurrency"].includes(code) &&
+        (prevConfig.value || "").toString() !==
+          (updatedConfig.value || "").toString()
       ) {
-        registerOnboardHistory({ models, type: 'generalSettingsCreate', user });
+        registerOnboardHistory({ models, type: "generalSettingsCreate", user });
       }
 
       if (
         [
-          'UPLOAD_FILE_TYPES',
-          'WIDGETS_UPLOAD_FILE_TYPES',
-          'UPLOAD_SERVICE_TYPE',
-          'FILE_SYSTEM_PUBLIC'
+          "UPLOAD_FILE_TYPES",
+          "WIDGETS_UPLOAD_FILE_TYPES",
+          "UPLOAD_SERVICE_TYPE",
+          "FILE_SYSTEM_PUBLIC"
         ].includes(code) &&
-        (prevConfig.value || '').toString() !==
-          (updatedConfig.value || '').toString()
+        (prevConfig.value || "").toString() !==
+          (updatedConfig.value || "").toString()
       ) {
         registerOnboardHistory({
           models,
-          type: 'generalSettingsUploadCreate',
+          type: "generalSettingsUploadCreate",
           user
         });
       }
 
       if (
-        ['sex_choices', 'company_industry_types', 'social_links'].includes(
+        ["sex_choices", "company_industry_types", "social_links"].includes(
           code
         ) &&
-        (prevConfig.value || '').toString() !==
-          (updatedConfig.value || '').toString()
+        (prevConfig.value || "").toString() !==
+          (updatedConfig.value || "").toString()
       ) {
         registerOnboardHistory({
           models,
-          type: 'generelSettingsConstantsCreate',
+          type: "generelSettingsConstantsCreate",
           user
         });
       }
@@ -88,7 +88,7 @@ const configMutations = {
           models,
           subdomain,
           {
-            type: 'config',
+            type: "config",
             object: prevConfig,
             newData: updatedConfig,
             updatedDocument: updatedConfig,
@@ -101,7 +101,7 @@ const configMutations = {
           models,
           subdomain,
           {
-            type: 'config',
+            type: "config",
             description: updatedConfig.code,
             object: updatedConfig,
             newData: updatedConfig
@@ -117,11 +117,11 @@ const configMutations = {
     args: { token: string; hostname: string }
   ) {
     try {
-      return await sendRequest({
-        method: 'POST',
-        url: `${getCoreDomain()}/activate-installation`,
-        body: args
-      });
+      return await fetch(`${getCoreDomain()}/activate-installation`, {
+        method: "POST",
+        body: JSON.stringify(args),
+        headers: { "Content-Type": "application/json" }
+      }).then(res => res.json());
     } catch (e) {
       throw new Error(e.message);
     }
@@ -133,37 +133,37 @@ const configMutations = {
     { models, subdomain }: IContext
   ) {
     const prevAction = await models.InstallationLogs.findOne({
-      message: { $ne: 'done' }
+      message: { $ne: "done" }
     });
 
     if (prevAction) {
-      throw new Error('Installer is busy. Please wait ...');
+      throw new Error("Installer is busy. Please wait ...");
     }
 
     await sendCommonMessage({
       subdomain,
-      serviceName: '',
-      action: 'managePluginInstall',
+      serviceName: "",
+      action: "managePluginInstall",
       data: {
         ...args,
         subdomain
       }
     });
 
-    return { status: 'success' };
+    return { status: "success" };
   }
 };
 
-checkPermission(configMutations, 'configsUpdate', 'manageGeneralSettings');
+checkPermission(configMutations, "configsUpdate", "manageGeneralSettings");
 checkPermission(
   configMutations,
-  'configsActivateInstallation',
-  'manageGeneralSettings'
+  "configsActivateInstallation",
+  "manageGeneralSettings"
 );
 checkPermission(
   configMutations,
-  'configsManagePluginInstall',
-  'manageGeneralSettings'
+  "configsManagePluginInstall",
+  "manageGeneralSettings"
 );
 
 export default configMutations;

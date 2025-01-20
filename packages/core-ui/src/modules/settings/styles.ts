@@ -1,10 +1,11 @@
 import { colors, dimensions } from 'modules/common/styles';
-import { rgba } from 'modules/common/styles/color';
+
+import { ActionButtons } from '@erxes/ui-settings/src/styles';
 import { DateContainer } from 'modules/common/styles/main';
+import { lighten } from '@erxes/ui/src/styles/ecolor';
+import { rgba } from 'modules/common/styles/color';
 import styled from 'styled-components';
 import styledTS from 'styled-components-ts';
-import { ActionButtons } from '@erxes/ui-settings/src/styles';
-import { lighten } from '@erxes/ui/src/styles/ecolor';
 
 const coreSpace = `${dimensions.coreSpacing}px`;
 const unitSpace = `${dimensions.unitSpacing}px`;
@@ -81,9 +82,9 @@ const BackgroundSelector = styled.div`
   }
 `;
 
-const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
+const SidebarListItem = styledTS<{ $isActive: boolean }>(styled.li)`
   position: relative;
-  background: ${props => props.isActive && rgba(colors.colorPrimary, 0.2)};
+  background: ${props => props.$isActive && rgba(colors.colorPrimary, 0.2)};
   overflow: hidden;
   display: flex;
   justify-content: space-between;
@@ -92,8 +93,8 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
   a {
     white-space: normal;
     flex: 1;
-    color: ${props => props.isActive && colors.colorPrimary};
-    font-weight: ${props => (props.isActive ? 600 : 500)};
+    color: ${props => props.$isActive && colors.colorPrimary};
+    font-weight: ${props => (props.$isActive ? 600 : 500)};
 
     border-bottom: 1px solid ${colors.borderPrimary};
 
@@ -102,7 +103,7 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
 
     &:hover {
       background: none;
-      color: ${props => !props.isActive && lighten(colors.textPrimary, 40)};
+      color: ${props => !props.$isActive && lighten(colors.textPrimary, 40)};
     }
 
     &:focus {
@@ -121,7 +122,7 @@ const SidebarListItem = styledTS<{ isActive: boolean }>(styled.li)`
 
   &:hover {
     cursor: pointer;
-    background: ${props => !props.isActive && colors.bgLight};
+    background: ${props => !props.$isActive && colors.bgLight};
 
     ${ActionButtons} {
       width: 35px;
@@ -143,6 +144,15 @@ const MenuFooter = styled.footer`
   padding: 10px 20px;
 `;
 
+const ImageWrapper = styled.div`
+  width: 100%;
+
+  > img {
+    width: 100%;
+    margin-bottom: ${dimensions.coreSpacing}px;
+  }
+`;
+
 export {
   FlexItem,
   ModuleBox,
@@ -150,5 +160,6 @@ export {
   WidgetApperance,
   BackgroundSelector,
   SidebarListItem,
+  ImageWrapper,
   MenuFooter
 };

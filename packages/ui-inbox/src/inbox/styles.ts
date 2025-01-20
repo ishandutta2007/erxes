@@ -1,17 +1,18 @@
-import { PopoverButton } from '@erxes/ui/src/styles/eindex';
 import {
   RichEditorControlsRoot,
   RichEditorRoot
-} from '@erxes/ui/src/components/editor/styles';
+} from "@erxes/ui/src/components/editor/styles";
 import {
   PopoverFooter as RootFooter,
   PopoverList as RootList
-} from '@erxes/ui/src/components/filterableList/styles';
-import styled from 'styled-components';
-import styledTS from 'styled-components-ts';
-import { colors, dimensions } from '@erxes/ui/src/styles';
-import { darken, rgba } from '@erxes/ui/src/styles/ecolor';
-import { isEnabled } from '@erxes/ui/src/utils/core';
+} from "@erxes/ui/src/components/filterableList/styles";
+import { colors, dimensions } from "@erxes/ui/src/styles";
+import { darken, rgba } from "@erxes/ui/src/styles/ecolor";
+
+import { PopoverButton } from "@erxes/ui/src/styles/eindex";
+import { isEnabled } from "@erxes/ui/src/utils/core";
+import styled from "styled-components";
+import styledTS from "styled-components-ts";
 
 const ResponseSuggestions = styled.ul`
   position: absolute;
@@ -38,7 +39,7 @@ const ResponseSuggestionItem = styled.li`
   text-overflow: ellipsis;
 
   :hover {
-    background-color: ${colors.bgUnread};
+    background-color: ${rgba(colors.bgUnread, 0.5)};
   }
 
   strong {
@@ -47,15 +48,25 @@ const ResponseSuggestionItem = styled.li`
 `;
 
 const RespondBoxStyled = styledTS<{
-  isInactive?: boolean;
-  isInternal?: boolean;
+  $isInactive?: boolean;
+  $isInternal?: boolean;
 }>(styled.div)`
   border-top: 1px solid ${colors.borderPrimary};
   position: relative;
   transition: background 0.3s ease;
   background: ${props =>
-    props.isInternal ? colors.bgInternal : colors.colorWhite};
-  filter: ${props => props.isInactive && 'blur(2px)'};
+    props.$isInternal ? colors.bgInternal : colors.colorWhite};
+  filter: ${props => props.$isInactive && "blur(2px)"};
+  div[data-prose-mirror-editor]{
+    background: ${props =>
+      props.$isInternal ? colors.bgInternal : colors.colorWhite};
+    transition: background 0.3s ease;
+  }
+  .cm-editor{
+    background: ${props =>
+      props.$isInternal ? colors.bgInternal : colors.colorWhite};
+    transition: background 0.3s ease;
+  }
 `;
 
 const MailRespondBox = styled(RespondBoxStyled)`
@@ -65,7 +76,7 @@ const MailRespondBox = styled(RespondBoxStyled)`
 `;
 
 const ResponseTemplateStyled = styled.div`
-  display: inline-block;
+  display: flex;
 
   button {
     margin-right: 10px;
@@ -96,20 +107,19 @@ const EditorActions = styled.div`
       cursor: pointer;
       color: ${darken(colors.colorCoreGray, 30)};
     }
-    ${isEnabled('internalnotes') &&
-      `
-      &:first-of-type {
-        position: absolute;
-        left: 20px;
-      }
-    `}
+
+    &:first-of-type {
+      position: absolute;
+      left: 20px;
+      z-index: 11;
+    }
   }
 
   i {
     margin: 0;
   }
 
-  input[type='file'] {
+  input[type="file"] {
     display: none;
   }
 `;
@@ -138,7 +148,7 @@ const InlineHeaderSpan = styled.span`
 const PopoverHeader = styled.div`
   background-color: ${colors.bgLight};
 
-  input[type='text'] {
+  input[type="text"] {
     padding: 4px 8px 4px 20px;
   }
 `;
@@ -153,12 +163,17 @@ const PopoverList = styledTS<{ center?: boolean }>(styled(RootList))`
   padding: 0;
 
   li {
-    text-align: ${props => props.center && 'center'};
+    text-align: ${props => props.center && "center"};
 
     a {
       color: ${colors.colorCoreDarkGray};
     }
 
+    &.active{
+      color: rgb(55, 55, 55);
+      background: ${colors.bgLight};
+      outline: 0px;
+    }
   }
 `;
 
@@ -269,7 +284,7 @@ const MaskWrapper = styled.div`
 
 const Mask = styled.div`
   position: absolute;
-  padding: 20px;
+  padding: 10px;
   left: 0;
   bottom: 0;
   right: 0;
@@ -350,8 +365,29 @@ const SmallEditor = styled.div`
 `;
 
 const CallLabel = styledTS<{ type: string }>(styled.span)`
-  color: ${props => (props.type === 'answered' ? 'green' : 'red')};
+  color: ${props => (props.type === "answered" ? "green" : "red")};
 `;
+
+const ModalWrapper = styledTS<{ $show?: boolean }>(styled.div)`
+${({ $show }) =>
+  $show
+    ? `
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 300;
+
+      .cke_contents {
+        min-height: 450px !important;
+      }
+  `
+    : `z-index: 3;`}`;
 
 export {
   PopoverButton,
@@ -381,5 +417,6 @@ export {
   NoHeight,
   SmallEditor,
   CallLabel,
-  MailRespondBox
+  MailRespondBox,
+  ModalWrapper
 };

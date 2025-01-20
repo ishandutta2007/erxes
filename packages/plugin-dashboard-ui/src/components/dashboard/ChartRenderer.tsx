@@ -1,7 +1,3 @@
-import { useCubeQuery } from '@cubejs-client/react';
-import dayjs from 'dayjs';
-import React from 'react';
-import Spinner from '@erxes/ui/src/components/Spinner';
 import {
   Area,
   AreaChart,
@@ -16,13 +12,18 @@ import {
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis
-} from 'recharts';
-import { chartColors } from '../../constants';
-import Table from '@erxes/ui/src/components/table';
-import { ChartTable, EmptyContent, Number } from '../../styles';
-import { __ } from '@erxes/ui/src/utils';
-import numeral from 'numeral';
+  XAxis,
+} from "recharts";
+import { ChartTable, EmptyContent, Number } from "../../styles";
+
+import React from "react";
+import Spinner from "@erxes/ui/src/components/Spinner";
+import Table from "@erxes/ui/src/components/table";
+import { __ } from "@erxes/ui/src/utils";
+import { chartColors } from "../../constants";
+import dayjs from "dayjs";
+import numeral from "numeral";
+import { useCubeQuery } from "@cubejs-client/react";
 
 type Props = {
   query?: any;
@@ -32,19 +33,19 @@ type Props = {
   validatedQuery?: any;
 };
 
-const msConversion = millis => {
+const msConversion = (millis) => {
   let sec = Math.floor(millis / 1000) as any;
   const hrs = Math.floor(sec / 3600) as any;
   sec -= hrs * 3600;
   let min = Math.floor(sec / 60) as any;
   sec -= min * 60;
 
-  sec = '' + sec;
-  sec = ('00' + sec).substring(sec.length);
+  sec = "" + sec;
+  sec = ("00" + sec).substring(sec.length);
 
   if (hrs > 0) {
-    min = '' + min;
-    min = ('00' + min).substring(min.length);
+    min = "" + min;
+    min = ("00" + min).substring(min.length);
     return `${hrs}h:${min}m:${sec}s`;
   } else {
     return `${min}m:${sec}s`;
@@ -52,41 +53,41 @@ const msConversion = millis => {
 };
 
 const numberFormatter = (item, measureType) => {
-  if (measureType === 'Conversations Average response time') {
+  if (measureType === "Conversations Average response time") {
     return msConversion(item);
   }
 
-  if (measureType === 'Conversations Average close time') {
+  if (measureType === "Conversations Average close time") {
     return msConversion(item);
   }
 
-  return numeral(item).format('0,0');
+  return numeral(item).format("0,0");
 };
 
 const dateFormatter = (item, dateType) => {
   switch (dateType) {
-    case 'hour':
-      return dayjs(item).format('HH:mm');
-    case 'day':
-      return dayjs(item).format('MMM/DD');
-    case 'month':
-      return dayjs(item).format('YYYY/MMM');
-    case 'year':
-      return dayjs(item).format('YYYY');
-    case 'week':
-      return dayjs(item).format('MMM/DD');
+    case "hour":
+      return dayjs(item).format("HH:mm");
+    case "day":
+      return dayjs(item).format("MMM/DD");
+    case "month":
+      return dayjs(item).format("YYYY/MMM");
+    case "year":
+      return dayjs(item).format("YYYY");
+    case "week":
+      return dayjs(item).format("MMM/DD");
     default:
-      return dayjs(item).format('YYYY');
+      return dayjs(item).format("YYYY");
   }
 };
 
 const decamelize = (str, separator) => {
-  separator = typeof separator === 'undefined' ? ' ' : separator;
+  separator = typeof separator === "undefined" ? " " : separator;
 
   str = str
-    .replace(/([a-z\d])([A-Z])/g, '$1' + separator + '$2')
-    .replace(/([A-Z]+)([A-Z][a-z\d]+)/g, '$1' + separator + '$2')
-    .replace('-', ' ');
+    .replace(/([a-z\d])([A-Z])/g, "$1" + separator + "$2")
+    .replace(/([A-Z]+)([A-Z][a-z\d]+)/g, "$1" + separator + "$2")
+    .replace("-", " ");
 
   return str.toLowerCase();
 };
@@ -95,7 +96,7 @@ const xAxisFormatter = (item, dateType) => {
   if (dateType) {
     return dateFormatter(item, dateType);
   } else {
-    return decamelize(item.toString(), ' ');
+    return decamelize(item.toString(), " ");
   }
 };
 
@@ -104,7 +105,7 @@ const CartesianChart = ({
   children,
   ChartComponent,
   height,
-  dateType
+  dateType,
 }) => {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -112,7 +113,7 @@ const CartesianChart = ({
         <XAxis
           axisLine={false}
           tickLine={false}
-          tickFormatter={item => xAxisFormatter(item, dateType)}
+          tickFormatter={(item) => xAxisFormatter(item, dateType)}
           dataKey="x"
           minTickGap={20}
         />
@@ -121,7 +122,7 @@ const CartesianChart = ({
         {children}
         <Legend />
         <Tooltip
-          labelFormatter={item => xAxisFormatter(item, dateType)}
+          labelFormatter={(item) => xAxisFormatter(item, dateType)}
           formatter={(item, key) => numberFormatter(item, key)}
         />
       </ChartComponent>
@@ -220,25 +221,25 @@ const TypeToChartComponent = {
   table: ({ resultSet }) => {
     const columns = resultSet
       .tableColumns()
-      .map(tableColumns => tableColumns.title);
+      .map((tableColumns) => tableColumns.title);
 
     const rowValues = resultSet.tablePivot();
 
     const renderTableValue = (value, key) => {
-      if (key === 'Conversations.avgResponse') {
+      if (key === "Conversations.avgResponse") {
         return msConversion(value);
       }
 
-      if (key === 'Conversations.avgClose') {
+      if (key === "Conversations.avgClose") {
         return msConversion(value);
       }
 
-      if (typeof value === 'number') {
-        return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      if (typeof value === "number") {
+        return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       }
 
-      if (typeof value === 'string') {
-        return decamelize(value, ' ');
+      if (typeof value === "string") {
+        return decamelize(value, " ");
       }
 
       return value;
@@ -246,16 +247,16 @@ const TypeToChartComponent = {
 
     return (
       <ChartTable>
-        <Table whiteSpace="nowrap" hover={true} responsive={true}>
+        <Table $whiteSpace="nowrap" $hover={true} $responsive={true}>
           <thead>
             <tr>
-              {columns.map(column => {
+              {columns.map((column) => {
                 return <th key={Math.random()}>{column}</th>;
               })}
             </tr>
           </thead>
           <tbody>
-            {rowValues.map(rowValue => {
+            {rowValues.map((rowValue) => {
               return (
                 <tr key={Math.random()}>
                   {/* {columns.map(column => {
@@ -265,7 +266,7 @@ const TypeToChartComponent = {
                       </td>
                     );
                   })} */}
-                  {Object.keys(rowValue).map(key => {
+                  {Object.keys(rowValue).map((key) => {
                     return (
                       <td key={Math.random()}>
                         {renderTableValue(rowValue[key], key)}
@@ -284,40 +285,42 @@ const TypeToChartComponent = {
   number: ({ resultSet }) => {
     let result = 0;
 
-    resultSet.seriesNames().map(s => {
+    resultSet.seriesNames().map((s) => {
       result = resultSet.totalRow();
 
       result = result[s.key];
     });
 
     return <Number>{result}</Number>;
-  }
+  },
 };
 const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
-  .map(key => ({
-    [key]: React.memo(TypeToChartComponent[key])
+  .map((key) => ({
+    [key]: React.memo(TypeToChartComponent[key]),
   }))
   .reduce((a, b) => ({ ...a, ...b }));
 
-const renderChart = Component => ({ resultSet, dateType, error, height }) => {
-  return (
-    (resultSet && (
-      <Component height={height} resultSet={resultSet} dateType={dateType} />
-    )) ||
-    (error && error.toString()) || (
-      <EmptyContent>
-        {' '}
-        <p>
-          <b> {error.toString()}</b>.
-        </p>
-      </EmptyContent>
-    )
-  );
-};
+const renderChart =
+  (Component) =>
+  ({ resultSet, dateType, error, height }) => {
+    return (
+      (resultSet && (
+        <Component height={height} resultSet={resultSet} dateType={dateType} />
+      )) ||
+      (error && error.toString()) || (
+        <EmptyContent>
+          {" "}
+          <p>
+            <b> {error.toString()}</b>.
+          </p>
+        </EmptyContent>
+      )
+    );
+  };
 
 const ChartRenderer = (props: Props) => {
   const { query, chartType, chartHeight, filters, validatedQuery } = props;
-  const component = TypeToMemoChartComponent[chartType || 'table'];
+  const component = TypeToMemoChartComponent[chartType || "table"];
   let finalQuery = query;
 
   if (filters && filters.length > 0) {
@@ -334,7 +337,7 @@ const ChartRenderer = (props: Props) => {
 
   let result = 0;
 
-  let dateType = '';
+  let dateType = "";
 
   if (renderProps.resultSet) {
     const { timeDimensions, measures } = query;
@@ -343,7 +346,7 @@ const ChartRenderer = (props: Props) => {
       dateType = timeDimensions[0].granularity;
     }
 
-    resultSet.seriesNames().map(s => {
+    resultSet.seriesNames().map((s) => {
       result = resultSet.totalRow();
 
       result = result[s.key];
@@ -353,7 +356,7 @@ const ChartRenderer = (props: Props) => {
       return (
         <EmptyContent>
           <p>
-            <b>{__('No data')}</b>
+            <b>{__("No data")}</b>
           </p>
         </EmptyContent>
       );
@@ -362,7 +365,7 @@ const ChartRenderer = (props: Props) => {
     return renderChart(component)({
       height: chartHeight,
       ...renderProps,
-      dateType
+      dateType,
     });
   }
 

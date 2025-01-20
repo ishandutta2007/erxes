@@ -2,15 +2,16 @@ import * as AWS from 'aws-sdk';
 import * as nodemailer from 'nodemailer';
 
 import EditorAttributeUtil from '@erxes/api-utils/src/editorAttributeUtils';
-
-import { SES_DELIVERY_STATUSES } from './constants';
-import { debugBase, debugError } from './debuggers';
-import messageBroker, { sendContactsMessage } from './messageBroker';
-import { ISESConfig } from './models/Configs';
+import { getEnv } from '@erxes/api-utils/src/core';
+import { debugError, debugInfo } from '@erxes/api-utils/src/debuggers';
 import { getServices } from '@erxes/api-utils/src/serviceDiscovery';
+
+import { IModels } from './connectionResolver';
+import { SES_DELIVERY_STATUSES } from './constants';
+import { sendCoreMessage } from './messageBroker';
+import { ISESConfig } from './models/Configs';
 import { getApi } from './trackers/engageTracker';
 import { ICampaign, ICustomer } from './types';
-import { IModels } from './connectionResolver';
 
 export const isUsingElk = () => {
   const ELK_SYNCER = getEnv({ name: 'ELK_SYNCER', defaultValue: 'true' });
@@ -21,11 +22,16 @@ export const isUsingElk = () => {
 export const createTransporter = async (models: IModels) => {
   const config: ISESConfig = await models.Configs.getSESConfigs();
 
-  AWS.config.update(config);
+  try {
+    AWS.config.update(config);
 
-  return nodemailer.createTransport({
-    SES: new AWS.SES({ apiVersion: '2010-12-01' })
-  });
+    return nodemailer.createTransport({
+      SES: new AWS.SES({ apiVersion: '2010-12-01' }),
+    });
+  } catch (error) {
+    debugError(`Error during create transporter: ${error.message}`);
+    throw new Error(error.message);
+  }
 };
 
 export interface IUser {
@@ -39,38 +45,38 @@ interface ICustomerAnalyzeParams {
   engageMessageId: string;
 }
 
-export const getEnv = ({
-  name,
-  defaultValue
-}: {
-  name: string;
-  defaultValue?: string;
-}): string => {
-  const value = process.env[name];
+// export const getEnv = ({
+//   name,
+//   defaultValue
+// }: {
+//   name: string;
+//   defaultValue?: string;
+// }): string => {
+//   const value = process.env[name];
 
-  if (!value && typeof defaultValue !== 'undefined') {
-    return defaultValue;
-  }
+//   if (!value && typeof defaultValue !== "undefined") {
+//     return defaultValue;
+//   }
 
-  if (!value) {
-    debugBase(`Missing environment variable configuration for ${name}`);
-  }
+//   if (!value) {
+//     debugInfo(`Missing environment variable configuration for ${name}`);
+//   }
 
-  return value || '';
-};
+//   return value || "";
+// };
 
 export const subscribeEngage = (models: IModels) => {
   return new Promise(async (resolve, reject) => {
     const snsApi = await getApi(models, 'sns');
     const sesApi = await getApi(models, 'ses');
-    const configSet = await getConfig(models, 'configSet', 'erxes');
+    const configSet = await getValueAsString(models, 'configSet', 'AWS_SES_CONFIG_SET', 'erxes');
 
     const DOMAIN = getEnv({ name: 'DOMAIN' });
 
     const topicArn = await snsApi
       .createTopic({ Name: configSet })
       .promise()
-      .catch(e => {
+      .catch((e) => {
         debugError(e.message);
 
         return reject(e.message);
@@ -84,26 +90,25 @@ export const subscribeEngage = (models: IModels) => {
       .subscribe({
         TopicArn: topicArn.TopicArn,
         Protocol: 'https',
-        Endpoint: `${DOMAIN}/gateway/pl:engages/service/engage/tracker`
+        Endpoint: `${DOMAIN}/gateway/pl:engages/service/engage/tracker`,
       })
       .promise()
-      .then(response => {
-        debugBase(response);
+      .then((response) => {
+        debugInfo(response);
       })
-      .catch(e => {
+      .catch((e) => {
         debugError(e.message);
-
         return reject(e.message);
       });
 
     await sesApi
       .createConfigurationSet({
         ConfigurationSet: {
-          Name: configSet
-        }
+          Name: configSet,
+        },
       })
       .promise()
-      .catch(e => {
+      .catch((e) => {
         debugError(e.message);
 
         if (e.message.includes('already exists')) {
@@ -125,17 +130,17 @@ export const subscribeEngage = (models: IModels) => {
             'delivery',
             'open',
             'click',
-            'renderingFailure'
+            'renderingFailure',
           ],
           Name: configSet,
           Enabled: true,
           SNSDestination: {
-            TopicARN: topicArn.TopicArn
-          }
-        }
+            TopicARN: topicArn.TopicArn,
+          },
+        },
       })
       .promise()
-      .catch(e => {
+      .catch((e) => {
         debugError(e.message);
 
         if (e.message.includes('already exists')) {
@@ -149,7 +154,18 @@ export const subscribeEngage = (models: IModels) => {
   });
 };
 
-export const getValueAsString = async (models: IModels, name: string) => {
+export const getValueAsString = async (
+  models: IModels,
+  name: string,
+  envKey: string,
+  defaultValue?: string
+) => {
+  const VERSION = getEnv({ name: 'VERSION' });
+
+  if (VERSION && VERSION === 'saas') {
+    return getEnv({ name: envKey, defaultValue });
+  }
+
   const entry = await models.Configs.getConfig(name);
 
   if (entry.value) {
@@ -200,7 +216,7 @@ export const cleanIgnoredCustomers = async (
   models: IModels,
   { customers, engageMessageId }: ICustomerAnalyzeParams
 ) => {
-  const customerIds = customers.map(c => c._id);
+  const customerIds = customers.map((c) => c._id);
   const ignoredCustomerIds: string[] = [];
 
   const allowedEmailSkipLimit = await getConfig(
@@ -224,14 +240,14 @@ export const cleanIgnoredCustomers = async (
             SES_DELIVERY_STATUSES.CLICK,
             SES_DELIVERY_STATUSES.RENDERING_FAILURE,
             SES_DELIVERY_STATUSES.REJECT,
-            SES_DELIVERY_STATUSES.COMPLAINT
-          ]
-        }
-      }
+            SES_DELIVERY_STATUSES.COMPLAINT,
+          ],
+        },
+      },
     },
     {
-      $group: { _id: '$customerId', count: { $sum: 1 } }
-    }
+      $group: { _id: '$customerId', count: { $sum: 1 } },
+    },
   ]);
 
   for (const delivery of deliveries) {
@@ -241,18 +257,18 @@ export const cleanIgnoredCustomers = async (
   }
 
   if (ignoredCustomerIds.length > 0) {
-    sendContactsMessage({
+    sendCoreMessage({
       subdomain,
       isRPC: false,
       action: 'customers.setUnsubscribed',
-      data: { customerIds: ignoredCustomerIds }
+      data: { customerIds: ignoredCustomerIds },
     });
 
     return {
       customers: customers.filter(
-        c => ignoredCustomerIds.indexOf(c._id) === -1
+        (c) => ignoredCustomerIds.indexOf(c._id) === -1
       ),
-      ignoredCustomerIds
+      ignoredCustomerIds,
     };
   }
 
@@ -263,15 +279,15 @@ const getAvgCondition = (fieldName: string) => ({
   $cond: [
     { $gt: [`$${fieldName}`, 0] },
     { $divide: [{ $multiply: [`$${fieldName}`, 100] }, '$total'] },
-    0
-  ]
+    0,
+  ],
 });
 
 // Prepares average engage stats of email delivery stats
 export const prepareAvgStats = (models: IModels) => {
   return models.Stats.aggregate([
     {
-      $match: { total: { $gt: 0 } }
+      $match: { total: { $gt: 0 } },
     },
     {
       $project: {
@@ -284,8 +300,8 @@ export const prepareAvgStats = (models: IModels) => {
         pctOpen: getAvgCondition('open'),
         pctReject: getAvgCondition('reject'),
         pctRenderingFailure: getAvgCondition('renderingfailure'),
-        pctSend: getAvgCondition('send')
-      }
+        pctSend: getAvgCondition('send'),
+      },
     },
     {
       $group: {
@@ -297,9 +313,9 @@ export const prepareAvgStats = (models: IModels) => {
         avgOpenPercent: { $avg: '$pctOpen' },
         avgRejectPercent: { $avg: '$pctReject' },
         avgRenderingFailurePercent: { $avg: '$pctRenderingFailure' },
-        avgSendPercent: { $avg: '$pctSend' }
-      }
-    }
+        avgSendPercent: { $avg: '$pctSend' },
+      },
+    },
   ]);
 };
 
@@ -323,12 +339,9 @@ export const setCampaignCount = async (models: IModels, data: ICampaign) => {
   const { _id, validCustomersCount = 0 } = data;
 
   const campaign = await models.EngageMessages.findOne({ _id });
-
   if (campaign) {
-    const {
-      validCustomersCount: currentValid = 0,
-      totalCustomersCount = 0
-    } = campaign;
+    const { validCustomersCount: currentValid = 0, totalCustomersCount = 0 } =
+      campaign;
     const validSum = currentValid + validCustomersCount;
 
     await models.EngageMessages.updateOne(
@@ -338,9 +351,9 @@ export const setCampaignCount = async (models: IModels, data: ICampaign) => {
           // valid count must never exceed total count
           validCustomersCount:
             validSum > totalCustomersCount ? totalCustomersCount : validSum,
-          lastRunAt: new Date()
+          lastRunAt: new Date(),
         },
-        $inc: { runCount: 1 }
+        $inc: { runCount: 1 },
       }
     );
   }
@@ -348,9 +361,10 @@ export const setCampaignCount = async (models: IModels, data: ICampaign) => {
 
 export const getEditorAttributeUtil = async (subdomain: string) => {
   const services = await getServices();
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
+
   const editor = await new EditorAttributeUtil(
-    messageBroker(),
-    `${process.env.DOMAIN}/gateway/pl:core`,
+    `${DOMAIN}/gateway/pl:core`,
     services,
     subdomain
   );

@@ -1,16 +1,15 @@
 import { IContext, IModels } from '../../../connectionResolver';
 import * as _ from 'underscore';
-import {
-  actionsMap,
-  IActionsMap,
-  IModuleMap,
-  modulesMap
-} from '../../permissions/utils';
+
 import { paginate } from '../../utils';
 import {
   checkPermission,
   requireLogin
 } from '@erxes/api-utils/src/permissions';
+import {
+  getPermissionActions,
+  getPermissionModules
+} from '../../permissions/utils';
 
 interface IListArgs {
   page?: number;
@@ -89,28 +88,12 @@ const permissionQueries = {
     return paginate(models.Permissions.find(filter), args);
   },
 
-  permissionModules() {
-    const modules: IModuleMap[] = [];
-
-    for (const m of _.pairs(modulesMap)) {
-      modules.push({ name: m[0], description: m[1].description });
-    }
-
-    return modules;
+  async permissionModules() {
+    return getPermissionModules();
   },
 
-  permissionActions() {
-    const actions: IActionsMap[] = [];
-
-    for (const a of _.pairs(actionsMap)) {
-      actions.push({
-        name: a[0],
-        description: a[1].description,
-        module: a[1].module
-      });
-    }
-
-    return actions;
+  async permissionActions() {
+    return getPermissionActions();
   },
 
   /**
@@ -132,7 +115,7 @@ const usersGroupQueries = {
    * @param {Object} args - Search params
    * @return {Promise} sorted and filtered users objects
    */
-  usersGroups(_root, args: IListArgs, { models }: IContext) {
+  async usersGroups(_root, args: IListArgs, { models }: IContext) {
     const users = paginate(models.UsersGroups.find({}), {
       ...args,
       perPage: args.perPage || 50
@@ -145,7 +128,7 @@ const usersGroupQueries = {
    * Get all groups list. We will use it in pager
    * @return {Promise} total count
    */
-  usersGroupsTotalCount(_root, _args, { models }: IContext) {
+  async usersGroupsTotalCount(_root, _args, { models }: IContext) {
     return models.UsersGroups.find({}).countDocuments();
   }
 };

@@ -4,30 +4,35 @@ import { Step, Steps } from '@erxes/ui/src/components/step';
 import AccociateForm from '../containers/AccociateForm';
 import Details from './Details';
 import FileUpload from './FileUpload';
-import { IImportHistoryContentType } from '../../types';
+import { IColumnWithChosenField, IImportCreate, IContentType } from '../../types';
 import MapColumn from '../containers/MapColumn';
 import React from 'react';
 import { StepButton } from '@erxes/ui/src/components/step/styles';
 import TypeForm from '../containers/TypeForm';
 import Wrapper from 'modules/layout/components/Wrapper';
 import { __ } from 'modules/common/utils';
+import { IAttachment } from '@erxes/ui/src/types';
 
 type Props = {
   contentType: string;
-  addImportHistory: (doc: any) => void;
+  addImportHistory: (doc: IImportCreate, columnAllSelected: boolean) => void;
 };
 
 type State = {
-  attachments: any;
+  attachments: IAttachment;
 
-  columnWithChosenField: any;
+  columnWithChosenField: IColumnWithChosenField;
   importName: string;
   disclaimer: boolean;
   type: string;
-  contentTypes: IImportHistoryContentType[];
+  contentType: string;
+  contentTypes: IContentType[];
 
   associatedField: string;
   associatedContentType: string;
+
+  columnWithSelected: number;
+  columnNumber: number;
 };
 
 class Form extends React.Component<Props, State> {
@@ -35,14 +40,17 @@ class Form extends React.Component<Props, State> {
     super(props);
 
     this.state = {
-      attachments: {},
+      attachments: {} as IAttachment,
       columnWithChosenField: {},
       importName: '',
       disclaimer: false,
       type: 'single',
+      contentType: props.contentType || '',
       contentTypes: [],
       associatedField: '',
-      associatedContentType: ''
+      associatedContentType: '',
+      columnNumber: 0,
+      columnWithSelected: 0,
     };
   }
 
@@ -58,7 +66,7 @@ class Form extends React.Component<Props, State> {
     this.setState({ attachments: temp });
   };
 
-  onChangeColumn = (column, value, contentType) => {
+  onChangeColumn = (column, value, contentType, columns) => {
     const { columnWithChosenField } = this.state;
 
     const temp = columnWithChosenField[contentType] || {};
@@ -71,36 +79,42 @@ class Form extends React.Component<Props, State> {
     temp2[contentType] = temp;
 
     this.setState({ columnWithChosenField: temp2 });
+    this.setState({ columnWithSelected: Object.keys(temp).length });
+    this.setState({ columnNumber: Object.keys(columns).length });
   };
 
-  onChangeImportName = value => {
+  onChangeImportName = (value) => {
     this.setState({ importName: value });
   };
 
-  onChangeDisclaimer = value => {
+  onChangecolumnNumber = (value) => {
+    this.setState({ columnNumber: value });
+  };
+
+  onChangeDisclaimer = (value) => {
     this.setState({ disclaimer: value });
   };
 
-  onChangeType = value => {
+  onChangeType = (value) => {
     this.setState({ type: value, contentTypes: [] });
   };
 
-  onChangeAssociateHeader = value => {
+  onChangeAssociateHeader = (value) => {
     this.setState({ associatedField: value });
   };
 
-  onChangeAssociateContentType = value => {
+  onChangeAssociateContentType = (value) => {
     this.setState({ associatedContentType: value });
   };
 
-  onChangeContentType = (contentType: IImportHistoryContentType) => {
+  onChangeContentType = (contentType: IContentType) => {
     const { type, contentTypes } = this.state;
 
     if (type === 'single') {
       return this.setState({ contentTypes: [contentType] });
     }
 
-    let temp: IImportHistoryContentType[] = [];
+    let temp: IContentType[] = [];
 
     if (contentTypes.length === 2) {
       temp = [...contentTypes];
@@ -126,10 +140,12 @@ class Form extends React.Component<Props, State> {
       attachments,
       contentTypes,
       associatedField,
-      associatedContentType
+      associatedContentType,
+      columnNumber,
+      columnWithSelected,
     } = this.state;
 
-    const files = [] as any;
+    const files = [] as IAttachment[];
 
     for (const contentType of contentTypes) {
       if (attachments[contentType.contentType]) {
@@ -145,10 +161,14 @@ class Form extends React.Component<Props, State> {
       files: attachments,
       columnsConfig: columnWithChosenField,
       associatedField,
-      associatedContentType
+      associatedContentType,
     };
 
-    return this.props.addImportHistory(doc);
+    if (columnWithSelected === columnNumber) {
+      return this.props.addImportHistory(doc, true);
+    }
+
+    return this.props.addImportHistory(doc, false);
   };
 
   renderImportButton = () => {
@@ -195,7 +215,7 @@ class Form extends React.Component<Props, State> {
   renderMapColumn = () => {
     const { contentTypes, attachments, columnWithChosenField } = this.state;
 
-    const result = [] as any;
+    const result = [] as React.ReactNode[];
 
     for (const contentType of contentTypes) {
       if (attachments[contentType.contentType]) {
@@ -209,7 +229,7 @@ class Form extends React.Component<Props, State> {
               columnWithChosenField={columnWithChosenField}
               onChangeColumn={this.onChangeColumn}
             />
-          </Step>
+          </Step>,
         );
       }
     }
@@ -218,14 +238,15 @@ class Form extends React.Component<Props, State> {
   };
 
   render() {
-    const { importName, disclaimer, type, contentTypes } = this.state;
+    const { importName, disclaimer, type, contentType, contentTypes } =
+      this.state;
 
     const title = __('Import');
 
     const breadcrumb = [
       { title: __('Settings'), link: '/settings' },
       { title: __('Import & Export'), link: '/settings/importHistories' },
-      { title }
+      { title },
     ];
 
     const content = (
@@ -236,6 +257,7 @@ class Form extends React.Component<Props, State> {
               <TypeForm
                 type={type}
                 onChangeContentType={this.onChangeContentType}
+                contentType={contentType}
                 contentTypes={contentTypes}
               />
             </Step>

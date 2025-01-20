@@ -1,13 +1,13 @@
-import { ActionTop, Column, Columns, Footer, Title } from '../styles/chooser';
-import { CenterContent, ModalFooter } from '../styles/main';
+import { ActionTop, Column, Columns, Footer, Title } from "../styles/chooser";
+import { CenterContent, ModalFooter } from "../styles/main";
 
-import Button from './Button';
-import EmptyState from './EmptyState';
-import FormControl from './form/Control';
-import Icon from './Icon';
-import ModalTrigger from './ModalTrigger';
-import React from 'react';
-import { __ } from '../utils/core';
+import Button from "./Button";
+import EmptyState from "./EmptyState";
+import FormControl from "./form/Control";
+import Icon from "./Icon";
+import ModalTrigger from "./ModalTrigger";
+import React from "react";
+import { __ } from "../utils/core";
 
 export type CommonProps = {
   data: any;
@@ -23,9 +23,12 @@ export type CommonProps = {
   resetAssociatedItem?: () => void;
   closeModal: () => void;
   onSelect: (datas: any[]) => void;
+  loading?: boolean;
+  onLoadMore?: () => void;
   renderExtra?: () => any;
   handleExtra?: (data: any) => void;
-  modalSize?: 'sm' | 'lg' | 'xl';
+  extraChecker?: (data: any) => any;
+  modalSize?: "sm" | "lg" | "xl";
 };
 
 type Props = {
@@ -49,13 +52,17 @@ class CommonChooser extends React.Component<Props, State> {
     this.state = {
       datas,
       loadmore: true,
-      searchValue: ''
+      searchValue: "",
     };
   }
 
   onSelect = () => {
-    this.props.onSelect(this.state.datas);
-    this.props.closeModal();
+    if (this.props.extraChecker) {
+      return this.props.extraChecker(this.state.datas);
+    } else {
+      this.props.onSelect(this.state.datas);
+      this.props.closeModal();
+    }
   };
 
   componentWillUnmount() {
@@ -81,18 +88,18 @@ class CommonChooser extends React.Component<Props, State> {
   handleChange = (type, data) => {
     const { datas } = this.state;
 
-    if (type === 'plus-1') {
-      if (this.props.limit && this.props.limit === datas.length) {
+    if (type === "plus-1") {
+      if (this.props.limit && this.props.limit <= datas.length) {
         return;
       }
 
       this.setState({ datas: [...datas, data] });
     } else {
-      this.setState({ datas: datas.filter(item => item !== data) });
+      this.setState({ datas: datas.filter((item) => item !== data) });
     }
   };
 
-  search = e => {
+  search = (e) => {
     if (this.timer) {
       clearTimeout(this.timer);
     }
@@ -107,16 +114,21 @@ class CommonChooser extends React.Component<Props, State> {
   };
 
   loadMore = () => {
+    const { onLoadMore, search } = this.props;
+
     this.setState({ loadmore: false });
-    this.props.search(this.state.searchValue, true);
+    search(this.state.searchValue, true);
+    // tslint:disable-next-line:no-unused-expression
+    onLoadMore && onLoadMore();
   };
 
   renderRow(data, icon) {
-    if (icon === 'plus-1' && this.state.datas.some(e => e._id === data._id)) {
+    if (icon === "plus-1" && this.state.datas.some((e) => e._id === data._id)) {
       return null;
     }
 
     const onClick = () => {
+      // tslint:disable-next-line:no-unused-expression
       this.props.handleExtra && this.props.handleExtra(data);
       this.handleChange(icon, data);
     };
@@ -133,7 +145,7 @@ class CommonChooser extends React.Component<Props, State> {
     if (selectedDatas.length) {
       return (
         <ul>
-          {selectedDatas.map(data => this.renderRow(data, 'times'))}
+          {selectedDatas.map((data) => this.renderRow(data, "times"))}
           {this.props.renderExtra && this.props.renderExtra()}
         </ul>
       );
@@ -143,7 +155,7 @@ class CommonChooser extends React.Component<Props, State> {
   }
 
   content() {
-    const { datas } = this.props;
+    const { datas, loading } = this.props;
 
     if (datas.length === 0) {
       return <EmptyState text="No matching items found" icon="list-ul" />;
@@ -151,7 +163,7 @@ class CommonChooser extends React.Component<Props, State> {
 
     return (
       <ul>
-        {datas.map(dataItem => this.renderRow(dataItem, 'plus-1'))}
+        {datas.map((dataItem) => this.renderRow(dataItem, "plus-1"))}
         {this.state.loadmore && (
           <CenterContent>
             <Button
@@ -160,7 +172,7 @@ class CommonChooser extends React.Component<Props, State> {
               onClick={this.loadMore}
               icon="angle-double-down"
             >
-              Load More
+              {loading ? "Loading" : "Load More"}
             </Button>
           </CenterContent>
         )}
@@ -194,14 +206,14 @@ class CommonChooser extends React.Component<Props, State> {
           <Column>
             <ActionTop>
               <FormControl
-                placeholder={__('Type to search')}
+                placeholder={__("Type to search")}
                 onChange={this.search}
               />
               {this.renderSubFilter()}
             </ActionTop>
             {this.content()}
           </Column>
-          <Column lastChild={true}>
+          <Column $lastChild={true}>
             <Title>
               {data.name}
               &apos;s {title}
@@ -216,7 +228,7 @@ class CommonChooser extends React.Component<Props, State> {
               <ModalTrigger
                 title={`New ${title}`}
                 trigger={addTrigger}
-                size={modalSize || 'lg'}
+                size={modalSize || "lg"}
                 content={renderForm}
               />
             )}

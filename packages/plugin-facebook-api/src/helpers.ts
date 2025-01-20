@@ -6,9 +6,11 @@ import {
   subscribePage,
   unsubscribePage
 } from './utils';
-import { getEnv, resetConfigsCache, sendRequest } from './commonUtils';
+import { getEnv, resetConfigsCache } from './commonUtils';
+import fetch from 'node-fetch';
 
 export const removeIntegration = async (
+  subdomain: string,
   models: IModels,
   integrationErxesApiId: string
 ): Promise<string> => {
@@ -47,8 +49,7 @@ export const removeIntegration = async (
         );
       }
 
-      await models.Posts.deleteMany({ recipientId: pageId });
-      await models.Comments.deleteMany({ recipientId: pageId });
+      await models.PostConversations.deleteMany({ recipientId: pageId });
 
       try {
         await unsubscribePage(pageId, pageTokenResponse);
@@ -61,9 +62,8 @@ export const removeIntegration = async (
 
     integrationRemoveBy = { fbPageIds: integration.facebookPageIds };
 
-    const conversationIds = await models.Conversations.find(selector).distinct(
-      '_id'
-    );
+    const conversationIds =
+      await models.Conversations.find(selector).distinct('_id');
 
     await models.Customers.deleteMany({
       integrationId: integrationErxesApiId
@@ -79,17 +79,18 @@ export const removeIntegration = async (
 
   // Remove from core =========
   const ENDPOINT_URL = getEnv({ name: 'ENDPOINT_URL' });
-  const DOMAIN = getEnv({ name: 'DOMAIN' });
-
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
   if (ENDPOINT_URL) {
     // send domain to core endpoints
     try {
-      await sendRequest({
-        url: `${ENDPOINT_URL}/remove-endpoint`,
+      await fetch(`${ENDPOINT_URL}/remove-endpoint`, {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           domain: DOMAIN,
           ...integrationRemoveBy
+        }),
+        headers: {
+          'Content-Type': 'application/json'
         }
       });
     } catch (e) {
@@ -103,6 +104,7 @@ export const removeIntegration = async (
 };
 
 export const removeAccount = async (
+  subdomain,
   models: IModels,
   _id: string
 ): Promise<{ erxesApiIds: string | string[] } | Error> => {
@@ -122,6 +124,7 @@ export const removeAccount = async (
     for (const integration of integrations) {
       try {
         const response = await removeIntegration(
+          subdomain,
           models,
           integration.erxesApiId
         );
@@ -138,6 +141,7 @@ export const removeAccount = async (
 };
 
 export const repairIntegrations = async (
+  subdomain: string,
   models: IModels,
   integrationId: string
 ): Promise<true | Error> => {
@@ -154,7 +158,7 @@ export const repairIntegrations = async (
 
     await subscribePage(pageId, pageTokens[pageId]);
 
-    await models.Integrations.remove({
+    await models.Integrations.deleteMany({
       erxesApiId: { $ne: integrationId },
       facebookPageIds: pageId,
       kind: integration.kind
@@ -167,19 +171,19 @@ export const repairIntegrations = async (
   );
 
   const ENDPOINT_URL = getEnv({ name: 'ENDPOINT_URL' });
-  const DOMAIN = getEnv({ name: 'DOMAIN' });
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
 
   if (ENDPOINT_URL) {
     // send domain to core endpoints
     try {
-      await sendRequest({
-        url: `${ENDPOINT_URL}/update-endpoint`,
+      await fetch(`${ENDPOINT_URL}/update-endpoint`, {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           domain: `${DOMAIN}/gateway/pl:facebook`,
           facebookPageIds: integration.facebookPageIds,
           fbPageIds: integration.facebookPageIds
-        }
+        }),
+        headers: { 'Content-Type': 'application/json' }
       });
     } catch (e) {
       throw e;
@@ -202,7 +206,7 @@ export const updateConfigs = async (
 ): Promise<void> => {
   await models.Configs.updateConfigs(configsMap);
 
-  resetConfigsCache();
+  await resetConfigsCache();
 };
 
 export const routeErrorHandling = (fn, callback?: any) => {
@@ -231,11 +235,11 @@ export const facebookGetCustomerPosts = async (
     return [];
   }
 
-  const result = await models.Comments.aggregate([
+  const result = await models.CommentConversation.aggregate([
     { $match: { senderId: customer.userId } },
     {
       $lookup: {
-        from: 'posts_facebooks',
+        from: 'posts_conversations_facebooks',
         localField: 'postId',
         foreignField: 'postId',
         as: 'post'
@@ -257,15 +261,16 @@ export const facebookGetCustomerPosts = async (
     }
   ]);
 
-  const conversationIds = result.map(conv => conv.conversationId);
+  const conversationIds = result.map((conv) => conv.conversationId);
 
   return conversationIds;
 };
 
 export const facebookCreateIntegration = async (
+  subdomain: string,
   models: IModels,
   { accountId, integrationId, data, kind }
-) => {
+): Promise<{ status: 'success' }> => {
   const facebookPageIds = JSON.parse(data).pageIds;
 
   const account = await models.Accounts.getAccount({ _id: accountId });
@@ -278,7 +283,7 @@ export const facebookCreateIntegration = async (
   });
 
   const ENDPOINT_URL = getEnv({ name: 'ENDPOINT_URL' });
-  const DOMAIN = getEnv({ name: 'DOMAIN' });
+  const DOMAIN = getEnv({ name: 'DOMAIN', subdomain });
 
   let domain = `${DOMAIN}/gateway/pl:facebook`;
 
@@ -289,14 +294,14 @@ export const facebookCreateIntegration = async (
   if (ENDPOINT_URL) {
     // send domain to core endpoints
     try {
-      await sendRequest({
-        url: `${ENDPOINT_URL}/register-endpoint`,
+      await fetch(`${ENDPOINT_URL}/register-endpoint`, {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           domain,
           facebookPageIds,
           fbPageIds: facebookPageIds
-        }
+        }),
+        headers: { 'Content-Type': 'application/json' }
       });
     } catch (e) {
       await models.Integrations.deleteOne({ _id: integration._id });
@@ -323,8 +328,9 @@ export const facebookCreateIntegration = async (
       }
     } catch (e) {
       debugError(
-        `Error ocurred while trying to get page access token with ${e.message ||
-          e}`
+        `Error ocurred while trying to get page access token with ${
+          e.message || e
+        }`
       );
 
       throw e;

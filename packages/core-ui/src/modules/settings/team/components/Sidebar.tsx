@@ -1,23 +1,29 @@
-import BranchList from '../containers/branch/List';
-import DepartmentList from '../containers/department/List';
-import React from 'react';
-import Sidebar from '@erxes/ui/src/layout/components/Sidebar';
-import UnitList from '../containers/unit/List';
-import { loadDynamicComponent } from '@erxes/ui/src/utils/core';
+import BlockList from "../containers/common/BlockList";
+import React from "react";
+import Sidebar from "@erxes/ui/src/layout/components/Sidebar";
+import SegmentsFilter from "@erxes/ui-segments/src/components/filter/SegmentsFilter";
 
 export default function LeftSidebar({
-  loadingMainQuery
+  loadingMainQuery,
+  queryParams
 }: {
   loadingMainQuery: boolean;
+  queryParams: Record<string, string>;
 }) {
   return (
-    <Sidebar hasBorder>
-      <BranchList />
-      <DepartmentList />
-      <UnitList />
-      {loadDynamicComponent('teamMemberSidebarComp', {
-        loadingMainQuery
-      })}
+    <Sidebar hasBorder={true}>
+      <BlockList
+        queryType="branches"
+        title="Branch"
+        queryParams={queryParams}
+      />
+      <BlockList
+        queryType="departments"
+        title="Department"
+        queryParams={queryParams}
+      />
+      <BlockList queryType="units" title="Unit" queryParams={queryParams} />
+      <SegmentsFilter loadingMainQuery={loadingMainQuery} />
     </Sidebar>
   );
 }

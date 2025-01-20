@@ -6,6 +6,7 @@ import React from 'react';
 import { graphql } from '@apollo/client/react/hoc';
 import TypeForm from '../components/TypeForm';
 import { queries } from '../../common/graphql';
+import { HistoryGetTypesQueryResponse } from '../../types';
 
 type Props = {
   onChangeContentType: (contentType: string, skipFilter: boolean) => void;
@@ -15,7 +16,7 @@ type Props = {
 type State = {};
 
 type FinalProps = {
-  historyGetTypes: any;
+  historyGetTypes: HistoryGetTypesQueryResponse;
 } & Props;
 
 class FormContainer extends React.Component<FinalProps, State> {
@@ -35,7 +36,12 @@ class FormContainer extends React.Component<FinalProps, State> {
 export default withProps<Props>(
   compose(
     graphql<Props>(gql(queries.historyGetTypes), {
-      name: 'historyGetTypes'
+      name: 'historyGetTypes',
+      options: () => ({
+        variables: {
+          type: 'export'
+        }
+      })
     })
   )(FormContainer)
 );

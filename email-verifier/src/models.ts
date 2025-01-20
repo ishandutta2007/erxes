@@ -3,6 +3,7 @@ import { Document, Model, model, Schema } from 'mongoose';
 export const EMAIL_VALIDATION_STATUSES = {
   VALID: 'valid',
   INVALID: 'invalid',
+  RISKY: 'risky',
   ACCEPT_ALL_UNVERIFIABLE: 'accept_all_unverifiable',
   UNKNOWN: 'unknown',
   DISPOSABLE: 'disposable',
@@ -13,14 +14,16 @@ export const EMAIL_VALIDATION_STATUSES = {
   ALL: [
     'valid',
     'invalid',
+    'risky',
     'accept_all_unverifiable',
     'unknown',
     'disposable',
     'catchall',
     'badsyntax',
     'unverifiable',
-    'Not checked'
-  ]
+    'Not checked',
+    'catch all',
+  ],
 };
 
 export const PHONE_VALIDATION_STATUSES = {
@@ -29,13 +32,17 @@ export const PHONE_VALIDATION_STATUSES = {
   UNKNOWN: 'unknown',
   RECEIVES_SMS: 'receives_sms',
   UNVERIFIABLE: 'unverifiable',
-  ALL: ['valid', 'invalid', 'unknown', 'receives_sms', 'unverifiable']
+  ALL: ['valid', 'invalid', 'unknown', 'receives_sms', 'unverifiable'],
 };
 
 export const EMAIL_VALIDATION_SOURCES = {
   ERXES: 'erxes',
+  CLEAROUT: 'clearout',
+  SENDGRID: 'sendgrid',
   TRUEMAIL: 'truemail',
-  ALL: ['erxes', 'truemail']
+  REACHER: 'reacher',
+  MAILSSO: 'mailsso',
+  ALL: ['erxes', 'sendgrid', 'reacher', 'truemail', 'clearout', 'mailsso'],
 };
 
 interface IEmail {
@@ -49,9 +56,12 @@ interface IEmailDocument extends IEmail, Document {
 
 const emailSchema = new Schema({
   email: { type: String, unique: true },
-  status: { type: String, enum: EMAIL_VALIDATION_STATUSES.ALL },
-  created: { type: Date, default: Date.now() }
+  status: { type: String },
+  created: { type: Date, default: Date.now() },
+  verifiedAt: { type: Date, optional: true },
 });
+
+emailSchema.index({ email: 1, verifiedAt: 1 });
 
 interface IEmailModel extends Model<IEmailDocument> {
   createEmail(doc: IEmail): Promise<IEmailDocument>;
@@ -77,7 +87,7 @@ const phoneSchema = new Schema({
   carrier: { type: String, optional: true },
   localFormat: { type: String, optional: true },
   internationalFormat: { type: String, optional: true },
-  created: { type: Date, default: Date.now() }
+  created: { type: Date, default: Date.now() },
 });
 
 interface IPhoneModel extends Model<IPhoneDocument> {
@@ -87,7 +97,15 @@ interface IPhoneModel extends Model<IPhoneDocument> {
 export const loadClass = () => {
   class Email {
     public static createEmail(doc: IEmail) {
-      return Emails.create(doc);
+      try {
+        return Emails.findOneAndUpdate(
+          { email: doc.email },
+          { ...doc, verifiedAt: new Date() },
+          { upsert: true, new: true }
+        );
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 

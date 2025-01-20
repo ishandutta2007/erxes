@@ -1,4 +1,4 @@
-import { isEnabled } from '@erxes/ui/src/utils/core';
+import { isEnabled } from "@erxes/ui/src/utils/core";
 
 const users = `
   query users {
@@ -39,7 +39,6 @@ const integrationDetail = `
   query integrationDetail($_id: String!) {
     integrationDetail(_id: $_id) {
       ${commonFields}
-      data
       messengerData
       uiOptions
       websiteMessengerApps {
@@ -95,33 +94,21 @@ const integrations = `
         name
         code
       }
+      createdAt
       webhookData
       leadData
       formId
       tagIds
-      ${
-        isEnabled('tags')
-          ? `
-        tags {
-          _id
-          colorCode
-          name
-        }
-      `
-          : ``
+      tags {
+        _id
+        colorCode
+        name
       }
-      ${
-        isEnabled('forms')
-          ? `
-              form {
-                _id
-                title
-                code
-              }
-            `
-          : ''
+      form {
+        _id
+        title
+        code
       }
-      data
       details
       healthStatus
     }
@@ -189,8 +176,8 @@ const integrationsGetFbPages = `
 `;
 
 const integrationsVideoCallUsageStatus = `
-  query integrationsVideoCallUsageStatus {
-    integrationsVideoCallUsageStatus
+  query VideoCallUsageStatus {
+    videoCallUsageStatus
   }
 `;
 

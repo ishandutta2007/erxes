@@ -1,8 +1,9 @@
 import * as graph from 'fbgraph';
 import { FacebookAdapter } from 'botbuilder-adapter-facebook-erxes';
 import * as AWS from 'aws-sdk';
-import * as request from 'request';
 import * as fs from 'fs';
+import fetch from 'node-fetch';
+import { pipeline } from 'node:stream/promises';
 
 import { IModels } from './connectionResolver';
 import { debugBase, debugError, debugFacebook } from './debuggers';
@@ -10,6 +11,8 @@ import { IIntegrationDocument } from './models/Integrations';
 import { generateAttachmentUrl, getConfig } from './commonUtils';
 import { IAttachment, IAttachmentMessage } from './types';
 import { getFileUploadConfigs } from './messageBroker';
+import { randomAlphanumeric } from '@erxes/api-utils/src/random';
+import { getSubdomain } from '@erxes/api-utils/src/core';
 
 export const graphRequest = {
   base(method: string, path?: any, accessToken?: any, ...otherParams) {
@@ -38,7 +41,32 @@ export const graphRequest = {
     return this.base('del', ...args);
   }
 };
+export const getPostDetails = async (
+  pageId: string,
+  pageTokens: { [key: string]: string },
+  postId: string
+) => {
+  let pageAccessToken;
 
+  try {
+    pageAccessToken = getPageAccessTokenFromMap(pageId, pageTokens);
+  } catch (e) {
+    debugError(`Error occurred while getting page access token: ${e.message}`);
+    throw new Error();
+  }
+
+  try {
+    const response: any = await graphRequest.get(
+      `/${postId}?fields=permalink_url,message,created_time`,
+      pageAccessToken
+    );
+
+    return response;
+  } catch (e) {
+    debugError(`Error occurred while getting facebook post: ${e.message}`);
+    return null;
+  }
+};
 export const getPageList = async (
   models: IModels,
   accessToken?: string,
@@ -150,8 +178,8 @@ export const unsubscribePage = async (
 ): Promise<{ success: true } | any> => {
   return graphRequest
     .delete(`${pageId}/subscribed_apps`, pageToken)
-    .then(res => res)
-    .catch(e => {
+    .then((res) => res)
+    .catch((e) => {
       debugError(e);
       throw e;
     });
@@ -190,44 +218,37 @@ export const getFacebookUser = async (
   }
 };
 
-export const uploadMedia = async (response: any, video) => {
-  const mediaFile = `${Math.random()}.${video ? 'mp4' : 'jpg'}`;
+export const uploadMedia = async (
+  subdomain: string,
+  url: string,
+  video: boolean
+) => {
+  const mediaFile = `${randomAlphanumeric()}.${video ? 'mp4' : 'jpg'}`;
 
-  const { AWS_BUCKET, FILE_SYSTEM_PUBLIC } = await getFileUploadConfigs();
-
-  // initialize s3
-  const s3 = await createAWS();
+  const { AWS_BUCKET } = await getFileUploadConfigs(subdomain);
+  const s3 = await createAWS(subdomain);
 
   try {
-    return new Promise((resolve, reject) => {
-      request(response)
-        .pipe(fs.createWriteStream(mediaFile))
-        .on('close', () => {
-          // Upload the file to S3
-          s3.upload(
-            {
-              Bucket: AWS_BUCKET,
-              Key: mediaFile,
-              Body: fs.readFileSync(mediaFile),
-              ACL: FILE_SYSTEM_PUBLIC === 'true' ? 'public-read' : undefined
-            },
-            (err, res) => {
-              if (err) {
-                reject(err);
-              }
-              const file =
-                FILE_SYSTEM_PUBLIC === 'true' ? res.Location : res.key;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `uploadMedia: unexpected response ${response.statusText}`
+      );
+    }
 
-              return resolve(file);
-            }
-          );
-        });
-    });
+    const uploadParams = {
+      Bucket: AWS_BUCKET,
+      Key: mediaFile,
+      Body: response.body,
+      ACL: 'public-read',
+      ContentDisposition: 'inline', // Set this header to make it viewable in the browser
+      ContentType: video ? 'video/mp4' : 'image/jpeg' // Set the appropriate Content-Type
+    };
+
+    const data = await s3.upload(uploadParams).promise(); // Use .promise() for cleaner code
+    return data.Location; // Return the public URL of the uploaded file
   } catch (e) {
-    debugError(
-      `Error occurred while getting facebook user profile pic: ${e.message}`
-    );
-
+    debugError(`Error occurred while uploading media: ${e.message}`);
     return null;
   }
 };
@@ -235,9 +256,10 @@ export const uploadMedia = async (response: any, video) => {
 export const getFacebookUserProfilePic = async (
   pageId: string,
   pageTokens: { [key: string]: string },
-  fbId: string
-) => {
-  let pageAccessToken;
+  fbId: string,
+  subdomain: string
+): Promise<string | null> => {
+  let pageAccessToken: string;
 
   try {
     pageAccessToken = getPageAccessTokenFromMap(pageId, pageTokens);
@@ -252,15 +274,20 @@ export const getFacebookUserProfilePic = async (
       pageAccessToken
     );
 
-    const { UPLOAD_SERVICE_TYPE } = await getFileUploadConfigs();
+    const { UPLOAD_SERVICE_TYPE } = await getFileUploadConfigs(subdomain);
 
     if (UPLOAD_SERVICE_TYPE === 'AWS') {
-      const awsResponse = await uploadMedia(response.location, false);
+      const awsResponse = await uploadMedia(
+        subdomain,
+        response.location,
+        false
+      );
 
-      return awsResponse;
+      return awsResponse as string; // Ensure the return type is string
     }
 
-    return null;
+    // Return the profile picture URL directly if not uploading to AWS
+    return response.location as string; // Type assertion to ensure it's a string
   } catch (e) {
     debugError(
       `Error occurred while getting facebook user profile pic: ${e.message}`
@@ -353,7 +380,10 @@ export const sendReply = async (
   }
 };
 
-export const generateAttachmentMessages = (attachments: IAttachment[]) => {
+export const generateAttachmentMessages = (
+  subdomain: string,
+  attachments: IAttachment[]
+) => {
   const messages: IAttachmentMessage[] = [];
 
   for (const attachment of attachments || []) {
@@ -363,7 +393,7 @@ export const generateAttachmentMessages = (attachments: IAttachment[]) => {
       type = 'image';
     }
 
-    const url = generateAttachmentUrl(attachment.url);
+    const url = generateAttachmentUrl(subdomain, attachment.url);
 
     messages.push({
       attachment: {
@@ -376,6 +406,48 @@ export const generateAttachmentMessages = (attachments: IAttachment[]) => {
   }
 
   return messages;
+};
+
+export const fetchPagePost = async (postId: string, accessToken: string) => {
+  const fields = 'message,created_time,full_picture,picture,permalink_url';
+
+  const response = await graphRequest.get(
+    `/${postId}?fields=${fields}&access_token=${accessToken}`
+  );
+
+  return response || null;
+};
+
+export const fetchPagePosts = async (pageId: string, accessToken: string) => {
+  const fields = 'message,created_time,full_picture,picture,permalink_url';
+  const response = await graphRequest.get(
+    `/${pageId}/posts?fields=${fields}&access_token=${accessToken}`
+  );
+
+  return response.data || [];
+};
+
+export const fetchPagesPosts = async (pageId: string, accessToken: string) => {
+  const fields = 'message,created_time,full_picture,picture,permalink_url';
+  const response = await graphRequest.get(
+    `/${pageId}/posts?fields=${fields}&access_token=${accessToken}`
+  );
+
+  return response.data || [];
+};
+
+export const fetchPagesPostsList = async (
+  pageId: string,
+  accessToken: string,
+  limit: number
+) => {
+  const fields = 'message,created_time,full_picture,picture,permalink_url';
+
+  const response = await graphRequest.get(
+    `/${pageId}/posts?fields=${fields}&access_token=${accessToken}&limit=${limit}`
+  );
+
+  return response.data || [];
 };
 
 export const checkFacebookPages = async (models: IModels, pages: any) => {
@@ -410,14 +482,14 @@ export const getAdapter = async (models: IModels): Promise<any> => {
   });
 };
 
-export const createAWS = async () => {
+export const createAWS = async (subdomain: string) => {
   const {
     AWS_FORCE_PATH_STYLE,
     AWS_COMPATIBLE_SERVICE_ENDPOINT,
     AWS_BUCKET,
     AWS_SECRET_ACCESS_KEY,
     AWS_ACCESS_KEY_ID
-  } = await getFileUploadConfigs();
+  } = await getFileUploadConfigs(subdomain);
 
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !AWS_BUCKET) {
     throw new Error('AWS credentials are not configured');
@@ -443,4 +515,20 @@ export const createAWS = async () => {
 
   // initialize s3
   return new AWS.S3(options);
+};
+
+export const checkIsAdsOpenThread = (entry: any[] = []) => {
+  const messaging = entry[0]?.messaging || [];
+
+  const referral = (messaging || [])[0]?.message?.referral;
+
+  if (!referral) {
+    return false;
+  }
+
+  const isSourceAds = referral?.source === 'ADS';
+  const isTypeOpenThread = referral?.type === 'OPEN_THREAD';
+  const hasAdsContextData = !referral?.ads_context_data;
+
+  return isSourceAds && isTypeOpenThread && hasAdsContextData;
 };

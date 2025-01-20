@@ -1,10 +1,10 @@
-import { IAttachment, QueryResponse } from '@erxes/ui/src/types';
+import { IAttachment, QueryResponse } from "@erxes/ui/src/types";
 import {
   IUser,
   IUserDetails,
   IUserDoc,
   IUserLinks
-} from '@erxes/ui/src/auth/types';
+} from "@erxes/ui/src/auth/types";
 
 export type IInvitationEntry = {
   email: string;
@@ -52,7 +52,7 @@ export type EditMutationResponse = {
 
 export type UserConverationsQueryResponse = {
   userConversations: {
-    list: any[]; //check - IConversation
+    list: any[]; // check - IConversation
     totalCount: number;
   };
 } & QueryResponse;
@@ -83,6 +83,15 @@ interface IStructureCommon {
   code: string;
   supervisorId: string;
   supervisor: IUser;
+  hasChildren?: boolean;
+}
+
+interface IWorkhourSchedule {
+  inactive?: boolean;
+  startFrom: string;
+  endTo: string;
+  lunchStartFrom?: string;
+  lunchEndTo?: string;
 }
 
 export interface IDepartment extends IStructureCommon {
@@ -91,7 +100,8 @@ export interface IDepartment extends IStructureCommon {
   order: string;
   userIds: string[];
   userCount: number;
-  users: IUser;
+  users: IUser[];
+  workhours: { [key: string]: IWorkhourSchedule };
 }
 
 export interface IUnit extends IStructureCommon {
@@ -99,7 +109,8 @@ export interface IUnit extends IStructureCommon {
   department: IDepartment;
   description: string;
   userIds: string[];
-  users: IUser;
+  userCount: number;
+  users: IUser[];
 }
 
 interface IContactInfo {
@@ -119,6 +130,15 @@ export interface IBranch extends IStructureCommon, IContactInfo {
   userCount: number;
   users: IUser[];
   radius: number;
+  workhours: { [key: string]: IWorkhourSchedule };
+}
+export interface IPosition extends IStructureCommon, IContactInfo {
+  parentId: string | null;
+  parent: IPosition;
+  order: string;
+  userIds: string[] | string;
+  userCount: number;
+  users: IUser[];
 }
 
 export interface IStructure extends IStructureCommon, IContactInfo {
@@ -147,14 +167,23 @@ export type DepartmentsMainQueryResponse = {
 
 export type BranchesMainQueryResponse = {
   branchesMain: {
-    list: IDepartment[];
+    list: IBranch[];
     totalCount: number;
     totalUsersCount: number;
   };
 } & QueryResponse;
+
 export type UnitsMainQueryResponse = {
   unitsMain: {
     list: IUnit[];
+    totalCount: number;
+    totalUsersCount: number;
+  };
+} & QueryResponse;
+
+export type PositionsMainQueryResponse = {
+  positionsMain: {
+    list: IPosition[];
     totalCount: number;
     totalUsersCount: number;
   };

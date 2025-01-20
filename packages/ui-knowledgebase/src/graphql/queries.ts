@@ -3,6 +3,20 @@ const categoryFields = `
   title
   description
   icon
+  code
+`;
+
+const knowledgeBaseTopicsShort = `
+  query kbTopics($page: Int, $perPage: Int) {
+    knowledgeBaseTopics(page: $page, perPage: $perPage) {
+      _id
+      title
+      brand {
+        _id
+        name
+      }
+    }
+  }
 `;
 
 const knowledgeBaseTopics = `
@@ -10,6 +24,7 @@ const knowledgeBaseTopics = `
     knowledgeBaseTopics(page: $page, perPage: $perPage) {
       _id
       title
+      code
       description
       brand {
         _id
@@ -49,6 +64,15 @@ const getBrandList = `
   }
 `;
 
+const getSegmentList = `
+query segments($contentTypes: [String]!) {
+  segments(contentTypes: $contentTypes) {
+    _id 
+    name
+  }
+}
+`;
+
 const knowledgeBaseCategories = `
   query objects($page: Int, $perPage: Int, $topicIds: [String]) {
     knowledgeBaseCategories(page: $page, perPage: $perPage, topicIds: $topicIds ) {
@@ -76,6 +100,7 @@ const knowledgeBaseCategoryDetail = `
         summary
         content
         status
+        isPrivate
       }
       firstTopic {
         _id
@@ -104,13 +129,15 @@ const categoriesGetLast = `
 `;
 
 const knowledgeBaseArticles = `
-  query objects($page: Int, $perPage: Int, $categoryIds: [String]) {
+  query KnowledgeBaseArticles($page: Int, $perPage: Int, $categoryIds: [String]) {
     knowledgeBaseArticles(page: $page, perPage: $perPage, categoryIds: $categoryIds) {
       _id
+      code
       title
       summary
       content
       status
+      isPrivate
       reactionChoices
       reactionCounts
       createdBy
@@ -132,6 +159,21 @@ const knowledgeBaseArticles = `
         size
         duration
       }
+
+      pdfAttachment {
+        pdf {
+          name
+          url
+          type
+          size
+        }
+        pages {
+          name
+          url
+          type
+          size
+        }
+      }
       image {
         name
         url
@@ -141,10 +183,22 @@ const knowledgeBaseArticles = `
       createdDate
       modifiedBy
       modifiedDate
+      scheduledDate
 
       forms {
         brandId
         formId
+      }
+
+      publishedUserId
+      publishedUser {
+        _id
+        username
+        email
+        details {
+          avatar
+          fullName
+        }
       }
     }
   }
@@ -158,12 +212,14 @@ const knowledgeBaseArticlesTotalCount = `
 
 export default {
   getBrandList,
+  getSegmentList,
   categoriesGetLast,
   knowledgeBaseTopics,
+  knowledgeBaseTopicsShort,
   knowledgeBaseTopicsTotalCount,
   knowledgeBaseCategories,
   knowledgeBaseCategoryDetail,
   knowledgeBaseCategoriesTotalCount,
   knowledgeBaseArticles,
-  knowledgeBaseArticlesTotalCount
+  knowledgeBaseArticlesTotalCount,
 };

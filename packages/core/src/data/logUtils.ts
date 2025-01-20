@@ -1,17 +1,17 @@
-import * as _ from 'underscore';
+import * as _ from "underscore";
 import {
   putCreateLog as commonPutCreateLog,
   putDeleteLog as commonPutDeleteLog,
   putUpdateLog as commonPutUpdateLog,
-  gatherUsernames
-} from '@erxes/api-utils/src/logUtils';
+  gatherUsernames,
+  putActivityLog
+} from "@erxes/api-utils/src/logUtils";
 
-import { IUserDocument } from '../db/models/definitions/users';
-import messageBroker from '../messageBroker';
-import { MODULE_NAMES } from './constants';
+import { IUserDocument } from "../db/models/definitions/users";
+import { MODULE_NAMES } from "./constants";
 
-import { registerOnboardHistory } from './utils';
-import { IModels } from '../connectionResolver';
+import { registerOnboardHistory } from "./utils";
+import { IModels } from "../connectionResolver";
 
 export type LogDesc = {
   [key: string]: any;
@@ -62,7 +62,7 @@ const gatherUserFieldNames = async (
 
   // show only user group names of users for now
   options = await gatherUsernames({
-    foreignKey: 'groupIds',
+    foreignKey: "groupIds",
     prevList: options,
     items: await models.UsersGroups.find({ _id: { $in: doc.groupIds } }).lean()
   });
@@ -77,7 +77,7 @@ const gatherDescriptions = async (
   const { obj, action, type, updatedDocument } = params;
 
   let extraDesc: LogDesc[] = [];
-  let description = '';
+  let description = "";
 
   switch (type) {
     case MODULE_NAMES.BRAND:
@@ -156,16 +156,15 @@ export const putCreateLog = async (
   const { extraDesc, description } = await gatherDescriptions(models, {
     ...params,
     obj: params.object,
-    action: 'create'
+    action: "create"
   });
 
   return commonPutCreateLog(
     subdomain,
-    messageBroker(),
     {
       ...params,
       extraDesc,
-      description: description || params.description || '',
+      description: description || params.description || "",
       type: `core:${params.type}`
     },
     user
@@ -186,17 +185,16 @@ export const putUpdateLog = async (
   const { extraDesc, description } = await gatherDescriptions(models, {
     ...params,
     obj: params.object,
-    action: 'update'
+    action: "update"
   });
 
   return commonPutUpdateLog(
     subdomain,
-    messageBroker(),
     {
       ...params,
       type: `core:${params.type}`,
       extraDesc,
-      description: description || params.description || ''
+      description: description || params.description || ""
     },
     user
   );
@@ -216,13 +214,33 @@ export const putDeleteLog = async (
   const { extraDesc, description } = await gatherDescriptions(models, {
     ...params,
     obj: params.object,
-    action: 'delete'
+    action: "delete"
   });
 
   return commonPutDeleteLog(
     subdomain,
-    messageBroker(),
     { ...params, type: `core:${params.type}`, description, extraDesc },
     user
   );
 };
+
+export async function logTaggingActivity(
+  subdomain,
+  user,
+  type,
+  target,
+  tagIds
+) {
+  await putActivityLog(subdomain, {
+    action: "createTagLog",
+    data: {
+      contentId: target._id,
+      userId: user ? user._id : "",
+      contentType: `core:${type}`,
+      target,
+      content: { tagIds: tagIds || [] },
+      createdBy: user._id,
+      action: "tagged"
+    }
+  });
+}

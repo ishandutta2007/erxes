@@ -1,33 +1,33 @@
-import React, { useState } from 'react';
-import { FormControl, FormGroup } from '@erxes/ui/src/components/form';
-import { IButtonMutateProps, IFormProps } from '@erxes/ui/src/types';
-import Form from '@erxes/ui/src/components/form/Form';
-import Button from '@erxes/ui/src/components/Button';
-import ControlLabel from '@erxes/ui/src/components/form/Label';
-import { ModalFooter } from '@erxes/ui/src/styles/main';
-import { __ } from 'modules/common/utils';
-import { IDepartment } from '@erxes/ui/src/team/types';
-import SelectTeamMembers from '@erxes/ui/src/team/containers/SelectTeamMembers';
-import SelectDepartments from '@erxes/ui/src/team/containers/SelectDepartments';
+import { FormControl, FormGroup } from "@erxes/ui/src/components/form";
+import { IButtonMutateProps, IFormProps } from "@erxes/ui/src/types";
+import React, { useState } from "react";
+
+import Button from "@erxes/ui/src/components/Button";
+import ControlLabel from "@erxes/ui/src/components/form/Label";
+import Form from "@erxes/ui/src/components/form/Form";
+import { IDepartment } from "@erxes/ui/src/team/types";
+import { ModalFooter } from "@erxes/ui/src/styles/main";
+import SelectTeamMembers from "@erxes/ui/src/team/containers/SelectTeamMembers";
+import { __ } from "modules/common/utils";
+import SelectDepartments from "@erxes/ui/src/team/containers/SelectDepartments";
 
 type Props = {
   renderButton: (props: IButtonMutateProps) => JSX.Element;
-  department?: IDepartment;
+  item?: IDepartment;
   closeModal: () => void;
-  departments: IDepartment[];
 };
 
 export default function DepartmentForm(props: Props) {
-  const { closeModal, renderButton } = props;
-  const object = props.department || ({} as any);
+  const { closeModal, renderButton, item } = props;
+  const object = item || ({} as IDepartment);
 
   const [userIds, setUserIds] = useState(
-    (object.users || []).map(user => user._id)
+    (object.users || []).map((user) => user._id),
   );
-  const [parentId, setParentId] = useState(object.parentId);
   const [supervisorId, setSupervisorId] = useState(object.supervisorId);
+  const [parentId, setParentId] = useState(object?.parentId || "");
 
-  const generateDoc = values => {
+  const generateDoc = (values) => {
     const finalValues = values;
 
     if (object) {
@@ -36,25 +36,20 @@ export default function DepartmentForm(props: Props) {
 
     return {
       userIds,
-      parentId,
       supervisorId,
-      ...finalValues
+      parentId: parentId,
+      code: finalValues.code,
+      description: finalValues.description,
+      title: finalValues.title,
+      _id: finalValues._id,
     };
   };
 
-  const onChangeParent = (value: any) => {
-    if (value) {
-      setParentId(value);
-    } else {
-      setParentId(null);
-    }
-  };
-
-  const onSelectUsers = values => {
+  const onSelectUsers = (values) => {
     setUserIds(values);
   };
 
-  const onSelectSupervisor = value => {
+  const onSelectSupervisor = (value) => {
     setSupervisorId(value);
   };
 
@@ -64,70 +59,79 @@ export default function DepartmentForm(props: Props) {
     return (
       <>
         <FormGroup>
-          <ControlLabel required={true}>{__('Title')}</ControlLabel>
+          <ControlLabel required={true}>{__("Title")}</ControlLabel>
           <FormControl
             {...formProps}
-            name="title"
+            name='title'
             defaultValue={object.title}
             autoFocus={true}
             required={true}
           />
         </FormGroup>
         <FormGroup>
-          <ControlLabel>{__('Description')}</ControlLabel>
+          <ControlLabel>{__("Description")}</ControlLabel>
           <FormControl
             {...formProps}
-            name="description"
+            name='description'
             defaultValue={object.description}
-            componentClass="textarea"
+            componentclass='textarea'
           />
         </FormGroup>
         <FormGroup>
-          <ControlLabel required={true}>{__('Code')}</ControlLabel>
+          <ControlLabel required={true}>{__("Code")}</ControlLabel>
           <FormControl
             {...formProps}
-            name="code"
+            name='code'
             defaultValue={object.code}
             required={true}
           />
         </FormGroup>
         <FormGroup>
-          <ControlLabel>{__('Supervisor')}</ControlLabel>
+          <ControlLabel>{__("Supervisor")}</ControlLabel>
 
           <SelectTeamMembers
-            label="Choose supervisor"
-            name="supervisorId"
+            label='Choose supervisor'
+            name='supervisorId'
             initialValue={supervisorId}
             onSelect={onSelectSupervisor}
             multi={false}
           />
         </FormGroup>
         <FormGroup>
-          <ControlLabel>{__('Parent')}</ControlLabel>
+          <ControlLabel>{__("Parent")}</ControlLabel>
           <SelectDepartments
-            label="Choose parent"
-            name="parentId"
-            onSelect={onChangeParent}
-            initialValue={parentId}
+            label='Department'
+            name='parentId'
             multi={false}
+            initialValue={parentId || undefined}
+            onSelect={(value: any) => setParentId(value)}
+            filterParams={{ withoutUserFilter: true }}
           />
-          {/* /> */}
+          {/* <FormControl
+            {...formProps}
+            name="parentId"
+            componentclass="select"
+            defaultValue={object.parentId || null}
+          >
+            <option value="" />
+            {generateOptions()}
+          </FormControl> */}
         </FormGroup>
         <FormGroup>
-          <ControlLabel>{__('Team Members')}</ControlLabel>
+          <ControlLabel>{__("Team Members")}</ControlLabel>
 
           <SelectTeamMembers
-            label="Choose team members"
-            name="userIds"
+            label='Choose team members'
+            name='userIds'
             initialValue={userIds}
             onSelect={onSelectUsers}
           />
         </FormGroup>
         <ModalFooter>
           <Button
-            btnStyle="simple"
-            type="button"
-            icon="times-circle"
+            btnStyle='simple'
+            type='button'
+            icon='times-circle'
             onClick={closeModal}
           >
             Cancel
@@ -138,7 +142,7 @@ export default function DepartmentForm(props: Props) {
             values: generateDoc(values),
             isSubmitted,
             callback: closeModal,
-            object
+            object,
           })}
         </ModalFooter>
       </>

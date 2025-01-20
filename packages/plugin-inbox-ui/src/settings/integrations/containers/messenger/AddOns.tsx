@@ -1,25 +1,18 @@
-import * as compose from 'lodash.flowright';
-
+import React, { useEffect } from 'react';
+import { gql, useQuery, useApolloClient } from '@apollo/client';
+import AddOns from '../../components/messenger/steps/AddOns';
+import Spinner from '@erxes/ui/src/components/Spinner';
+import { queries as kbQueries } from '@erxes/ui-knowledgebase/src/graphql';
+import { queries } from '@erxes/ui-inbox/src/settings/integrations/graphql';
 import {
   ILeadMessengerApp,
   IMessengerApps,
   ITopicMessengerApp,
   IWebsiteMessengerApp,
-  IntegrationsQueryResponse
+  IntegrationsQueryResponse,
 } from '@erxes/ui-inbox/src/settings/integrations/types';
-import { gql } from '@apollo/client';
-import { graphql, withApollo } from '@apollo/client/react/hoc';
-
-import AddOns from '../../components/messenger/steps/AddOns';
-import { IRouterProps } from '@erxes/ui/src/types';
 import { ITopic } from '@erxes/ui-knowledgebase/src/types';
-import React from 'react';
-import Spinner from '@erxes/ui/src/components/Spinner';
 import { TopicsQueryResponse } from '@erxes/ui-knowledgebase/src/types';
-import { queries as kbQueries } from '@erxes/ui-knowledgebase/src/graphql';
-import { queries } from '@erxes/ui-inbox/src/settings/integrations/graphql';
-import { withProps } from '@erxes/ui/src/utils';
-import { withRouter } from 'react-router-dom';
 
 type Props = {
   selectedBrand?: string;
@@ -29,62 +22,49 @@ type Props = {
   websiteMessengerApps?: IWebsiteMessengerApp[];
 };
 
-type FinalProps = {
-  knowledgeBaseTopicsQuery: TopicsQueryResponse;
-  leadIntegrationsQuery: IntegrationsQueryResponse;
-  leadIntegrationsTotalCountQuery: any;
-} & IRouterProps &
-  Props;
+const KnowledgeBaseContainer: React.FC<Props> = (props) => {
+  const client = useApolloClient();
 
-class KnowledgeBaseContainer extends React.Component<FinalProps> {
-  render() {
-    const {
-      knowledgeBaseTopicsQuery,
-      leadIntegrationsQuery,
-      leadIntegrationsTotalCountQuery
-    } = this.props;
+  const { data: knowledgeBaseTopicsData, loading: kbTopicsLoading } = useQuery<TopicsQueryResponse>(
+    gql(kbQueries.knowledgeBaseTopicsShort)
+  );
 
-    if (knowledgeBaseTopicsQuery.loading) {
-      return <Spinner objective={true} />;
+  const { data: leadIntegrationsTotalCountData } = useQuery(
+    gql(queries.integrationTotalCount)
+  );
+
+  const { data: leadIntegrationsData, refetch: refetchLeads } = useQuery<IntegrationsQueryResponse>(
+    gql(queries.integrations),
+    {
+      variables: {
+        kind: 'lead',
+        perPage: 20,
+      },
     }
+  );
 
-    if (leadIntegrationsTotalCountQuery?.integrationsTotalCount) {
-      leadIntegrationsQuery.refetch({
-        perPage:
-          leadIntegrationsTotalCountQuery?.integrationsTotalCount?.byKind?.lead
+  useEffect(() => {
+    if (leadIntegrationsTotalCountData?.integrationsTotalCount) {
+      refetchLeads({
+        perPage: leadIntegrationsTotalCountData.integrationsTotalCount.byKind.lead,
       });
     }
+  }, [leadIntegrationsTotalCountData, refetchLeads]);
 
-    const topics = knowledgeBaseTopicsQuery.knowledgeBaseTopics || [];
-    const leads = leadIntegrationsQuery.integrations || [];
-
-    const updatedProps = {
-      ...this.props,
-      topics: topics as ITopic[],
-      leads
-    };
-
-    return <AddOns {...updatedProps} />;
+  if (kbTopicsLoading) {
+    return <Spinner objective={true} />;
   }
-}
 
-export default withProps<FinalProps>(
-  compose(
-    graphql<Props, TopicsQueryResponse>(gql(kbQueries.knowledgeBaseTopics), {
-      name: 'knowledgeBaseTopicsQuery'
-    }),
-    graphql<{}>(gql(queries.integrationTotalCount), {
-      name: 'leadIntegrationsTotalCountQuery'
-    }),
-    graphql<Props, IntegrationsQueryResponse>(gql(queries.integrations), {
-      name: 'leadIntegrationsQuery',
-      options: () => ({
-        variables: {
-          kind: 'lead',
-          perPage: 20
-        }
-      })
-    }),
-    withApollo
-  )(withRouter<FinalProps>(KnowledgeBaseContainer))
-);
+  const topics = knowledgeBaseTopicsData?.knowledgeBaseTopics || [];
+  const leads = leadIntegrationsData?.integrations || [];
+
+  const updatedProps = {
+    ...props,
+    topics: topics as ITopic[],
+    leads,
+  };
+
+  return <AddOns {...updatedProps} />;
+};
+
+export default KnowledgeBaseContainer;

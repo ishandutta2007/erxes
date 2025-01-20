@@ -12,6 +12,9 @@ type Props = {
   queryParams?: any;
   title: string;
   additionalMenuItem?: React.ReactNode;
+  filterTitle?: string;
+  extraFilterParams?: { param: string, bool: boolean, title?: string }[];
+  extraFilterWithData?: { paramKey: string, type: string, fields?: string }[];
 };
 
 class Header extends React.Component<Props> {
@@ -33,7 +36,15 @@ class Header extends React.Component<Props> {
   }
 
   render() {
-    const { breadcrumb, submenu, queryParams, additionalMenuItem } = this.props;
+    const {
+      breadcrumb,
+      submenu,
+      queryParams,
+      additionalMenuItem,
+      filterTitle,
+      extraFilterParams,
+      extraFilterWithData
+    } = this.props;
 
     return (
       <PageHeader>
@@ -41,7 +52,9 @@ class Header extends React.Component<Props> {
         {submenu && (
           <Submenu items={submenu} additionalMenuItem={additionalMenuItem} />
         )}
-        {queryParams && <Filter queryParams={queryParams} />}
+        {queryParams && (
+          <Filter queryParams={queryParams} filterTitle={filterTitle} extraFilterParams={extraFilterParams} extraFilterWithData={extraFilterWithData} />
+        )}
       </PageHeader>
     );
   }

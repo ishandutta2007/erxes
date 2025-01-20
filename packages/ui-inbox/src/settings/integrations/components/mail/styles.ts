@@ -2,6 +2,7 @@ import { colors, dimensions } from '@erxes/ui/src/styles';
 
 import { Attachment } from '@erxes/ui-inbox/src/inbox/styles';
 import { SelectWrapper } from '@erxes/ui/src/components/form/styles';
+import { rgba } from '@erxes/ui/src/styles/ecolor';
 import styled from 'styled-components';
 import styledTS from 'styled-components-ts';
 
@@ -49,6 +50,12 @@ const LeftSection = styled.div`
 const MailEditorWrapper = styled.div`
   position: relative;
   background: ${colors.colorWhite};
+  overflow-y: hidden;
+  min-height: 350px;
+
+  .cke_contents {
+    min-height: 350px;
+  }
 
   .cke {
     border: 0;
@@ -78,11 +85,11 @@ const MailEditorWrapper = styled.div`
   }
 `;
 
-const Resipients = styledTS<{ isActive?: boolean }>(styled.a)`
+const Resipients = styledTS<{ $isActive?: boolean }>(styled.a)`
   padding-left: ${dimensions.unitSpacing}px;
   font-size: 12px;
   color: ${colors.colorCoreLightGray};
-  display: ${props => props.isActive && 'none'};
+  display: ${props => props.$isActive && 'none'};
   font-weight: 500;
 
   &:hover {
@@ -93,6 +100,12 @@ const Resipients = styledTS<{ isActive?: boolean }>(styled.a)`
 
 const EditorFooter = styled.div`
   padding: ${dimensions.unitSpacing}px ${dimensions.coreSpacing}px;
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+`;
+
+const EditorFooterGroup = styled.div`
   display: flex;
   gap: 15px;
 `;
@@ -105,18 +118,18 @@ const Attachments = styled.div`
   border-bottom: 1px solid ${colors.borderPrimary};
 `;
 
-const FlexRow = styled.div`
+const FlexRow = styledTS<{ $isEmail?: boolean }>(styled.div)`
   display: flex;
   align-items: center;
+  height: ${props => props.$isEmail && '28px'};
 
   > label {
-    margin: 2px ${dimensions.unitSpacing}px 2px 0;
+    margin: ${props =>
+      props.$isEmail
+        ? `auto ${dimensions.unitSpacing}px auto 0`
+        : `2px ${dimensions.unitSpacing}px 2px 0`};
     color: ${colors.colorCoreGray};
     align-self: baseline;
-
-    &.from {
-      margin-top: 7px;
-    }
   }
 `;
 
@@ -137,6 +150,7 @@ const ToolBar = styled.div`
     margin-bottom: 0 !important;
     margin-top: 0 !important;
     padding: 0 !important;
+    display: block;
 
     &:hover {
       cursor: pointer;
@@ -180,7 +194,7 @@ const SpaceBetweenRow = styled.div`
 `;
 
 const Subject = styledTS<{ noBorder?: boolean }>(styled.div)`
-  padding: ${dimensions.unitSpacing}px ${dimensions.coreSpacing}px;
+  padding: ${dimensions.unitSpacing - 2}px ${dimensions.coreSpacing}px;
   border-bottom:${props =>
     !props.noBorder && `1px solid ${colors.borderPrimary}`};
 
@@ -192,7 +206,7 @@ const Subject = styledTS<{ noBorder?: boolean }>(styled.div)`
 
 const ShowReplyButtonWrapper = styled.div`
   position: absolute;
-  z-index: 100;
+  z-index: 1;
   width: 100%;
   height: 50px;
   bottom: 42px;
@@ -248,7 +262,8 @@ const Meta = styledTS<{ toggle?: boolean }>(styled.div)`
 `;
 
 const NewEmailHeader = styled.h5`
-  background: ${colors.bgActive};
+  background: ${rgba(colors.colorSecondary, 0.1)};
+  color: ${colors.colorSecondary};
   margin-bottom: 0;
   margin-top: 0;
   padding: 10px 20px;
@@ -261,9 +276,11 @@ const NewEmailHeader = styled.h5`
   i {
     margin-left: 5px;
     padding: 5px;
+    border-radius: 5px;
+    transition: all ease 0.3s;
 
     &:hover {
-      background: ${colors.bgGray};
+      background: ${rgba(colors.colorSecondary, 0.3)};
     }
   }
 
@@ -272,22 +289,40 @@ const NewEmailHeader = styled.h5`
   }
 `;
 
-const WidgetWrapper = styledTS<{ show: boolean; shrink: boolean }>(styled.div)`
+const WidgetWrapper = styledTS<{
+  $show: boolean;
+  $shrink: boolean;
+  $fullScreen?: boolean;
+  $haveWidgets?: boolean;
+}>(styled.div)`
   position: fixed;
-  bottom: ${dimensions.unitSpacing}px;
-  right: ${dimensions.coreSpacing}px;
-  display: flex;
   flex-direction: column;
-  z-index: 300;
+  z-index: 9999;
   justify-content: flex-end;
   align-content: flex-end;
   background: #fff;
-  box-shadow: rgba(50, 50, 93, 0.25) 0px 6px 12px -2px, rgba(0, 0, 0, 0.3) 0px 3px 7px -3px;
   border-radius: 8px;
-  width: ${props => (props.shrink ? '260px' : '600px')};
-  overflow: hidden;
+  width: ${({ $fullScreen, $shrink }) =>
+    $fullScreen ? '75vw' : $shrink ? '260px' : '600px'};
+  ${({ $fullScreen, $haveWidgets }) =>
+    $fullScreen
+      ? `
+    left: 50%;
+    top: 6%;
+    transform: translate(-50%, 0);
+    box-shadow: 0 0 0 50vmax rgba(0,0,0,.3);
+  `
+      : `
+    bottom: ${dimensions.unitSpacing}px;
+    right: ${$haveWidgets ? '90' : dimensions.coreSpacing}px; 
+    box-shadow: rgba(50, 50, 93, 0.25) 0px 6px 12px -2px, rgba(0, 0, 0, 0.3) 0px 0px 3px -4px;
+  `}
+  ${({ $show }) => ($show ? 'display: flex;' : 'display:none;')} 
+  ${({ $shrink }) => ($shrink ? `h5 {border-radius: 8px;}` : 'overflow: hidden;')} 
 
-  ${props => !props.show && 'display:none;'}
+  .Select-arrow-zone {
+    padding: 0;
+  }
 `;
 
 const UploaderWrapper = styled.div`
@@ -318,6 +353,80 @@ const WidgetButton = styled.div`
 
 const Link = styled.a`
   cursor: pointer;
+  display: flex;
+  align-items: center;
+`;
+
+const SignatureChooserFooter = styledTS<{
+  $noSignatures: boolean;
+}>(styled.div)`
+  display: flex;
+  width: 100%;
+  justify-content: ${({ $noSignatures }) =>
+    $noSignatures ? 'flex-end' : 'space-between'};
+  align-items: center;
+  padding: 8px 0 8px 1rem;
+  border-top: 1px solid #e9ecef;
+`;
+
+const SignatureContentWrapper = styledTS<{show: boolean}>(styled.div)`
+  height: ${props => props.show ? 'fit-content': 0};
+  transition: all ease 3s;
+  overflow: hidden;
+
+  p {
+    margin: 0;
+  }
+`;
+
+const SignatureOptionWrapper = styled.div`
+  min-width: 260px;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  justify-content: space-between;
+
+  i {
+    cursor: pointer;
+    margin-left: auto;
+  }
+`;
+
+const SignatureHiderButton = styled.button`
+  all: unset;
+  color: ${colors.textSecondary};
+  &:hover {
+    cursor: pointer;
+    color: ${colors.textPrimary};
+  }
+`;
+
+// dropdown-item
+const SignatureDropdownWrapper = styled.div`
+  padding: 0.5rem 1rem;
+
+  button {
+    border: none;
+    text-align: left;
+    background: transparent;
+    flex: 1;
+    padding: 0;
+  }
+  &:hover {
+    cursor: pointer;
+    background-color: ${rgba(colors.colorSecondary, 0.2)};
+  }
+
+  &.active {
+    background-color: ${rgba(colors.colorSecondary, 0.4)};
+  }
+`;
+
+const SignatureContainer = styled.div`
+  max-height: 400px;
+  overflow: auto;
 `;
 
 export {
@@ -342,5 +451,12 @@ export {
   WidgetWrapper,
   UploaderWrapper,
   WidgetButton,
-  Link
+  Link,
+  SignatureChooserFooter,
+  SignatureOptionWrapper,
+  SignatureHiderButton,
+  SignatureDropdownWrapper,
+  EditorFooterGroup,
+  SignatureContainer,
+  SignatureContentWrapper
 };

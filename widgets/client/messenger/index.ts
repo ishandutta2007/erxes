@@ -1,14 +1,16 @@
-import gql from 'graphql-tag';
-import client from '../apollo-client';
 import { getLocalStorageItem, initStorage, setLocalStorageItem } from '../common';
-import { setLocale } from '../utils';
-import widgetConnect from '../widgetConnect';
-import { connection } from './connection';
-import graphqTypes from './graphql';
+
 import { IConnectResponse } from './types';
 import asyncComponent from '../AsyncComponent';
+import client from '../apollo-client';
+import { connection } from './connection';
+import { enabledServicesQuery } from '../form/graphql';
+import gql from 'graphql-tag';
+import graphqTypes from './graphql';
+import { setLocale } from '../utils';
+import widgetConnect from '../widgetConnect';
 
-const App = asyncComponent(() => 
+const App = asyncComponent(() =>
   import( /* webpackChunkName: "MessengerApp" */'./containers/App')
 )
 
@@ -19,6 +21,16 @@ widgetConnect({
     connection.setting = setting;
 
     initStorage(storage);
+
+    client.query({
+      query: gql(enabledServicesQuery),
+      fetchPolicy: "network-only"
+    }).then((res: any) => {
+      if (res.data.enabledServices) {
+        const { enabledServices } = res.data;
+        connection.enabledServices = enabledServices;
+      }
+    });
 
     const cachedCustomerId = getLocalStorageItem('customerId');
 

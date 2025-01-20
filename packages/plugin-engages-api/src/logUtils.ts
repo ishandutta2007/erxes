@@ -5,7 +5,7 @@ import {
   putDeleteLog as commonPutDeleteLog,
   getSchemaLabels,
   gatherNames
-} from '@erxes/api-utils/src/logUtils';
+} from "@erxes/api-utils/src/logUtils";
 
 import {
   engageMessageSchema,
@@ -14,19 +14,14 @@ import {
   messengerSchema,
   IEngageMessageDocument,
   IEngageMessage
-} from './models/definitions/engages';
-import messageBroker, {
-  sendSegmentsMessage,
-  sendCoreMessage,
-  sendTagsMessage,
-  sendEmailTemplatesMessage
-} from './messageBroker';
-import configs from './configs';
+} from "./models/definitions/engages";
+import { sendCoreMessage } from "./messageBroker";
+import configs from "./configs";
 
 export const LOG_ACTIONS = {
-  CREATE: 'create',
-  UPDATE: 'update',
-  DELETE: 'delete'
+  CREATE: "create",
+  UPDATE: "update",
+  DELETE: "delete"
 };
 
 const gatherEngageFieldNames = async (
@@ -46,14 +41,14 @@ const gatherEngageFieldNames = async (
 
   if (doc.segmentIds && doc.segmentIds.length > 0) {
     const segments = await sendRPCMessage(
-      { action: 'find', data: { _id: { $in: doc.segmentIds } } },
-      sendSegmentsMessage
+      { action: "segmentFind", data: { _id: { $in: doc.segmentIds } } },
+      sendCoreMessage
     );
 
     options = await gatherNames({
-      foreignKey: 'segmentIds',
+      foreignKey: "segmentIds",
       prevList: options,
-      nameFields: ['name'],
+      nameFields: ["name"],
       items: segments
     });
   }
@@ -61,30 +56,30 @@ const gatherEngageFieldNames = async (
   if (doc.brandIds && doc.brandIds.length > 0) {
     const brands = await sendRPCMessage(
       {
-        action: 'brands.find',
+        action: "brands.find",
         data: { query: { _id: { $in: doc.brandIds } } }
       },
       sendCoreMessage
     );
 
     options = await gatherNames({
-      foreignKey: 'brandIds',
+      foreignKey: "brandIds",
       prevList: options,
-      nameFields: ['name'],
+      nameFields: ["name"],
       items: brands
     });
   }
 
   if (doc.customerTagIds && doc.customerTagIds.length > 0) {
     const tags = await sendRPCMessage(
-      { action: 'find', data: { _id: { $in: doc.customerTagIds } } },
-      sendTagsMessage
+      { action: "tagFind", data: { _id: { $in: doc.customerTagIds } } },
+      sendCoreMessage
     );
 
     options = await gatherNames({
-      foreignKey: 'customerTagIds',
+      foreignKey: "customerTagIds",
       prevList: options,
-      nameFields: ['name'],
+      nameFields: ["name"],
       items: tags
     });
   }
@@ -92,7 +87,7 @@ const gatherEngageFieldNames = async (
   if (doc.fromUserId) {
     const user = await sendRPCMessage(
       {
-        action: 'users.findOne',
+        action: "users.findOne",
         data: { _id: doc.fromUserId }
       },
       sendCoreMessage
@@ -100,9 +95,9 @@ const gatherEngageFieldNames = async (
 
     if (user && user._id) {
       options = await gatherNames({
-        foreignKey: 'fromUserId',
+        foreignKey: "fromUserId",
         prevList: options,
-        nameFields: ['email', 'username'],
+        nameFields: ["email", "username"],
         items: [user]
       });
     }
@@ -111,7 +106,7 @@ const gatherEngageFieldNames = async (
   if (doc.messenger && doc.messenger.brandId) {
     const brand = await sendRPCMessage(
       {
-        action: 'brands.findOne',
+        action: "brands.findOne",
         data: { _id: doc.messenger.brandId }
       },
       sendCoreMessage
@@ -119,9 +114,9 @@ const gatherEngageFieldNames = async (
 
     if (brand) {
       options = await gatherNames({
-        foreignKey: 'brandId',
+        foreignKey: "brandId",
         prevList: options,
-        nameFields: ['name'],
+        nameFields: ["name"],
         items: [brand]
       });
     }
@@ -130,7 +125,7 @@ const gatherEngageFieldNames = async (
   if (doc.createdBy) {
     const user = await sendRPCMessage(
       {
-        action: 'users.findOne',
+        action: "users.findOne",
         data: { _id: doc.createdBy }
       },
       sendCoreMessage
@@ -138,9 +133,9 @@ const gatherEngageFieldNames = async (
 
     if (user) {
       options = await gatherNames({
-        foreignKey: 'createdBy',
+        foreignKey: "createdBy",
         prevList: options,
-        nameFields: ['email', 'username'],
+        nameFields: ["email", "username"],
         items: [user]
       });
     }
@@ -149,17 +144,17 @@ const gatherEngageFieldNames = async (
   if (doc.email && doc.email.templateId) {
     const template = await sendRPCMessage(
       {
-        action: 'findOne',
+        action: "emailTemplatesFindOne",
         data: { _id: doc.email.templateId }
       },
-      sendEmailTemplatesMessage
+      sendCoreMessage
     );
 
     if (template) {
       options = await gatherNames({
-        foreignKey: 'email.templateId',
+        foreignKey: "email.templateId",
         prevList: options,
-        nameFields: ['name'],
+        nameFields: ["name"],
         items: [template]
       });
     }
@@ -193,7 +188,6 @@ export const putDeleteLog = async (subdomain: string, logDoc, user) => {
 
   await commonPutDeleteLog(
     subdomain,
-    messageBroker(),
     {
       ...logDoc,
       description,
@@ -212,7 +206,6 @@ export const putUpdateLog = async (subdomain: string, logDoc, user) => {
 
   await commonPutUpdateLog(
     subdomain,
-    messageBroker(),
     {
       ...logDoc,
       description,
@@ -231,7 +224,6 @@ export const putCreateLog = async (subdomain: string, logDoc, user) => {
 
   await commonPutCreateLog(
     subdomain,
-    messageBroker(),
     {
       ...logDoc,
       description,
@@ -244,10 +236,10 @@ export const putCreateLog = async (subdomain: string, logDoc, user) => {
 
 export default {
   getSchemaLabels: ({ data: { type } }) => ({
-    status: 'success',
+    status: "success",
     data: getSchemaLabels(type, [
       {
-        name: 'engage',
+        name: "engage",
         schemas: [
           engageMessageSchema,
           emailSchema,

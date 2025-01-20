@@ -1,8 +1,8 @@
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Popover from 'react-bootstrap/Popover';
+import { Popover } from '@headlessui/react';
 import React from 'react';
 import Tagger from '../containers/Tagger';
 import { __ } from '@erxes/ui/src/utils';
+import { PopoverButton, PopoverHeader } from '@erxes/ui/src/styles/main';
 
 type Props = {
   type: string;
@@ -13,6 +13,8 @@ type Props = {
   refetchQueries?: any[];
   parentTagId?: string;
   singleSelect?: boolean;
+  disableTreeView?: boolean;
+  perPage?: number;
 };
 
 function TaggerPopover(props: Props) {
@@ -21,33 +23,29 @@ function TaggerPopover(props: Props) {
     container,
     refetchQueries,
     parentTagId,
+    perPage,
+    disableTreeView,
     ...taggerProps
   } = props;
 
-  const popover = (
-    <Popover id="tags-popover">
-      <Popover.Title as="h3">{__('Choose your tags')}</Popover.Title>
-      <Popover.Content>
+  return (
+    <Popover style={{ position: 'relative' }}>
+      <Popover.Button>
+        <PopoverButton>{trigger}</PopoverButton>
+      </Popover.Button>
+
+      <Popover.Panel style={{ position: 'absolute', zIndex: 10 }}>
+        <PopoverHeader>{__('Choose your tags')}</PopoverHeader>
         <Tagger
           parentTagId={parentTagId}
           event="onExit"
+          perPage={perPage}
+          disableTreeView={disableTreeView}
           {...taggerProps}
           refetchQueries={refetchQueries}
         />
-      </Popover.Content>
+      </Popover.Panel>
     </Popover>
-  );
-
-  return (
-    <OverlayTrigger
-      trigger="click"
-      placement="bottom"
-      overlay={popover}
-      container={container}
-      rootClose={true}
-    >
-      {trigger}
-    </OverlayTrigger>
   );
 }
 

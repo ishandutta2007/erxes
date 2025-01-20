@@ -1,12 +1,7 @@
-const externalId = '_id: String! @external';
+const externalId = "_id: String! @external";
 const keyFields = '@key(fields: "_id")';
 
-export const types = async serviceDiscovery => {
-  const enabledTags = await serviceDiscovery.isEnabled('tags');
-  const enabledContacts = await serviceDiscovery.isEnabled('contacts');
-  const enabledSegments = await serviceDiscovery.isEnabled('segments');
-
-  return `
+export const types = `
     extend type User ${keyFields} {
       ${externalId}
     }
@@ -15,33 +10,20 @@ export const types = async serviceDiscovery => {
       ${externalId}
     }
 
-    ${
-      enabledSegments
-        ? `
-          extend type Segment ${keyFields} {
-            ${externalId}
-          }
-        `
-        : ''
-    }
 
-    ${
-      enabledTags
-        ? `extend type Tag ${keyFields} {
+    extend type Segment ${keyFields} {
       ${externalId}
-    }`
-        : ''
     }
 
-    ${
-      enabledContacts
-        ? `
-        extend type Customer ${keyFields} {
-          ${externalId}
-        }
-      `
-        : ''
+
+    extend type Tag ${keyFields} {
+      ${externalId}
     }
+
+    extend type Customer ${keyFields} {
+      ${externalId}
+    }
+    
 
     type EngageMessage ${keyFields} {
       _id: String!
@@ -51,6 +33,7 @@ export const types = async serviceDiscovery => {
       segmentIds: [String]
       brandIds: [String]
       customerIds: [String]
+      cpId: String
       title: String
       fromUserId: String
       method: String
@@ -70,19 +53,14 @@ export const types = async serviceDiscovery => {
       email: JSON
       messenger: JSON
       shortMessage: EngageMessageSms
+      notification: JSON
       createdBy: String
 
       scheduleDate: EngageScheduleDate
 
-      ${enabledSegments ? 'segments: [Segment]' : ''}
-      ${
-        enabledTags
-          ? `
-        customerTags: [Tag]
-        getTags: [Tag]
-        `
-          : ''
-      }
+      segments: [Segment]
+      customerTags: [Tag]
+      getTags: [Tag]
       brands: [Brand]
       fromUser: User
       fromIntegration: JSON
@@ -90,6 +68,7 @@ export const types = async serviceDiscovery => {
 
       stats: JSON
       smsStats: JSON
+      notificationStats: JSON
       logs: [EngageLog]
     }
 
@@ -206,8 +185,13 @@ export const types = async serviceDiscovery => {
       content: String!
       fromIntegrationId: String!
     }
+
+    input EngageMessageNotification {
+      title: String!,
+      content: String!,
+      isMobile: Boolean,
+    }
   `;
-};
 
 const listParams = `
   kind: String
@@ -244,9 +228,11 @@ const commonParams = `
   customerTagIds: [String],
   brandIds: [String],
   customerIds: [String],
+  cpId: String,
   email: EngageMessageEmail,
   scheduleDate: EngageScheduleDateInput,
   messenger: EngageMessageMessenger,
+  notification: EngageMessageNotification,
   shortMessage: EngageMessageSmsInput
   forceCreateConversation: Boolean
 `;
@@ -265,12 +251,23 @@ export const mutations = `
   engageMessageCopy(_id: String!): EngageMessage
 
   engageSendMail(
+    integrationId: String
+    conversationId: String
     subject: String!
     body: String
     to: [String]!
     cc: [String]
     bcc: [String]
     from: String!
+    shouldResolve: Boolean
+    shouldOpen: Boolean
+    headerId: String
+    replyTo: [String]
+    inReplyTo: String
+    threadId: String
+    messageId: String
+    replyToMessageId: String
+    references: [String]
     attachments: [JSON]
     customerId: String
   ): JSON

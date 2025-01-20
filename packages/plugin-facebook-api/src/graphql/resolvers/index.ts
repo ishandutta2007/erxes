@@ -2,19 +2,19 @@ import customScalars from '@erxes/api-utils/src/customScalars';
 
 import mutations from './mutations';
 import queries from './queries';
-import FacebookConversationMessage from './conversationMessage';
-import FacebookComment from './comment';
+import CustomResolvers from '../customResolvers';
 
-const resolvers: any = async _serviceDiscovery => ({
+const resolvers: any = async () => ({
   ...customScalars,
-  FacebookConversationMessage,
-  FacebookComment,
+
+  ...CustomResolvers,
+
   Mutation: {
-    ...mutations
+    ...mutations,
   },
   Query: {
-    ...queries
-  }
+    ...queries,
+  },
 });
 
 export default resolvers;

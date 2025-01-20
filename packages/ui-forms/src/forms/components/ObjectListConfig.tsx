@@ -1,18 +1,15 @@
-import Button from '@erxes/ui/src/components/Button';
-import {
-  ControlLabel,
-  FormControl,
-  FormGroup
-} from '@erxes/ui/src/components/form';
-import { IObjectListConfig } from '@erxes/ui/src/types';
-import { __ } from '@erxes/ui/src/utils';
-import React from 'react';
+import { ControlLabel, FormControl } from "@erxes/ui/src/components/form";
 import {
   LogicItem,
   LogicRow,
-  RowSmall
-} from '@erxes/ui-forms/src/forms/styles';
-import { Column } from '@erxes/ui/src/styles/main';
+  RowSmall,
+} from "@erxes/ui-forms/src/forms/styles";
+
+import Button from "@erxes/ui/src/components/Button";
+import { Column } from "@erxes/ui/src/styles/main";
+import { IObjectListConfig } from "@erxes/ui/src/types";
+import React from "react";
+import { __ } from "@erxes/ui/src/utils";
 
 type Props = {
   onChangeOption: (option: IObjectListConfig, index: number) => void;
@@ -24,17 +21,17 @@ type Props = {
 function LocationOption(props: Props) {
   const { option, onChangeOption, removeOption, index } = props;
 
-  const onChangeType = e => {
+  const onChangeType = (e) => {
     option.type = e.target.value;
     onChangeOption(option, index);
   };
 
-  const onChangeKey = e => {
+  const onChangeKey = (e) => {
     option.key = e.target.value;
     onChangeOption(option, index);
   };
 
-  const onChangeLabel = e => {
+  const onChangeLabel = (e) => {
     option.label = e.target.value;
     onChangeOption(option, index);
   };
@@ -49,7 +46,7 @@ function LocationOption(props: Props) {
         <Column>
           <LogicRow>
             <RowSmall>
-              <ControlLabel>{__('Key')}:</ControlLabel>
+              <ControlLabel>{__("Key")}:</ControlLabel>
               <FormControl
                 value={option.key}
                 name="key"
@@ -58,7 +55,7 @@ function LocationOption(props: Props) {
             </RowSmall>
             <RowSmall>
               <Column>
-                <ControlLabel>{__('Label')}:</ControlLabel>
+                <ControlLabel>{__("Label")}:</ControlLabel>
                 <FormControl
                   value={option.label}
                   name="label"
@@ -68,18 +65,18 @@ function LocationOption(props: Props) {
             </RowSmall>
             <RowSmall>
               <Column>
-                <ControlLabel>{__('Type')}:</ControlLabel>
+                <ControlLabel>{__("Type")}:</ControlLabel>
                 <FormControl
                   value={option.type}
                   name="type"
-                  componentClass="select"
+                  componentclass="select"
                   onChange={onChangeType}
                 >
                   <option key="text" value="text">
-                    {__('Text')}
+                    {__("Text")}
                   </option>
                   <option key="textarea" value="textarea">
-                    {__('Text Area')}
+                    {__("Text Area")}
                   </option>
                 </FormControl>
               </Column>

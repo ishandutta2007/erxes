@@ -1,20 +1,23 @@
 <br>
 
 <p align="center">
- <img src="docs/static/img/logo_dark.svg" alt="erxes logo" width="20%" />
+ <img src="https://github.com/erxes/erxes/assets/1748857/53a70732-7385-475d-9cb5-efd0ec801db5" alt="erxes logo" width="20%" />
 </p>
 
-<p align="center">An open-source Hubspot/Qualtrics alternative enables SaaS providers and digital marketing agencies/developers to create unique experiences for their entire business
-</p>
+<p align="center">Welcome to erxes, the source available experience management infrastructure. Pioneering the future of experiences through XOS (Experience Operating System), a term coined by us. erxes serves as an alternative to the combined functionalities of Hubspot (CRM & Marketing automation) and Qualtrics (Experience management)</p>
 
 <p align="center">
-  <a href="https://erxes.io/resource-center">Docs</a>
-  |
-  <a href="https://xosdemo.erxes.io/">Demo</a>
-  |
   <a href="https://erxes.io/">Website</a>
   |
   <a href="https://erxes.io/invest">Invest</a>
+  |
+  <a href="https://erxes.io/docs">Docs</a>
+  |
+  <a href="https://erxes.io/roadmap">Roadmap</a>
+  |
+  <a href="https://erxes.io/changelog">Changelog</a>
+  |
+  <a href="https://discord.com/invite/aaGzy3gQK5">Discord</a>
   </p>
 </p>
 
@@ -22,37 +25,19 @@
    <a href="https://github.com/erxes/erxes/blob/master/LICENSE.md">
       <img alt="License Badge" src="https://img.shields.io/badge/license-AGPLv3-brightgreen">
   </a>
+    <a href="https://ossrank.com/p/416">
+      <img alt="Ossrank" src="https://shields.io/endpoint?url=https://ossrank.com/shield/416">
+  </a>
   <a href="#">
       <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/erxes/erxes">
   </a>
-  <a href="https://www.figma.com/@erxes" target="_blank">
-      <img alt="Figma" src="https://img.shields.io/badge/Figma-Design%20System-blueviolet">
-  </a>
-   <a href="https://docs.erxes.io/docs/contribute/overview">
-      <img alt="Help Wanted" src="https://img.shields.io/badge/Help%20Wanted-Contribute-blue">
-  </a>
-   <a href="https://github.com/erxes/erxes/stargazers">
-      <img alt="Stars" src="https://img.shields.io/badge/Stars-%202.7k-orange">
-  </a>
-   <a href="https://discord.com/invite/aaGzy3gQK5">
-      <img alt="Discord" src="https://img.shields.io/badge/Discord-%20Community-blueviolet">
-  </a>
-   <a href="https://explore.transifex.com/erxes-inc/erxes/">
+   <a href="https://explore.transifex.com/erxes-inc/erxesxos/">
       <img alt="Transfix" src="https://img.shields.io/badge/translations-contribute-brightgreen">
-  </a>
-   <a href="https://ossrank.com/p/416">
-      <img alt="Ossrank" src="https://shields.io/endpoint?url=https://ossrank.com/shield/416">
-  </a>
-   <a href="https://twitter.com/erxeshq">
-      <img alt="Twitter" src="https://img.shields.io/badge/twitter-blue">
-  </a>
-  <a href="https://cloud.cypress.io/projects/bg7eun/runs">
-      <img alt="Cypress" src="https://img.shields.io/endpoint?url=https://cloud.cypress.io/badge/simple/bg7eun/master&style=flat&logo=cypress">
   </a>
 </p>
 
 <p align="center">
- <a href="https://erxes.io" target="_blank" rel="noopener noreferrer"><img src="https://erxes-docs.s3.us-west-2.amazonaws.com/xos.jpeg" width="100%" alt="erxes: Free and open fair-code licensed experience operating system (XOS)">
+ <a href="https://erxes.io" target="_blank" rel="noopener noreferrer"><img src="https://erxes-docs.s3.us-west-2.amazonaws.com/xos.jpeg" width="100%" alt="erxes: the source available experience management infrastructure">
 </a>
 </p>
 
@@ -61,7 +46,7 @@ Achieving growth and unity within your company is possible with erxes, because i
 
 
 
-- **100% free & sustainable:** erxes offers a sustainable business model in which both developers and users win. It is open-source software, but even better.
+- **100% free & sustainable:** erxes offers a sustainable business model in which both developers and users win. It is the source available software, but even better.
 - **100% customizable:** Our plugin-based architecture provides unlimited customization and lets you meet all your needs, no matter how specific they are.
 - **100% privacy:** We've designed the erxes platform to retain complete control over your company's sensitive data with no third-party monitoring.
 - **100% in control:** You can build any experience you want, where all the channels your business operates on are connected and integrated.
@@ -70,10 +55,12 @@ Achieving growth and unity within your company is possible with erxes, because i
 
 ## What does erxes mean? How do you pronounce it?
 
-erxes (pronounced 'erk-sis') means "heavenly bodies" in Mongolian. It is branded as “erxes” with all lowercase letters.
+erxes (pronounced 'erk-sis') is a Mongolian word meaning “galaxy”. A galaxy is a system of stars, stellar remnants, interstellar gas, dust, and dark matter bound together by gravity. The word is derived from the Greek galaxias (γαλαξίας), literally 'milky', a reference to the Milky Way galaxy that contains the Solar System. It is branded as “erxes” with all lowercase letters.
+
+erxes - Improving everyday experiences can significantly enhance the quality of life. These small, incremental improvements can lead to substantial benefits and better living. Better living and happier people will have a contagious effect on everything they touch, eventually improving the universe. 
 
 ## What is erxes?
-erxes is a secure, self-hosted, and scalable open-source experience operating system (XOS) that enables SaaS providers and digital marketing agencies/developers to create unique experiences that work for all types of business. You can learn more about **<a href="https://docs.erxes.io/docs/introduction/architecture">erxes architecture in our documentation</a>.**
+erxes is a secure, self-hosted, and scalable source available experience management infrastructure that enables SaaS providers and digital marketing agencies/developers to create unique experiences that work for all types of business.
 
 ## erxes XOS & Plugins
 erxes is composed of 2 main components: **XOS** & **Plugins**
@@ -94,11 +81,11 @@ erxes is composed of 2 main components: **XOS** & **Plugins**
  
 ## Getting Started
 
-Read **<a href="https://docs.erxes.io/docs/intro" >the documentation<a>** to install erxes locally.
+Read **<a href="https://erxes.io/docs" >the documentation<a>** to install erxes locally.
 
 **🖐 Requirements**
 
-Complete installation requirements can be found in the documentation under **<a href="https://docs.erxes.io/docs/intro" >installation requirements</a>**.
+Complete installation requirements can be found in the documentation under **<a href="https://erxes.io/docs" >installation requirements</a>**.
 
 Supported operating systems:
 
@@ -129,7 +116,7 @@ We recommend always using the latest version of erxes to start your new projects
 
 
 Offer your expertise to the world and introduce your community to erxes. 
-Let’s start growing **<a href="https://erxes.io/partners">together</a>**.
+Let’s start growing together. Join our **<a href="https://discord.com/invite/aaGzy3gQK5">Discord</a>**.
 
 ## Contributing 
 
@@ -144,10 +131,6 @@ For general help using erxes, please refer to the erxes documentation. For addit
 - **<a href="https://github.com/erxes/erxes" > GitHub</a>** Bug reports, contributions
 - **<a href="https://github.com/erxes/erxes/issues" > Feedback section</a>** Roadmap, feature requests & bugs
 - **<a href="https://twitter.com/erxesHQ" > Twitter</a>** Get the news fast
- 
-## Upgrade Guides
-
-Follow our **<a href="https://docs.erxes.io/docs/update/">upgrade guides</a>** on the documentation to keep your erxes code up-to-date. See our dedicated repository for the erxes documentation, or view our **<a href="https://docs.erxes.io/docs/intro">documentation here</a>**.
 
  
 ## License

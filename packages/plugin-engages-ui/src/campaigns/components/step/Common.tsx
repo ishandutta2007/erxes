@@ -1,13 +1,13 @@
-import { Counts, IButtonMutateProps } from '@erxes/ui/src/types';
-import { CustomerCounts, RadioContainer } from '@erxes/ui-engage/src/styles';
+import { Counts, IButtonMutateProps } from "@erxes/ui/src/types";
+import { CustomerCounts, RadioContainer } from "@erxes/ui-engage/src/styles";
 
-import FormControl from '@erxes/ui/src/components/form/Control';
-import { ISegmentDoc } from '@erxes/ui-segments/src/types';
-import { ITag } from '@erxes/ui-tags/src/types';
-import Icon from '@erxes/ui/src/components/Icon';
-import React from 'react';
-import Targets from '../Targets';
-import { __ } from 'coreui/utils';
+import FormControl from "@erxes/ui/src/components/form/Control";
+import { ISegmentDoc } from "@erxes/ui-segments/src/types";
+import { ITag } from "@erxes/ui-tags/src/types";
+import Icon from "@erxes/ui/src/components/Icon";
+import React from "react";
+import Targets from "../Targets";
+import { __ } from "coreui/utils";
 
 type Props<Target, OnSubmit> = {
   name: string;
@@ -30,7 +30,7 @@ type Props<Target, OnSubmit> = {
   content: ({
     actionSelector,
     selectedComponent,
-    customerCounts
+    customerCounts,
   }: {
     actionSelector: React.ReactNode;
     selectedComponent: React.ReactNode;
@@ -38,6 +38,7 @@ type Props<Target, OnSubmit> = {
   }) => React.ReactNode;
   icons?: React.ReactNode[];
   loadingCount: boolean;
+  loading: boolean;
 };
 
 type State = {
@@ -54,7 +55,7 @@ class Common<Target, OnSubmit> extends React.Component<
 
     this.state = {
       targetIds: props.targetIds || [],
-      show: false
+      show: false,
     };
   }
 
@@ -65,7 +66,7 @@ class Common<Target, OnSubmit> extends React.Component<
       formProps.afterSave();
     }
 
-    this.setState(s => ({ show: !s.show }));
+    this.setState((s) => ({ show: !s.show }));
   };
 
   onChangeStep = (name: string, targetIds: string[]) => {
@@ -76,12 +77,11 @@ class Common<Target, OnSubmit> extends React.Component<
 
   renderCounts() {
     const { targetIds } = this.state;
-
     return (
       <CustomerCounts>
         <Icon icon="users" size={50} />
         <p>
-          {this.props.customersCount(targetIds)} {__('customers')}
+          {this.props.customersCount(targetIds)} {__("customers")}
         </p>
       </CustomerCounts>
     );
@@ -89,7 +89,7 @@ class Common<Target, OnSubmit> extends React.Component<
 
   renderRadioControl = ({
     title,
-    checked
+    checked,
   }: {
     title: string;
     checked: boolean;
@@ -102,7 +102,7 @@ class Common<Target, OnSubmit> extends React.Component<
         name={label}
         onChange={this.toggleForm}
         value={this.state.show}
-        componentClass="radio"
+        componentclass="radio"
       >
         {title}
       </FormControl>
@@ -117,12 +117,12 @@ class Common<Target, OnSubmit> extends React.Component<
       <RadioContainer>
         {this.renderRadioControl({
           checked: show === false,
-          title: __(`Choose a ${messageType}`)
+          title: __(`Choose a ${messageType}`),
         })}
 
         {this.renderRadioControl({
           checked: show === true,
-          title: __(`Create a ${messageType}`)
+          title: __(`Create a ${messageType}`),
         })}
       </RadioContainer>
     );
@@ -140,7 +140,8 @@ class Common<Target, OnSubmit> extends React.Component<
       formProps,
       onSubmit,
       icons,
-      loadingCount
+      loadingCount,
+      loading,
     } = this.props;
 
     if (this.state.show) {
@@ -165,6 +166,7 @@ class Common<Target, OnSubmit> extends React.Component<
         onChangeStep={this.onChangeStep}
         icons={icons}
         loadingCount={loadingCount}
+        loading={loading}
       />
     );
   }
@@ -177,7 +179,7 @@ class Common<Target, OnSubmit> extends React.Component<
     return this.props.content({
       actionSelector,
       selectedComponent,
-      customerCounts
+      customerCounts,
     });
   }
 }

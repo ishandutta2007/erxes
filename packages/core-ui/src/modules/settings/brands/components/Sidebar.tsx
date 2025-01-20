@@ -1,25 +1,18 @@
-import Button from "modules/common/components/Button";
-// import EmptyState from 'modules/common/components/EmptyState';
-// import LoadMore from 'modules/common/components/LoadMore';
-import ModalTrigger from "modules/common/components/ModalTrigger";
-// import Spinner from 'modules/common/components/Spinner';
-// import { TopHeader } from "modules/common/styles/main";
-import { IButtonMutateProps } from "@erxes/ui/src/types";
-// import LeftSidebar from 'modules/layout/components/Sidebar';
-// import { SidebarList as List } from 'modules/layout/styles';
-import BrandForm from "@erxes/ui/src/brands/components/BrandForm";
-import React from "react";
-import { IBrand } from "../types";
-// import BrandRow from "./BrandRow";
 import ActionButtons from "modules/common/components/ActionButtons";
+import BrandForm from "@erxes/ui/src/brands/components/BrandForm";
+import Button from "modules/common/components/Button";
+import { Description } from "@erxes/ui-settings/src/styles";
+import { IBrand } from "../types";
+import { IButtonMutateProps } from "@erxes/ui/src/types";
+import Icon from "modules/common/components/Icon";
+import ModalTrigger from "modules/common/components/ModalTrigger";
+import React from "react";
 import Tip from "modules/common/components/Tip";
 import { __ } from "../../../common/utils";
-import Icon from "modules/common/components/Icon";
 
 type Props = {
   brands: IBrand[];
   remove: (brandId: string) => void;
-  loading: boolean;
   currentBrandId?: string;
   renderButton: (props: IButtonMutateProps) => JSX.Element;
 };
@@ -67,6 +60,11 @@ class Sidebar extends React.Component<Props, {}> {
     return brands.map((brand) => (
       <tr key={brand._id}>
         <td>{brand.name}</td>
+        <td>
+          <Description $noMargin={true} $halfWidth={true}>
+            {brand.description || "-"}
+          </Description>
+        </td>
         <td>
           <ActionButtons>
             <ActionButtons>

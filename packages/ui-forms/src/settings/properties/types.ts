@@ -21,6 +21,7 @@ export type FieldsCombinedByType = {
   group?: string;
   options?: string[];
   title?: string;
+  disabled?: boolean;
   value?: string;
   validation?: string;
 };
@@ -54,6 +55,7 @@ export interface IFieldGroup {
 export type FieldsMutationVariables = {
   type?: string;
   validation?: string;
+  regexValidation?: string;
   text?: string;
   description?: string;
   options?: any[];
@@ -117,6 +119,7 @@ export interface IConfigColumn {
   label: string;
   order: number;
   checked?: boolean;
+  group?: string;
 }
 
 export type InboxFieldsQueryResponse = {
